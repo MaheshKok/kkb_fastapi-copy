@@ -1,0 +1,39 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+
+# Environment variables
+.env
+.env.*
+
+# Dependency directories
+venv/
+env/
+lib/
+libs/
+bin/
+build/
+dist/
+.venv/
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.pyc
+
+# Log files
+*.log
+
+# Generated files
+*.db
+*.sqlite
+
+# Compiled Python modules
+*.pyd
+*.so
+*.dll
+
+# Miscellaneous
+.DS_Store
