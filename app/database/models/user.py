@@ -1,4 +1,7 @@
+import uuid
 from datetime import datetime
+
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.database.base import db
 
@@ -6,7 +9,7 @@ from app.database.base import db
 class User(db.Model):
     __tablename__ = "user"
 
-    id = db.Column(db.Integer(), primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = db.Column(db.String(), nullable=False, unique=True)
 
     access_token = db.Column(db.String(), nullable=False)
