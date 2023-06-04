@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from pydantic import Field
 
 from app.schemas.enums import ActionEnum
+from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 
 
@@ -18,6 +19,7 @@ class TradePostSchema(BaseModel):
     )
     action: ActionEnum = Field(description="Action", example="BUY")
     position: PositionEnum = Field(description="Position", example="LONG")
+    instrument: str = Field(description="Instrument name", example="BANKNIFTY27APR23FUT")
     received_at: datetime = Field(
         description="Received At", example="2023-05-22 05:11:01.117358+00"
     )
@@ -43,7 +45,7 @@ class TradeSchema(TradePostSchema):
         description="Exited At", example="2023-05-22 06:25:03.117358+00"
     )
 
-    option_type: str = Field(description="Option Type", example="CE")
+    option_type: OptionTypeEnum = Field(description="Option Type", example="CE")
     expiry: date = Field(description="Expiry", example="2023-05-22")
 
     strategy_id: uuid.UUID = Field(
