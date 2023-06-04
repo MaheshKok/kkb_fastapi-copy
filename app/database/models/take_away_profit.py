@@ -18,7 +18,7 @@ class TakeAwayProfit(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     profit = Column(Float, nullable=True)
-    futures_profit = Column(Float, nullable=True, default=0.0)
+    future_profit = Column(Float, nullable=True, default=0.0)
     strategy_id = Column(
         UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
     )
