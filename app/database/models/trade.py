@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 
+from pydantic import ValidationError
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -12,6 +13,8 @@ class Trade(db.Model):
 
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     quantity = db.Column(db.Integer, default=25)
+    position = db.Column(db.String, nullable=False, index=True)
+    action = db.Column(db.String, nullable=False, index=True)
     entry_price = db.Column(db.Float, nullable=False)
     exit_price = db.Column(db.Float, nullable=True)
     profit = db.Column(db.Float, nullable=True)
@@ -29,3 +32,12 @@ class Trade(db.Model):
         UUID(as_uuid=True), db.ForeignKey("strategy.id"), nullable=False, index=True
     )
     strategy = relationship("Strategy", backref="trades")
+
+    async def validate(self):
+        if self.position not in ["LONG", "SHORT"]:
+            raise ValidationError("Invalid position")
+
+        if self.action not in ["BUY", "SELL"]:
+            raise ValidationError("Invalid action")
+
+        return self
