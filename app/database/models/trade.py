@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from app.database.base import db
 
@@ -24,6 +25,6 @@ class Trade(db.Model):
     expiry = db.Column(db.Date, index=True)
 
     strategy_id = db.Column(
-        UUID(as_uuid=True), db.ForeignKey("strategy.id"), nullable=True, index=True
+        UUID(as_uuid=True), db.ForeignKey("strategy.id"), nullable=False, index=True
     )
-    strategy = db.relationship("Strategy", backref="trades")
+    strategy = relationship("Strategy", backref="trades")

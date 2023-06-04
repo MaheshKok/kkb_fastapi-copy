@@ -1,6 +1,7 @@
 import uuid
 
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from app.database.base import db
 
@@ -16,3 +17,6 @@ class Broker(db.Model):
     api_key = db.Column(db.String, nullable=True)
     app_id = db.Column(db.String, nullable=True)
     totp = db.Column(db.String, nullable=True)
+
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=False, index=True)
+    user = relationship("User", backref="brokers")

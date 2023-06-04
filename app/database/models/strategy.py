@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from app.database.base import db
 
@@ -22,4 +23,12 @@ class Strategy(db.Model):
     broker_id = db.Column(
         UUID(as_uuid=True), db.ForeignKey("broker.id"), nullable=True, index=True
     )
-    broker = db.relationship("Broker", backref="trades")
+    broker = relationship("Broker", backref="strategies")
+
+    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=False, index=True)
+    user = relationship("User", backref="trades")
+
+    completed_profit_id = db.Column(
+        UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=True, index=True
+    )
+    completed_profit = relationship("CompletedProfit", backref="strategy")

@@ -3,18 +3,18 @@ from sqlalchemy.engine.url import URL
 
 from app.core.config import Config
 
-db = Gino()
+db: Gino = Gino()
 
 
-async def get_db_url(config: Config) -> URL:
+def get_db_url(config: Config, drivername="postgresql+asyncpg") -> URL:
     config_db = config.data["db"]
-    return URL(drivername="postgresql+asyncpg", **config_db)
+    return URL(drivername=drivername, **config_db)
 
 
 async def setup_and_teardown_db(app):
     @app.on_event("startup")
     async def startup():
-        db_url = await get_db_url(app.state.config)
+        db_url = get_db_url(app.state.config)
         await db.set_bind(db_url)
 
     @app.on_event("shutdown")

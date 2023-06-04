@@ -4,7 +4,7 @@ from app.database.base import db
 
 
 class User(db.Model):
-    __tablename__ = "users"
+    __tablename__ = "user"
 
     id = db.Column(db.Integer(), primary_key=True)
     email = db.Column(db.String(), nullable=False, unique=True)

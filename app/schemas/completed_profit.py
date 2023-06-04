@@ -1,4 +1,5 @@
 import uuid
+from typing import Optional
 
 from pydantic import BaseModel
 from pydantic import Field
@@ -17,5 +18,7 @@ class CompletedProfitSchema(BaseModel):
         description="Strategy ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3"
     )
     created_at: str = Field(description="Created At", example="2023-05-22 05:11:03.117358+00")
-    updated_at: str = Field(description="Updated At", example="2023-05-22 05:11:03.117358+00")
+    updated_at: Optional[str] = Field(
+        description="Updated At", example="2023-05-22 05:11:03.117358+00"
+    )
     total_trades: int = Field(description="Total Trades", example=1300)
