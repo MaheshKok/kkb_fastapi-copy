@@ -3,6 +3,6 @@ ENVIRONMENT = "production"
 [db]
 host = "l8yc5u.stackhero-network.com"
 port = "5432"
-database = "postgres"
+database = "trading"
 username = "admin"
 password = "V7Bqqlbzx6zX9VAmcC0355dzZVNHdiYa"
