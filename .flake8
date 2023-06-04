@@ -1,0 +1,4 @@
+[flake8]
+max-line-length = 96
+extend-ignore = E203, E266, H106, H904, W293, E251, E221, E222, E501, B008
+exclude = app/database/models/__init__.py, .git, __pycache__, docs/source/conf.py, old, build, dist, .venv, .tox, *.egg-info, .eggs, .cache, .mypy_cache, .pytest_cache, .vscode, .github, .gitlab, .circleci, .idea

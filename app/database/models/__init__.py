@@ -1,3 +1,5 @@
+# noqa: F401
+
 from app.database.models.broker import Broker
 from app.database.models.completed_profit import TakeAwayProfit
 from app.database.models.strategy import Strategy
