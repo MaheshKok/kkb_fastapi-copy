@@ -19,7 +19,7 @@ class TradePostSchema(BaseModel):
     )
     action: ActionEnum = Field(description="Action", example="BUY")
     position: PositionEnum = Field(description="Position", example="LONG")
-    instrument: str = Field(description="Instrument name", example="BANKNIFTY27APR23FUT")
+
     received_at: datetime = Field(
         description="Received At", example="2023-05-22 05:11:01.117358+00"
     )
@@ -47,3 +47,5 @@ class TradeSchema(TradePostSchema):
 
     option_type: OptionTypeEnum = Field(description="Option Type", example="CE")
     expiry: date = Field(description="Expiry", example="2023-05-22")
+
+    instrument: str = Field(description="Instrument name", example="BANKNIFTY27APR23FUT")

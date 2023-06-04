@@ -3,10 +3,11 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import create_engine
+from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import get_config
-from app.database.base import db
+from app.database.base import Base
 from app.database.base import get_db_url
 from app.database.models import *  # noqa
 
@@ -25,7 +26,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = db
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -57,6 +58,13 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def do_run_migrations(connection: Connection):
+    context.configure(connection=connection, target_metadata=target_metadata)
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
 async def run_async_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
@@ -67,19 +75,15 @@ async def run_async_migrations_online() -> None:
     cnf_file = os.path.join(os.path.abspath("app/cfg"), CONFIG_FILE.PRODUCTION)
     config_ = get_config(cnf_file)
 
-    db_url = get_db_url(config_, drivername="postgresql")
+    async_db_url = get_db_url(config_)
     # Create SQLAlchemy engine
-    engine = create_engine(db_url)
+    async_engine = create_async_engine(async_db_url)
 
-    with engine.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            version_table_schema="public",  # Modify this if your version table is in a different schema
-            include_schemas=True,
-        )
+    # Create a connection
+    async with async_engine.connect() as connection:
+        await connection.run_sync(do_run_migrations)
 
-        context.run_migrations()
+    await async_engine.dispose()
 
 
 if context.is_offline_mode():

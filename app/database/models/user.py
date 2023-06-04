@@ -6,10 +6,10 @@ from sqlalchemy import DateTime
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import UUID
 
-from app.database.base import db
+from app.database.base import Base
 
 
-class User(db.Model):
+class User(Base):
     __tablename__ = "user"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

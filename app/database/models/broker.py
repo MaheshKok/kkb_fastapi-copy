@@ -1,22 +1,27 @@
 import uuid
 
+from sqlalchemy import Boolean
+from sqlalchemy import Column
+from sqlalchemy import ForeignKey
+from sqlalchemy import String
+from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.database.base import db
+from app.database.base import Base
 
 
-class Broker(db.Model):
+class Broker(Base):
     __tablename__ = "broker"
 
-    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    access_token = db.Column(db.String, nullable=False)
-    name = db.Column(db.String, nullable=False)
-    username = db.Column(db.String, nullable=False)
-    password = db.Column(db.String, nullable=False)
-    api_key = db.Column(db.String, nullable=True)
-    app_id = db.Column(db.String, nullable=True)
-    totp = db.Column(db.String, nullable=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    access_token = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    username = Column(String, nullable=False)
+    password = Column(String, nullable=False)
+    api_key = Column(String, nullable=True)
+    app_id = Column(String, nullable=True)
+    totp = Column(String, nullable=True)
 
-    user_id = db.Column(UUID(as_uuid=True), db.ForeignKey("user.id"), nullable=False, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id"), nullable=False, index=True)
     user = relationship("User", backref="brokers")

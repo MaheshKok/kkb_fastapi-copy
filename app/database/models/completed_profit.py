@@ -1,23 +1,32 @@
 # Create data storage
 import uuid
 
+from sqlalchemy import Boolean
+from sqlalchemy import Column
+from sqlalchemy import DateTime
+from sqlalchemy import Float
+from sqlalchemy import ForeignKey
+from sqlalchemy import Integer
+from sqlalchemy import String
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.database.base import db
+from app.database.base import Base
 
 
-class CompletedProfit(db.Model):
-    __tablename__ = "completed_profit"
+class TakeAwayProfit(Base):
+    __tablename__ = "take_away_profit"
 
-    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    profit = db.Column(db.Float, nullable=True)
-    futures_profit = db.Column(db.Float, nullable=True, default=0.0)
-    strategy_id = db.Column(
-        UUID(as_uuid=True), db.ForeignKey("strategy.id"), nullable=False, index=True
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    profit = Column(Float, nullable=True)
+    futures_profit = Column(Float, nullable=True, default=0.0)
+    strategy_id = Column(
+        UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
     )
 
-    created_at = db.Column(db.DateTime, nullable=False, default=db.func.now())
-    updated_at = db.Column(db.DateTime, nullable=True)
-    total_trades = db.Column(db.Integer, nullable=False)
-    strategy = relationship("Strategy", backref="completed_profit")
+    created_at = Column(DateTime, nullable=False, default=func.now())
+    updated_at = Column(DateTime, nullable=True)
+    total_trades = Column(Integer, nullable=False)
+    strategy = relationship("Strategy", back_populates="take_away_profit")
