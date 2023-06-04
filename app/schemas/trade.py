@@ -47,7 +47,3 @@ class TradeSchema(TradePostSchema):
 
     option_type: OptionTypeEnum = Field(description="Option Type", example="CE")
     expiry: date = Field(description="Expiry", example="2023-05-22")
-
-    strategy_id: uuid.UUID = Field(
-        description="Strategy ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3"
-    )
