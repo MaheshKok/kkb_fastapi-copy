@@ -1,10 +1,16 @@
 from fastapi import APIRouter
 
-healthcheck_router = APIRouter(
-    tags=["healthcheck"],
+from app.schemas.trade import TradePostSchema
+from app.schemas.trade import TradeSchema
+
+trading_router = APIRouter(
+    prefix="/api/trading",
+    tags=["trading"],
 )
 
 
-@healthcheck_router.get("/")
-async def healthcheck():
-    return {"status": "ok"}
+@trading_router.post("/nfo", status_code=201, response_model=TradeSchema)
+def post_nfo(
+    payload: TradePostSchema,
+):
+    print(payload)

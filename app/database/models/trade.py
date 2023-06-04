@@ -15,6 +15,7 @@ class Trade(db.Model):
     entry_price = db.Column(db.Float, nullable=False)
     exit_price = db.Column(db.Float, nullable=True)
     profit = db.Column(db.Float, nullable=True)
+    future_received_entry_price = db.Column(db.Float, nullable=True)
     future_entry_price = db.Column(db.Float, nullable=True)
     future_exit_price = db.Column(db.Float, nullable=True)
     future_profit = db.Column(db.Float, nullable=True)
