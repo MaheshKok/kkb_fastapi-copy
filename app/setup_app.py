@@ -1,11 +1,13 @@
 from fastapi import FastAPI
 
+from app.api.endpoints.trading import healthcheck_router
 from app.core.config import Config
 from app.database.base import setup_and_teardown_db
 
 
 async def register_routers(app):
     # include all routers
+    app.include_router(healthcheck_router)
     pass
 
 
