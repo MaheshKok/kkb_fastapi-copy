@@ -1,9 +1,6 @@
 import uuid
 from datetime import datetime
 from datetime import timedelta
-from test.factory.base_factory import BaseFactory
-from test.factory.strategy import StrategyFactory
-from test.factory.user import UserFactory
 
 import factory
 
@@ -11,6 +8,9 @@ from app.database.models import Trade
 from app.schemas.enums import ActionEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
+from test.factory.base_factory import BaseFactory
+from test.factory.strategy import StrategyFactory
+from test.factory.user import UserFactory
 
 
 def generate_expiry_date():

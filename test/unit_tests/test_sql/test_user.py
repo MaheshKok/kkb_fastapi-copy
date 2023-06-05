@@ -1,6 +1,6 @@
-from test.factory.user import UserFactory
-
 import pytest
+
+from test.factory.user import UserFactory
 
 
 @pytest.mark.asyncio

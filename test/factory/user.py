@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime
 from datetime import timedelta
-from test.factory.base_factory import BaseFactory
 
 import factory
 from factory import Sequence
 
 from app.database.models import User
+from test.factory.base_factory import BaseFactory
 
 
 class UserFactory(BaseFactory):

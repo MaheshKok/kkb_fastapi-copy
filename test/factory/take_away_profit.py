@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime
 from datetime import timedelta
-from test.factory.base_factory import BaseFactory
-from test.factory.strategy import StrategyFactory
 
 import factory
 
 from app.database.models import TakeAwayProfit
+from test.factory.base_factory import BaseFactory
+from test.factory.strategy import StrategyFactory
 
 
 class TakeAwayProfitFactory(BaseFactory):

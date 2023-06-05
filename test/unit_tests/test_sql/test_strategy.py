@@ -1,7 +1,7 @@
+import pytest
+
 from test.factory.strategy import StrategyFactory
 from test.factory.user import UserFactory
-
-import pytest
 
 
 @pytest.mark.asyncio
