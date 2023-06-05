@@ -15,6 +15,7 @@ from app.database.models import *  # noqa
 # access to the values within the .ini file in use.
 from app.utils.constants import CONFIG_FILE
 
+
 config = context.config
 
 # Interpret the config file for Python logging.

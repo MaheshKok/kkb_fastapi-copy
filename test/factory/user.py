@@ -18,5 +18,5 @@ class UserFactory(BaseFactory):
     access_token = Sequence(lambda n: f"access_token_{n}")
     refresh_token = Sequence(lambda n: f"refresh_token_{n}")
     token_expiry = Sequence(lambda n: datetime.utcnow() + timedelta(days=n))
-    created_at = factory.LazyFunction(datetime.utcnow() - timedelta(days=1))
-    updated_at = factory.LazyFunction(datetime.utcnow())
+    created_at = Sequence(lambda n: datetime.utcnow() - timedelta(days=n))
+    updated_at = factory.LazyFunction(datetime.utcnow)

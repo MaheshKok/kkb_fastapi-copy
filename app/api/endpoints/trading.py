@@ -7,6 +7,7 @@ from app.api.utils import is_valid_strategy_id
 from app.schemas.trade import TradePostSchema
 from app.schemas.trade import TradeSchema
 
+
 trading_router = APIRouter(
     prefix="/api/trading",
     tags=["trading"],

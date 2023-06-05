@@ -9,6 +9,7 @@ from app.core.config import get_config
 from app.setup_app import get_application
 from app.utils.constants import CONFIG_FILE
 
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 

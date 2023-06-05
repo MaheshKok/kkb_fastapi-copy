@@ -1,4 +1,4 @@
-import os
+import importlib
 
 import pytest as pytest
 import pytest_asyncio
@@ -16,7 +16,7 @@ from app.utils.constants import CONFIG_FILE
 
 @pytest.fixture(scope="function")
 def test_config():
-    cnf_file = os.path.join(os.path.abspath("app/cfg"), CONFIG_FILE.TEST)
+    cnf_file = importlib.resources.path("app.cfg", CONFIG_FILE.TEST)
     config = get_config(cnf_file)
     return config
 

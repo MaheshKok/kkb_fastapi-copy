@@ -27,6 +27,10 @@ def generate_instrument():
     return f"BANKNIFTY{expiry_date_formated}43000CE"
 
 
+def placed_at():
+    return datetime.utcnow() - timedelta(days=1)
+
+
 class TradeFactory(BaseFactory):
     class Meta:
         model = Trade
@@ -48,8 +52,8 @@ class TradeFactory(BaseFactory):
     future_exit_price = 44625.0
     future_profit = 7500.0
 
-    placed_at = factory.LazyFunction(datetime.utcnow() - timedelta(days=1))
-    exited_at = factory.LazyFunction(datetime.utcnow())
+    placed_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(days=n))
+    exited_at = factory.LazyFunction(datetime.utcnow)
 
     strike = 43000.0
     option_type = OptionTypeEnum.CE

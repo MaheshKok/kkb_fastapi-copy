@@ -17,7 +17,7 @@ class StrategyFactory(BaseFactory):
     exchange = "NFO"
 
     instrument_type = "OPTIDX"
-    created_at = factory.LazyFunction(datetime.utcnow() - timedelta(days=3))
+    created_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(days=n))
     symbol = "BANKNIFTY"
 
     is_active = True

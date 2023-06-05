@@ -6,4 +6,4 @@ class ENVIRONMENT:
 class CONFIG_FILE:
     DEVELOPMENT = "starter.toml"
     PRODUCTION = "starter.toml"
-    TEST = "test.toml"
+    TEST = "local.toml"
