@@ -1,11 +1,16 @@
 import pytest
+from sqlalchemy import select
 
+from app.database.models import Strategy
 from test.factory.strategy import StrategyFactory
 from test.factory.user import UserFactory
 
 
 @pytest.mark.asyncio
 async def test_strategy_sql(async_session):
-    user = await UserFactory(async_session=async_session)
-    strategy = await StrategyFactory(async_session=async_session, user=user)
-    assert strategy.id is not None
+    for _ in range(10):
+        user = await UserFactory(async_session=async_session)
+        await StrategyFactory(async_session=async_session, user=user)
+
+    result = await async_session.execute(select(Strategy))
+    assert len(result.all()) == 10

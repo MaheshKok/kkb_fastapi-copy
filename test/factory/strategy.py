@@ -1,14 +1,19 @@
 import uuid
-from datetime import datetime
 from datetime import timedelta
 
 import factory
+import pytest
 
 from app.database.models import Strategy
 from test.factory.base_factory import BaseFactory
 from test.factory.user import UserFactory
 
 
+def create_user():
+    return UserFactory()
+
+
+@pytest.mark.asyncio
 class StrategyFactory(BaseFactory):
     class Meta:
         model = Strategy
@@ -17,11 +22,13 @@ class StrategyFactory(BaseFactory):
     exchange = "NFO"
 
     instrument_type = "OPTIDX"
-    created_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(days=n))
     symbol = "BANKNIFTY"
 
     is_active = True
     name = factory.Sequence(lambda n: f"strategy_{n}")
 
     user = factory.SubFactory(UserFactory)
-    user_id = factory.LazyAttribute(lambda obj: obj.user.id)
+
+    @factory.lazy_attribute
+    def created_at(self):
+        return self.user.created_at + timedelta(days=1)

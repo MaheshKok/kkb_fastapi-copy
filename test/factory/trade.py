@@ -35,7 +35,7 @@ class TradeFactory(BaseFactory):
     class Meta:
         model = Trade
 
-    id = uuid.uuid4()
+    id = factory.LazyFunction(uuid.uuid4)
     user_id = factory.SubFactory(UserFactory)
     symbol = "BANKNIFTY"
     instrument = factory.LazyFunction(generate_instrument)
@@ -60,3 +60,11 @@ class TradeFactory(BaseFactory):
     expiry = factory.LazyFunction(generate_expiry_date)
 
     strategy = factory.SubFactory(StrategyFactory)
+
+    @factory.lazy_attribute
+    def placed_at(self):
+        return self.strategy.created_at + timedelta(days=1)
+
+    @factory.lazy_attribute
+    def exited_at(self):
+        return self.placed_at + timedelta(days=1)
