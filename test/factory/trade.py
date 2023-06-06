@@ -10,7 +10,6 @@ from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from test.factory.base_factory import BaseFactory
 from test.factory.strategy import StrategyFactory
-from test.factory.user import UserFactory
 
 
 def generate_expiry_date():
@@ -27,17 +26,11 @@ def generate_instrument():
     return f"BANKNIFTY{expiry_date_formated}43000CE"
 
 
-def placed_at():
-    return datetime.utcnow() - timedelta(days=1)
-
-
 class TradeFactory(BaseFactory):
     class Meta:
         model = Trade
 
     id = factory.LazyFunction(uuid.uuid4)
-    user_id = factory.SubFactory(UserFactory)
-    symbol = "BANKNIFTY"
     instrument = factory.LazyFunction(generate_instrument)
     quantity = 25
     position = PositionEnum.LONG
@@ -60,11 +53,3 @@ class TradeFactory(BaseFactory):
     expiry = factory.LazyFunction(generate_expiry_date)
 
     strategy = factory.SubFactory(StrategyFactory)
-
-    @factory.lazy_attribute
-    def placed_at(self):
-        return self.strategy.created_at + timedelta(days=1)
-
-    @factory.lazy_attribute
-    def exited_at(self):
-        return self.placed_at + timedelta(days=1)

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from datetime import timedelta
 
 import factory
@@ -29,6 +30,4 @@ class StrategyFactory(BaseFactory):
 
     user = factory.SubFactory(UserFactory)
 
-    @factory.lazy_attribute
-    def created_at(self):
-        return self.user.created_at + timedelta(days=1)
+    created_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(days=n))
