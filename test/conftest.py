@@ -1,5 +1,3 @@
-import importlib
-
 import pytest as pytest
 import pytest_asyncio
 from httpx import AsyncClient
@@ -17,8 +15,7 @@ from app.utils.constants import CONFIG_FILE
 
 @pytest.fixture(scope="function")
 def test_config():
-    cnf_file = importlib.resources.path("app.cfg", CONFIG_FILE.TEST)
-    config = get_config(cnf_file)
+    config = get_config(CONFIG_FILE.TEST)
     return config
 
 

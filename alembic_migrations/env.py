@@ -1,5 +1,4 @@
 import asyncio
-import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -73,8 +72,7 @@ async def run_async_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    cnf_file = os.path.join(os.path.abspath("app/cfg"), CONFIG_FILE.PRODUCTION)
-    config_ = get_config(cnf_file)
+    config_ = get_config(CONFIG_FILE.PRODUCTION)
 
     async_db_url = get_db_url(config_)
     # Create SQLAlchemy engine

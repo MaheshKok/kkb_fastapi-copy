@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 
 from hypercorn.asyncio import serve
 from hypercorn.config import Config
@@ -15,8 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 async def start_application():
-    cnf_file = os.path.join(os.path.abspath("cfg"), CONFIG_FILE.PRODUCTION)
-    config = get_config(cnf_file)
+    config = get_config(CONFIG_FILE.PRODUCTION)
     app = await get_application(config)
 
     logger.info(f"Trading System API version {app.version}")

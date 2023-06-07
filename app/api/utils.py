@@ -1,9 +1,9 @@
-from uuid import UUID
-
 from fastapi import Depends
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
+from sqlalchemy import Row
+from sqlalchemy import RowMapping
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,9 +24,9 @@ async def get_async_session(app: FastAPI = Depends(get_app)) -> AsyncSession:
         await async_session.close()
 
 
-async def is_valid_strategy_id(
+async def is_valid_strategy(
     payload: TradePostSchema, db: AsyncSession = Depends(get_async_session)
-) -> UUID:
+) -> Row | RowMapping:
     # query database to check if strategy_id exists
     stmt = select(Strategy).where(Strategy.id == payload.strategy_id)
     result = await db.execute(stmt)
@@ -34,4 +34,4 @@ async def is_valid_strategy_id(
 
     if not strategy_db:
         raise HTTPException(status_code=400, detail="Invalid strategy_id")
-    return payload.strategy_id
+    return strategy_db
