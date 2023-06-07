@@ -3,6 +3,7 @@ import importlib
 import pytest as pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from sqlalchemy import QueuePool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -24,7 +25,15 @@ def test_config():
 @pytest_asyncio.fixture(scope="function")
 async def async_engine(test_config):
     async_db_url = get_db_url(test_config)
-    engine = create_async_engine(async_db_url)
+    engine = create_async_engine(
+        async_db_url,
+        poolclass=QueuePool,
+        pool_recycle=3600,
+        pool_pre_ping=True,
+        pool_size=90,
+        max_overflow=110,
+        pool_timeout=30,
+    )
     async with engine.connect() as conn:
         trans = await conn.begin()
         try:
