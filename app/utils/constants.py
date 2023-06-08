@@ -1,9 +1,14 @@
-class ENVIRONMENT:
+class Environment:
     PRODUCTION = "production"
     TEST = "test"
 
 
-class CONFIG_FILE:
+class ConfigFile:
     DEVELOPMENT = "starter.toml"
     PRODUCTION = "starter.toml"
     TEST = "local.toml"
+
+
+class OptionType:
+    CE = "CE"
+    PE = "PE"

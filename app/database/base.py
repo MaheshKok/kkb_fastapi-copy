@@ -1,14 +1,13 @@
+import asyncio
+
 from sqlalchemy import QueuePool
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import Config
-
-
-Base = declarative_base()
+from app.extensions.redis_cache.trades import cache_ongoing_trades
 
 
 def get_db_url(config: Config) -> URL:
@@ -32,12 +31,15 @@ def create_async_session_maker(async_db_url: URL) -> sessionmaker:
     return async_session_maker
 
 
-async def setup_and_teardown_db(app):
+async def app_lifespan(app):
     @app.on_event("startup")
     async def startup():
         async_db_url = get_db_url(app.state.config)
         app.state.async_session_maker = create_async_session_maker(async_db_url)
 
+        # create a task to cache ongoing trades in Redis
+        asyncio.create_task(cache_ongoing_trades(app))
+
     @app.on_event("shutdown")
     async def shutdown_event():
-        await app.state.async_session_maker.kw["bind"].close()
+        await app.state.async_session_maker.kw["bind"].dispose()

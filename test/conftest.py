@@ -7,15 +7,15 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import get_config
-from app.database.base import Base
+from app.database import Base
 from app.database.base import get_db_url
 from app.setup_app import get_application
-from app.utils.constants import CONFIG_FILE
+from app.utils.constants import ConfigFile
 
 
 @pytest.fixture(scope="function")
 def test_config():
-    config = get_config(CONFIG_FILE.TEST)
+    config = get_config(ConfigFile.TEST)
     return config
 
 

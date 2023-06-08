@@ -2,9 +2,9 @@ from aioredis import Redis
 from fastapi import APIRouter
 from fastapi import Depends
 
-from app.api.utils import is_valid_strategy
+from app.api.dependency import get_redis_pool
+from app.api.dependency import is_valid_strategy
 from app.database.models import Strategy
-from app.extensions.redis_cache import get_redis_pool
 from app.schemas.trade import TradePostSchema
 from app.schemas.trade import TradeSchema
 

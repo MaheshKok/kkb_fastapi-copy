@@ -6,7 +6,7 @@ from hypercorn.config import Config
 
 from app.core.config import get_config
 from app.setup_app import get_application
-from app.utils.constants import CONFIG_FILE
+from app.utils.constants import ConfigFile
 
 
 logging.basicConfig(level=logging.INFO)
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 async def start_application():
-    config = get_config(CONFIG_FILE.PRODUCTION)
+    config = get_config(ConfigFile.PRODUCTION)
     app = await get_application(config)
 
     logger.info(f"Trading System API version {app.version}")

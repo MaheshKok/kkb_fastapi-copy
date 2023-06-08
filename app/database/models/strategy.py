@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from app.database.base import Base
+from app.database import Base
 
 
 class Strategy(Base):

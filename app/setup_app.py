@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.trading import trading_router
 from app.core.config import Config
-from app.database.base import setup_and_teardown_db
+from app.database.base import app_lifespan
 
 
 async def register_routers(app):
@@ -20,6 +20,8 @@ async def get_application(config: Config) -> FastAPI:
 
     # Include routers
     await register_routers(app)
-    await setup_and_teardown_db(app)
+
+    # TODO: register scout and new relic
+    await app_lifespan(app)
 
     return app

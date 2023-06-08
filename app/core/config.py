@@ -7,7 +7,7 @@ import pathlib
 
 import tomli as toml
 
-from app.utils.constants import CONFIG_FILE
+from app.utils.constants import ConfigFile
 
 
 class Config:
@@ -84,6 +84,6 @@ class Config:
         return self
 
 
-def get_config(config_file: str = CONFIG_FILE.PRODUCTION):
+def get_config(config_file: str = ConfigFile.PRODUCTION):
     config_file_path = os.path.join(os.path.abspath("cfg"), config_file)
     return Config(pathlib.Path(config_file_path)).update(os.environ).configure_logging()

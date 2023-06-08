@@ -6,13 +6,13 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.core.config import get_config
-from app.database.base import Base
+from app.database import Base
 from app.database.base import get_db_url
 from app.database.models import *  # noqa
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
-from app.utils.constants import CONFIG_FILE
+from app.utils.constants import ConfigFile
 
 
 config = context.config
@@ -72,7 +72,7 @@ async def run_async_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    config_ = get_config(CONFIG_FILE.PRODUCTION)
+    config_ = get_config(ConfigFile.PRODUCTION)
 
     async_db_url = get_db_url(config_)
     # Create SQLAlchemy engine

@@ -1,37 +1,26 @@
-from fastapi import Depends
-from fastapi import FastAPI
-from fastapi import HTTPException
-from fastapi import Request
-from sqlalchemy import Row
-from sqlalchemy import RowMapping
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 
-from app.database.models import Strategy
-from app.schemas.trade import TradePostSchema
+from app.extensions.redis_cache import redis
 
 
-def get_app(request: Request) -> FastAPI:
-    return request.app
+async def get_current_and_next_expiry():
+    expiry_list = await redis.get("expiry_list")
 
+    todays_date = datetime.now().date()
+    is_today_expiry = False
+    current_expiry_str = None
+    next_expiry_str = None
+    for index, expiry_str in enumerate(expiry_list):
+        expiry_date = datetime.strptime(expiry_str, "%d %b %Y").date()
+        if todays_date > expiry_date:
+            continue
+        elif expiry_date == todays_date:
+            next_expiry_str = expiry_list[index + 1]
+            current_expiry_str = expiry_str
+            is_today_expiry = True
+            break
+        elif todays_date < expiry_date:
+            current_expiry_str = expiry_str
+            break
 
-async def get_async_session(app: FastAPI = Depends(get_app)) -> AsyncSession:
-    async_session = app.state.async_session_maker()
-    try:
-        async with async_session.begin():
-            yield async_session
-    finally:
-        await async_session.close()
-
-
-async def is_valid_strategy(
-    payload: TradePostSchema, db: AsyncSession = Depends(get_async_session)
-) -> Row | RowMapping:
-    # query database to check if strategy_id exists
-    stmt = select(Strategy).where(Strategy.id == payload.strategy_id)
-    result = await db.execute(stmt)
-    strategy_db = result.scalars().one_or_none()
-
-    if not strategy_db:
-        raise HTTPException(status_code=400, detail="Invalid strategy_id")
-    return strategy_db
+    return current_expiry_str, next_expiry_str, is_today_expiry
