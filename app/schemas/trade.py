@@ -17,14 +17,29 @@ class TradePostSchema(BaseModel):
     strategy_id: uuid.UUID = Field(
         description="Strategy ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3"
     )
-    action: ActionEnum = Field(description="Action", example="BUY")
-    position: PositionEnum = Field(description="Position", example="LONG")
+    action: ActionEnum = Field(
+        description="Action, if its BUY then option_type = CE and if its SELL then PE",
+        example="BUY",
+    )
+    position: PositionEnum = Field(description="Position,", example="LONG")
 
     received_at: datetime = Field(
         description="Received At", example="2023-05-22 05:11:01.117358+00"
     )
     premium: Optional[float] = Field(description="Premium", example=350.0)
     strike: Optional[float] = Field(description="Strike", example=42500.0, default=0.0)
+
+    class Config:
+        orm_mode = True
+        example = {
+            "quantity": 25,
+            "future_received_entry_price": 40600.5,
+            "strategy_id": "0d478355-1439-4f73-a72c-04bb0b3917c7",
+            "action": "BUY",
+            "position": "LONG",
+            "received_at": "2023-05-22 05:11:01.117358+00",
+            "premium": 350.0,
+        }
 
 
 class TradeSchema(TradePostSchema):
