@@ -1,6 +1,10 @@
+from datetime import datetime
+
 from aioredis import Redis
 from fastapi import APIRouter
 from fastapi import Depends
+from fastapi import Request
+from tasks.tasks import task_buying_trade
 
 from app.api.dependency import get_redis_pool
 from app.api.dependency import is_valid_strategy
@@ -18,25 +22,34 @@ trading_router = APIRouter(
 
 @trading_router.post("/nfo", status_code=200)
 async def post_nfo(
-    payload: TradePostSchema,
-    strategy_db: Strategy = Depends(is_valid_strategy),
+    request: Request,
+    trade: TradePostSchema,
+    strategy: Strategy = Depends(is_valid_strategy),
     redis: Redis = Depends(get_redis_pool),
 ):
-    current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry()
+    payload = await request.json()
+    payload["option_type"] = trade.option_type
+    payload["symbol"] = strategy.symbol
 
-    opposite_option_type_ongoing_trades_key = (
-        f"{payload.strategy_id} {current_expiry_date} {get_opposite_option_type(payload.action)}"
+    todays_date = datetime.now().date()
+    current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
+        todays_date
     )
 
-    # TODO: in future decide based on strtegy new column, strategy_type:
+    opposite_option_type_ongoing_trades_key = (
+        f"{trade.strategy_id} {current_expiry_date} {get_opposite_option_type(trade.action)}"
+    )
+
+    # TODO: in future decide based on strategy new column, strategy_type:
     # if strategy_position is "every" then close all ongoing trades and buy new trade
-    # 2. strategy_position is "signal", then on EXIT action close same option type trades
-    # and buy new trade on BUY action, to be decided in future
+    # 2. strategy_position is "signal", then on action: EXIT, close same option type trades
+    # and buy new trade on BUY action,
+    # To be decided in future, what actions would be
 
     if ongoing_trades := await redis.get(opposite_option_type_ongoing_trades_key):
         # initiate celery close_trade
-        print(f"found trades to be {len(ongoing_trades)}")
+        print(f"found: {len(ongoing_trades)} trades to be closed")
         pass
 
     # initiate celery buy_trade
-    pass
+    task_buying_trade.delay(payload, str(current_expiry_date))

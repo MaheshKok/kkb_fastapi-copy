@@ -29,9 +29,10 @@ async def get_async_session(app: FastAPI = Depends(get_app)) -> AsyncSession:
 async def is_valid_strategy(
     payload: TradePostSchema, db: AsyncSession = Depends(get_async_session)
 ) -> Row | RowMapping:
+    # TODO: Implement in memory caching for strategy_id and symbol
     # query database to check if strategy_id exists
-    stmt = select(Strategy).where(Strategy.id == payload.strategy_id)
-    result = await db.execute(stmt)
+    _query = select(Strategy).where(Strategy.id == payload.strategy_id)
+    result = await db.execute(_query)
     strategy_db = result.scalars().one_or_none()
 
     if not strategy_db:

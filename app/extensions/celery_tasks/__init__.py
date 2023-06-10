@@ -6,7 +6,7 @@ from app.core.config import get_config
 
 
 config = get_config()
-redis_url = config.get("celery_redis")
+redis_url = config.data["celery_redis"]
 
 celery = Celery(
     "KokoBrothersBackend",

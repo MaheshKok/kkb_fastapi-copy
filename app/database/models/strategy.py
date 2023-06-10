@@ -40,11 +40,6 @@ class Strategy(Base):
     daily_profits = relationship("DailyProfit", back_populates="strategy")
     take_away_profit = relationship("TakeAwayProfit", back_populates="strategy")
 
-    # completed_profit_id = Column(
-    #     UUID(as_uuid=True), ForeignKey("completed_profit.id"), nullable=True, index=True
-    # )
-    # completed_profit = relationship("CompletedProfit", backref="strategy")
-
     async def validate(self):
         if self.instrument_type not in ["FUTIDX", "OPTIDX"]:
             raise ValidationError("Invalid position")

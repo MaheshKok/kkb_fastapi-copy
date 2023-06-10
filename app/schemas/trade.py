@@ -5,7 +5,9 @@ from typing import Optional
 
 from pydantic import BaseModel
 from pydantic import Field
+from pydantic import root_validator
 
+from app.api.utils import get_option_type
 from app.schemas.enums import ActionEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
@@ -21,6 +23,7 @@ class TradePostSchema(BaseModel):
         description="Action, if its BUY then option_type = CE and if its SELL then PE",
         example="BUY",
     )
+    option_type: OptionTypeEnum = Field(description="Option Type", example="CE")
     position: PositionEnum = Field(description="Position,", example="LONG")
 
     received_at: datetime = Field(
@@ -41,6 +44,12 @@ class TradePostSchema(BaseModel):
             "premium": 350.0,
         }
 
+    @root_validator(pre=True)
+    def populate_option_type(cls, values):
+        action_ = values.get("action")
+        values["option_type"] = get_option_type(action_)
+        return values
+
 
 class TradeSchema(TradePostSchema):
     class Config:
@@ -60,7 +69,6 @@ class TradeSchema(TradePostSchema):
         description="Exited At", example="2023-05-22 06:25:03.117358+00"
     )
 
-    option_type: OptionTypeEnum = Field(description="Option Type", example="CE")
     expiry: date = Field(description="Expiry", example="2023-05-22")
 
     instrument: str = Field(description="Instrument name", example="BANKNIFTY27APR23FUT")
