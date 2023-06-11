@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import pytest as pytest
 import pytest_asyncio
 from httpx import AsyncClient
@@ -11,6 +13,10 @@ from app.database import Base
 from app.database.base import get_db_url
 from app.setup_app import get_application
 from app.utils.constants import ConfigFile
+from test.factory.strategy import StrategyFactory
+from test.factory.take_away_profit import TakeAwayProfitFactory
+from test.factory.trade import TradeFactory
+from test.factory.user import UserFactory
 
 
 @pytest.fixture(scope="function")
@@ -74,10 +80,45 @@ async def async_session(async_session_maker):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def async_client(async_session_maker, test_config):
-    app = await get_application(test_config)
+async def async_client(async_session_maker):
+    app = get_application(ConfigFile.TEST)
     app.state.async_session_maker = async_session_maker
 
     # TODO: figure it out how to dynamically set the base_url
     async with AsyncClient(app=app, base_url="http://localhost:8080/") as ac:
         yield ac
+
+
+async def create_ecosystem(
+    async_session, users=1, strategies=1, trades=10, take_away_profit=False, daily_profit=0
+):
+    for _ in range(users):
+        user = await UserFactory(async_session=async_session)
+
+        for _ in range(strategies):
+            strategy = await StrategyFactory(
+                async_session=async_session,
+                user=user,
+                created_at=user.created_at + timedelta(days=1),
+            )
+
+            for _ in range(trades):
+                _ = await TradeFactory(async_session=async_session, strategy=strategy)
+
+            if take_away_profit:
+                TakeAwayProfitFactory(
+                    async_session=async_session, strategy=strategy, trades=trades
+                )
+
+
+@pytest_asyncio.fixture(scope="function")
+async def test_trade_data():
+    return {
+        "quantity": 25,
+        "future_received_entry_price": 40600.5,
+        "strategy_id": "0d478355-1439-4f73-a72c-04bb0b3917c7",
+        "option_type": "CE",
+        "position": "LONG",
+        "received_at": "2023-05-22 05:11:01.117358+00",
+        "premium": 350.0,
+    }

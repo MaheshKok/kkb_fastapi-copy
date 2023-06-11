@@ -24,6 +24,7 @@ class StrategyFactory(BaseFactory):
 
     instrument_type = "OPTIDX"
     symbol = "BANKNIFTY"
+    position = "LONG"
 
     is_active = True
     name = factory.Sequence(lambda n: f"strategy_{n}")

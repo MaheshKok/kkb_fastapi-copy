@@ -1,27 +1,9 @@
-import bisect
 from datetime import datetime
 from functools import lru_cache
 
 from app.extensions.redis_cache import redis
-from app.schemas.enums import ActionEnum
-from app.schemas.enums import OptionTypeEnum
 from app.utils.constants import EDELWEISS_DATE_FORMAT
-
-
-@lru_cache
-def get_option_type(action: ActionEnum):
-    if action == ActionEnum.BUY:
-        return OptionTypeEnum.CE
-    elif action == ActionEnum.SELL:
-        return OptionTypeEnum.PE
-
-
-@lru_cache
-def get_opposite_option_type(action: ActionEnum):
-    if action == ActionEnum.BUY:
-        return OptionTypeEnum.PE
-    elif action == ActionEnum.SELL:
-        return OptionTypeEnum.CE
+from app.utils.constants import OptionType
 
 
 async def get_expiry_list():
@@ -50,30 +32,45 @@ async def get_current_and_next_expiry(todays_date):
     return current_expiry_date, next_expiry_date, is_today_expiry
 
 
-def find_key_value_less_than_or_equal_to(dictionary, value):
-    _keys = dictionary.keys()
-    index = bisect.bisect_right(_keys, value)
-
-    if index == 0:
-        # No key-value pair with key less than the supplied key
-        return None, None
-
-    key = _keys[index - 1]
-    return key, dictionary[key]
-
-
-def get_strike_and_entry_price(option_chain, premium=None, strike=None, future_price=None):
+def get_strike_and_entry_price(
+    option_chain, option_type, strike=None, premium=None, future_price=None
+):
     # use bisect to find the strike and its price from option chain
     if strike:
+        if premium := option_chain.get(strike):
+            return strike, premium
+
         # even if strike is not present in option chain then the closest strike will be fetched
-        return find_key_value_less_than_or_equal_to(option_chain, strike)
+        if option_type == OptionType.CE:
+            for option_strike, option_strike_premium in option_chain.items():
+                if float(option_strike_premium) != 0.0 and float(option_strike) <= strike:
+                    return strike, option_strike_premium
+
+        prev_strike, prev_strike_premium = 0, 0
+        if option_type == OptionType.PE:
+            for option_strike, option_strike_premium in option_chain.items():
+                if float(option_strike_premium) != 0.0 and float(option_strike) >= strike:
+                    return prev_strike, prev_strike_premium
+
+                prev_strike, prev_strike_premium = option_strike, option_strike_premium
 
     elif premium:
         # get the strike and its price which is just less than the premium
-        return find_key_value_less_than_or_equal_to(option_chain, premium)
+        if option_type == OptionType.CE:
+            for strike, strike_premium in option_chain.items():
+                if float(strike_premium) != 0.0 and float(strike_premium) <= premium:
+                    return strike, strike_premium
 
-    else:
-        # TODO: to fetch the strike based on volumne and open interest, add more data to option chain
-        if not future_price:
-            raise Exception("Either premium or strike or future_price should be provided")
-        return find_key_value_less_than_or_equal_to(option_chain, future_price)
+        prev_strike, prev_strike_premium = 0, 0
+        if option_type == OptionType.PE:
+            for strike, strike_premium in option_chain.items():
+                if float(strike_premium) != 0.0 and float(strike_premium) >= premium:
+                    return prev_strike, prev_strike_premium
+
+                prev_strike, prev_strike_premium = strike, strike_premium
+
+    elif future_price:
+        # TODO: to fetch the strike based on volume and open interest, add more data to option chain
+        pass
+
+    raise Exception("Either premium or strike or future_price should be provided")

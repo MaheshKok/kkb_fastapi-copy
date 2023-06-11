@@ -16,7 +16,7 @@ def get_db_url(config: Config) -> URL:
     return URL.create(drivername="postgresql+asyncpg", **config_db)
 
 
-def create_async_session_maker(async_db_url: URL) -> sessionmaker:
+def get_async_session_maker(async_db_url: URL) -> sessionmaker:
     async_engine = create_async_engine(
         async_db_url,
         poolclass=QueuePool,
@@ -35,7 +35,7 @@ def create_async_session_maker(async_db_url: URL) -> sessionmaker:
 @asynccontextmanager
 async def lifespan(app):
     async_db_url = get_db_url(app.state.config)
-    app.state.async_session_maker = create_async_session_maker(async_db_url)
+    app.state.async_session_maker = get_async_session_maker(async_db_url)
 
     # create a task to cache ongoing trades in Redis
     asyncio.create_task(cache_ongoing_trades(app))

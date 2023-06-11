@@ -4,8 +4,7 @@ from datetime import timedelta
 
 import factory
 
-from app.database.models import Trade
-from app.schemas.enums import ActionEnum
+from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from test.factory.base_factory import BaseFactory
@@ -28,13 +27,12 @@ def generate_instrument():
 
 class TradeFactory(BaseFactory):
     class Meta:
-        model = Trade
+        model = TradeModel
 
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)
     quantity = 25
     position = PositionEnum.LONG
-    action = ActionEnum.BUY
 
     entry_price = 400.0
     exit_price = 500.0
@@ -45,6 +43,7 @@ class TradeFactory(BaseFactory):
     future_exit_price = 44625.0
     future_profit = 7500.0
 
+    received_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(days=n, minutes=1))
     placed_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(days=n))
     exited_at = factory.LazyFunction(datetime.utcnow)
 

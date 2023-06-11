@@ -13,12 +13,12 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
-from app.schemas.enums import ActionEnum
+from app.database.models import Strategy
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 
 
-class Trade(Base):
+class TradeModel(Base):
     __tablename__ = "trade"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -26,7 +26,6 @@ class Trade(Base):
 
     quantity = Column(Integer, default=25)
     position = Column(String, nullable=False, index=True)
-    action = Column(String, nullable=False, index=True)
 
     entry_price = Column(Float, nullable=False)
     exit_price = Column(Float, nullable=True)
@@ -37,6 +36,7 @@ class Trade(Base):
     future_exit_price = Column(Float, nullable=True)
     future_profit = Column(Float, nullable=True)
 
+    received_at = Column(TIMESTAMP(timezone=True), nullable=False)
     placed_at = Column(TIMESTAMP(timezone=True), nullable=False, default=datetime.now())
     exited_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
@@ -47,14 +47,11 @@ class Trade(Base):
     strategy_id = Column(
         UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
     )
-    strategy = relationship("Strategy", back_populates="trades")
+    strategy = relationship(Strategy, back_populates="trades")
 
     async def validate(self):
         if self.position not in [PositionEnum.LONG, PositionEnum.SHORT]:
             raise ValidationError("Invalid position")
-
-        if self.action not in [ActionEnum.BUY, ActionEnum.SELL]:
-            raise ValidationError("Invalid action")
 
         if self.option_type not in [OptionTypeEnum.CE, OptionTypeEnum.PE]:
             raise ValidationError("Invalid option type")

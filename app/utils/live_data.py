@@ -11,5 +11,7 @@ async def get_option_chain(
         raise ValueError("Futures dont have option_type")
 
     future_or_option_type = "FUT" if is_future else option_type
-    option_chain = eval(await redis.hgetall(f"{symbol} {expiry} {future_or_option_type}"))
-    return dict(sorted(option_chain.items()))
+    option_chain = await redis.hgetall(f"{symbol} {expiry} {future_or_option_type}")
+    if option_chain:
+        return dict(sorted(option_chain.items()))
+    raise Exception(f"No option data: [{symbol} {expiry} {future_or_option_type}] found in redis")

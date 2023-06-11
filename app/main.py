@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 async def start_application():
-    config = get_config(ConfigFile.PRODUCTION)
-    app = await get_application(config)
+    app = get_application(ConfigFile.PRODUCTION)
 
+    config = get_config(ConfigFile.PRODUCTION)
     logger.info(f"Trading System API version {app.version}")
 
     hypercorn_config = Config.from_mapping(config.data.get("app", {}))
