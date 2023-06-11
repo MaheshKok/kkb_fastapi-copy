@@ -5,7 +5,7 @@ from app.database.base import get_db_url
 from app.database.models import TradeModel
 from app.extensions.celery_tasks import celery
 from app.schemas.trade import TradeSchema
-from app.utils.live_data import get_option_chain
+from app.utils.option_chain import get_option_chain
 
 
 # @celery.task(name="tasks.closing_trade")
@@ -43,8 +43,6 @@ def _get_async_session_maker(config_file):
 
 @celery.task(name="tasks.buying_trade")
 async def task_buying_trade(trade_payload, config_file):
-    # from app.setup_app import get_application
-
     option_chain = await get_option_chain(
         trade_payload["symbol"],
         expiry=trade_payload["expiry"],
@@ -62,6 +60,11 @@ async def task_buying_trade(trade_payload, config_file):
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
     if not strike:
         return None
+
+    # if we already have a strike in the payload then remove it
+    # as we have successfully fetched the available strike from option_chain
+    if "strike" in trade_payload:
+        trade_payload.pop("strike")
 
     if broker_id := trade_payload.get("broker_id"):
         print("broker_id", broker_id)

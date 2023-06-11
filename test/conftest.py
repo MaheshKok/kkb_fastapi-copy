@@ -1,7 +1,9 @@
 from datetime import timedelta
+from unittest.mock import AsyncMock
 
 import pytest as pytest
 import pytest_asyncio
+from asynctest import MagicMock
 from httpx import AsyncClient
 from sqlalchemy import QueuePool
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +19,8 @@ from test.factory.strategy import StrategyFactory
 from test.factory.take_away_profit import TakeAwayProfitFactory
 from test.factory.trade import TradeFactory
 from test.factory.user import UserFactory
+from test.unit_tests.test_data import get_ce_option_chain
+from test.unit_tests.test_data import get_pe_option_chain
 
 
 @pytest.fixture(scope="function")
@@ -41,7 +45,7 @@ async def async_engine(test_config):
         trans = await conn.begin()
         try:
             yield engine
-        except Exception as e:
+        except Exception as e:  # pragma: no cover
             await trans.rollback()
             raise e
         else:
@@ -72,7 +76,7 @@ async def async_session(async_session_maker):
         try:
             yield async_session
             await async_session.commit()
-        except Exception as e:
+        except Exception as e:  # pragma: no cover
             await async_session.rollback()
             raise e
         finally:
@@ -81,11 +85,11 @@ async def async_session(async_session_maker):
 
 @pytest_asyncio.fixture(scope="function")
 async def async_client(async_session_maker):
-    app = get_application(ConfigFile.TEST)
-    app.state.async_session_maker = async_session_maker
+    app = get_application(ConfigFile.TEST)  # pragma: no cover
+    app.state.async_session_maker = async_session_maker  # pragma: no cover
 
     # TODO: figure it out how to dynamically set the base_url
-    async with AsyncClient(app=app, base_url="http://localhost:8080/") as ac:
+    async with AsyncClient(app=app, base_url="http://localhost:8080/") as ac:  # pragma: no cover
         yield ac
 
 
@@ -112,13 +116,15 @@ async def create_ecosystem(
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_trade_data():
-    return {
-        "quantity": 25,
-        "future_received_entry_price": 40600.5,
-        "strategy_id": "0d478355-1439-4f73-a72c-04bb0b3917c7",
-        "option_type": "CE",
-        "position": "LONG",
-        "received_at": "2023-05-22 05:11:01.117358+00",
-        "premium": 350.0,
-    }
+async def patch_redis_option_chain(monkeypatch):
+    async def mock_hgetall(key):
+        # You can perform additional checks or logic based on the key if needed
+        if "CE" in key:
+            return get_ce_option_chain()
+        else:
+            return get_pe_option_chain()
+
+    mock_redis = MagicMock()
+    mock_redis.hgetall = AsyncMock(side_effect=mock_hgetall)
+
+    monkeypatch.setattr("app.utils.option_chain.redis", mock_redis)

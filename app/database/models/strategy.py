@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
 
-from pydantic import ValidationError
 from sqlalchemy import Boolean
 from sqlalchemy import Column
 from sqlalchemy import ForeignKey
@@ -49,9 +48,3 @@ class Strategy(Base):
 
     daily_profits = relationship("DailyProfit", back_populates="strategy")
     take_away_profit = relationship("TakeAwayProfit", back_populates="strategy")
-
-    async def validate(self):
-        if self.instrument_type not in ["FUTIDX", "OPTIDX"]:
-            raise ValidationError("Invalid position")
-
-        return self

@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
 
-from pydantic import ValidationError
 from sqlalchemy import Column
 from sqlalchemy import Date
 from sqlalchemy import Float
@@ -14,8 +13,6 @@ from sqlalchemy.orm import relationship
 
 from app.database import Base
 from app.database.models import Strategy
-from app.schemas.enums import OptionTypeEnum
-from app.schemas.enums import PositionEnum
 
 
 class TradeModel(Base):
@@ -48,12 +45,3 @@ class TradeModel(Base):
         UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
     )
     strategy = relationship(Strategy, back_populates="trades")
-
-    async def validate(self):
-        if self.position not in [PositionEnum.LONG, PositionEnum.SHORT]:
-            raise ValidationError("Invalid position")
-
-        if self.option_type not in [OptionTypeEnum.CE, OptionTypeEnum.PE]:
-            raise ValidationError("Invalid option type")
-
-        return self

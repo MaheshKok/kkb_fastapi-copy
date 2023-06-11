@@ -62,3 +62,5 @@ wsproto==1.2.0
 celery~=5.3.0
 
 cachetools~=5.3.1
+
+asynctest~=0.13.0

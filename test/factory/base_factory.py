@@ -1,5 +1,6 @@
 import pytest
 from factory.alchemy import SQLAlchemyModelFactory
+from sqlalchemy.exc import SQLAlchemyError
 
 
 @pytest.mark.asyncio
@@ -12,6 +13,6 @@ class BaseFactory(SQLAlchemyModelFactory):
             await async_session.commit()
             await async_session.refresh(instance)
             return instance
-        except Exception as e:
+        except SQLAlchemyError as e:
             await async_session.rollback()
             raise e
