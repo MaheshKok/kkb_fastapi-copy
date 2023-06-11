@@ -26,4 +26,4 @@ class TakeAwayProfit(Base):
     created_at = Column(DateTime, nullable=False, default=func.now())
     updated_at = Column(DateTime, nullable=True)
     total_trades = Column(Integer, nullable=False)
-    strategy = relationship("Strategy", back_populates="take_away_profit")
+    strategy = relationship("StrategyModel", back_populates="take_away_profit")

@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import select
 
-from app.database.models import Strategy
+from app.database.models import StrategyModel
 from test.factory.strategy import StrategyFactory
 from test.factory.user import UserFactory
 
@@ -12,7 +12,7 @@ async def test_strategy_factory(async_session):
     for _ in range(10):
         await StrategyFactory(async_session=async_session, user=user)
 
-    result = await async_session.execute(select(Strategy))
+    result = await async_session.execute(select(StrategyModel))
     assert len(result.all()) == 10
 
 
@@ -21,5 +21,5 @@ async def test_strategy_factory_with_invalid_position(async_session):
     user = await UserFactory(async_session=async_session)
     await StrategyFactory(async_session=async_session, user=user, position="INVALID")
 
-    result = await async_session.execute(select(Strategy))
+    result = await async_session.execute(select(StrategyModel))
     assert len(result.all()) == 1

@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
-from app.database.models import Strategy
+from app.database.models import StrategyModel
 
 
 class TradeModel(Base):
@@ -44,4 +44,4 @@ class TradeModel(Base):
     strategy_id = Column(
         UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
     )
-    strategy = relationship(Strategy, back_populates="trades")
+    strategy = relationship(StrategyModel, backref="trades")

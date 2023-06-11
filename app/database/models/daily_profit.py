@@ -20,6 +20,6 @@ class DailyProfit(Base):
     strategy_id = Column(
         UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
     )
-    strategy = relationship("Strategy", back_populates="daily_profits")
+    strategy = relationship("StrategyModel", back_populates="daily_profits")
 
     date = Column(Date, nullable=False)

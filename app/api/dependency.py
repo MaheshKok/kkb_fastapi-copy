@@ -8,7 +8,7 @@ from sqlalchemy import RowMapping
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import Strategy
+from app.database.models import StrategyModel
 from app.extensions.redis_cache import redis
 from app.schemas.trade import TradePostSchema
 
@@ -27,11 +27,11 @@ async def get_async_session(app: FastAPI = Depends(get_app)) -> AsyncSession:
 
 
 async def is_valid_strategy(
-    payload: TradePostSchema, db: AsyncSession = Depends(get_async_session)
+    trade_post_schema: TradePostSchema, db: AsyncSession = Depends(get_async_session)
 ) -> Row | RowMapping:
     # TODO: Implement in memory caching for strategy_id and symbol
     # query database to check if strategy_id exists
-    _query = select(Strategy).where(Strategy.id == payload.strategy_id)
+    _query = select(StrategyModel).where(StrategyModel.id == trade_post_schema.strategy_id)
     result = await db.execute(_query)
     strategy_db = result.scalars().one_or_none()
 

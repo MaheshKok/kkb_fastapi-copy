@@ -94,7 +94,7 @@ async def async_client(async_session_maker):
 
 
 async def create_ecosystem(
-    async_session, users=1, strategies=1, trades=10, take_away_profit=False, daily_profit=0
+    async_session, users=1, strategies=1, trades=0, take_away_profit=False, daily_profit=0
 ):
     for _ in range(users):
         user = await UserFactory(async_session=async_session)

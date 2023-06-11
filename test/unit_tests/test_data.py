@@ -1,4 +1,4 @@
-def get_test_trade_payload():
+def get_test_post_trade_payload():
     return {
         "quantity": 25,
         "future_received_entry_price": 40600.5,

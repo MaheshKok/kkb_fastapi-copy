@@ -6,23 +6,23 @@ from tasks.tasks import task_buying_trade
 
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import TradeModel
-from app.database.models.strategy import Strategy
+from app.database.models.strategy import StrategyModel
 from app.utils.constants import ConfigFile
 from test.conftest import create_ecosystem
-from test.unit_tests.test_data import get_test_trade_payload
+from test.unit_tests.test_data import get_test_post_trade_payload
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("option_type", ["CE", "PE"], ids=["CE Options", "PE Options"])
 async def test_buy_trade_for_premium(async_session, option_type, patch_redis_option_chain):
-    test_trade_data = get_test_trade_payload()
+    test_trade_data = get_test_post_trade_payload()
     if option_type == "PE":
         test_trade_data["option_type"] = "PE"
 
     await create_ecosystem(async_session, users=1, strategies=1, trades=0)
     # query database for stragey
 
-    fetch_strategy_query_ = await async_session.execute(Select(Strategy))
+    fetch_strategy_query_ = await async_session.execute(Select(StrategyModel))
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
@@ -49,14 +49,14 @@ async def test_buy_trade_for_premium(async_session, option_type, patch_redis_opt
 )
 @pytest.mark.asyncio
 async def test_buy_trade_for_strike(async_session, patch_redis_option_chain, payload_strike):
-    test_trade_data = get_test_trade_payload()
+    test_trade_data = get_test_post_trade_payload()
     del test_trade_data["premium"]
     test_trade_data["strike"] = payload_strike
 
     await create_ecosystem(async_session, users=1, strategies=1, trades=0)
     # query database for stragey
 
-    fetch_strategy_query_ = await async_session.execute(Select(Strategy))
+    fetch_strategy_query_ = await async_session.execute(Select(StrategyModel))
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(

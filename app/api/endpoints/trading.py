@@ -9,7 +9,7 @@ from tasks.tasks import task_buying_trade
 from app.api.dependency import get_redis_pool
 from app.api.dependency import is_valid_strategy
 from app.api.utils import get_current_and_next_expiry
-from app.database.models import Strategy
+from app.database.models import StrategyModel
 from app.schemas.trade import TradePostSchema
 
 
@@ -34,7 +34,7 @@ futures_router = APIRouter(
 async def post_nfo(
     request: Request,
     trade_post_schema: TradePostSchema,
-    strategy: Strategy = Depends(is_valid_strategy),
+    strategy: StrategyModel = Depends(is_valid_strategy),
     redis: Redis = Depends(get_redis_pool),
 ):
     payload = await request.json()
@@ -54,7 +54,7 @@ async def post_nfo(
     # if strategy_position is "every" then close all ongoing trades and buy new trade
     # 2. strategy_position is "signal", then on action: EXIT, close same option type trades
     # and buy new trade on BUY action,
-    # To be decided in future, what actions would be
+    # To be decided in future, the name of actions
 
     if opposite_option_type_ongoing_trades := await redis.get(
         opposite_option_type_ongoing_trades_key
@@ -65,3 +65,4 @@ async def post_nfo(
 
     # initiate celery buy_trade
     task_buying_trade.delay(payload)
+    return {"message": "Trade initiated successfully"}

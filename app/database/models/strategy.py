@@ -13,7 +13,7 @@ from app.database import Base
 from app.schemas.enums import PositionEnum
 
 
-class Strategy(Base):
+class StrategyModel(Base):
     """
     RULES:
     1. Strategy can be either LONG or SHORT, it cannot be both
@@ -43,8 +43,6 @@ class Strategy(Base):
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id"), nullable=False, index=True)
     user = relationship("User", backref="strategy_list")
-
-    trades = relationship("TradeModel", back_populates="strategy")
 
     daily_profits = relationship("DailyProfit", back_populates="strategy")
     take_away_profit = relationship("TakeAwayProfit", back_populates="strategy")

@@ -5,7 +5,7 @@ from datetime import timedelta
 import factory
 import pytest
 
-from app.database.models import Strategy
+from app.database.models import StrategyModel
 from app.schemas.enums import PositionEnum
 from test.factory.base_factory import BaseFactory
 from test.factory.user import UserFactory
@@ -14,7 +14,7 @@ from test.factory.user import UserFactory
 @pytest.mark.asyncio
 class StrategyFactory(BaseFactory):
     class Meta:
-        model = Strategy
+        model = StrategyModel
 
     id = factory.LazyFunction(uuid.uuid4)
     exchange = "NFO"
