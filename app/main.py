@@ -1,10 +1,10 @@
 import asyncio
 import logging
 
-from hypercorn.asyncio import serve
-from hypercorn.config import Config
+import uvicorn
+from starlette.responses import JSONResponse
 
-from app.core.config import get_config
+from app.database.base import lifespan
 from app.setup_app import get_application
 from app.utils.constants import ConfigFile
 
@@ -16,12 +16,31 @@ logger = logging.getLogger(__name__)
 async def start_application():
     app = get_application(ConfigFile.PRODUCTION)
 
-    config = get_config(ConfigFile.PRODUCTION)
-    logger.info(f"Trading System API version {app.version}")
+    @app.exception_handler(Exception)
+    async def exception_handler(request, exc):
+        logging.error(f"Internal Server Error: {str(exc)}")
+        return JSONResponse(status_code=500, content={"message": "Internal Server Error"})
 
-    hypercorn_config = Config.from_mapping(config.data.get("app", {}))
-    await serve(app, hypercorn_config)
+    async with lifespan(app):
+        return app
+
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s]: %(message)s",
+    handlers=[
+        logging.StreamHandler(),  # Log to console
+    ],
+)
+
+# Log a sample message
+logging.debug("Debug message")
+logging.info("Info message")
+logging.warning("Warning message")
+logging.error("Error message")
 
 
 if __name__ == "__main__":
-    asyncio.run(start_application())
+    app = asyncio.run(start_application())
+    uvicorn.run(app)

@@ -31,7 +31,7 @@ async def cache_ongoing_trades(app):
         # key should be combination of three columns strategy_id, expiry and option_type
         # then we can avoid the for loop and the redis_key_trades_dict
 
-        result = await session.execute(select(TradeModel).filter_by(exited_at=None))
+        result = await session.execute(select(TradeModel).filter_by(exit_at=None))
         db_ongoing_trades = result.scalars().all()
         redis_key_trades_dict = {}
         for ongoing_trade in db_ongoing_trades:

@@ -40,6 +40,7 @@ async def lifespan(app):
     # create a task to cache ongoing trades in Redis
     asyncio.create_task(cache_ongoing_trades(app))
 
-    yield
-
-    await app.state.async_session_maker.kw["bind"].dispose()
+    try:
+        yield
+    finally:
+        await app.state.async_session_maker.kw["bind"].dispose()
