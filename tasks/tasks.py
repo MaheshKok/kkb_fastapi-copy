@@ -177,3 +177,4 @@ async def task_buying_trade(trade_payload, config_file):
         new_trade = TradeModel(**trade_schema.dict(exclude={"premium"}))
         async_session.add(new_trade)
         await async_session.commit()
+        return "successfully added trade to db"
