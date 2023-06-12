@@ -198,3 +198,11 @@ async def patch_redis_delete_ongoing_trades(monkeypatch):
     mock_redis.delete = AsyncMock(return_value=True)
     monkeypatch.setattr("tasks.tasks.redis", mock_redis)
     return mock_redis
+
+
+@pytest_asyncio.fixture(scope="function")
+async def patch_redis_add_ongoing_trades(monkeypatch):
+    mock_redis = MagicMock()
+    mock_redis.exists = AsyncMock(return_value=True)
+    monkeypatch.setattr("app.database.models.trade.redis", mock_redis)
+    return mock_redis
