@@ -37,7 +37,7 @@ class EntryTradeSchema(BaseModel):
             "strategy_id": "0d478355-1439-4f73-a72c-04bb0b3917c7",
             "option_type": "CE",
             "position": "LONG",
-            "entry_received_at": "2023-05-22 05:11:01.117358",
+            "received_at": "2023-05-22 05:11:01.117358",
             "premium": 350.0,
         }
 

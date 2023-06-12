@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from aioredis import Redis
@@ -11,6 +12,10 @@ from app.api.dependency import is_valid_strategy
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
 from app.schemas.trade import EntryTradeSchema
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 trading_router = APIRouter(
@@ -65,4 +70,5 @@ async def post_nfo(
 
     # initiate celery buy_trade
     task_buying_trade.delay(payload)
+    logger.info(f"successfully placed buy order: {payload}")
     return {"message": "Trade initiated successfully"}
