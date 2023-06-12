@@ -1,6 +1,5 @@
 # !/usr/bin/env python
 # encoding: utf-8
-import importlib
 import logging
 import logging.config
 import os
@@ -86,5 +85,5 @@ class Config:
 
 
 def get_config(config_file: str = ConfigFile.PRODUCTION):
-    config_file_path = importlib.resources.files("app.cfg").joinpath(config_file)
+    config_file_path = f"{os.getcwd()}/cfg/{config_file}"
     return Config(pathlib.Path(config_file_path)).update(os.environ).configure_logging()
