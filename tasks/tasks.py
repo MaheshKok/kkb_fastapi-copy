@@ -187,6 +187,8 @@ async def task_buying_trade(trade_payload, config_file):
         await async_session.refresh(trade_model)
 
         # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
+        # it works i confirmed this with python_console with dummy data,
+        # interesting part is to get such trades i have to call lrange with 0, -1
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
         trade = RedisTradeSchema.from_orm(trade_model).json()
         if not await redis.exists(trade_key):
