@@ -85,5 +85,7 @@ class Config:
 
 
 def get_config(config_file: str = ConfigFile.PRODUCTION):
-    config_file_path = os.path.join(os.getcwd(), "cfg", config_file)
+    config_file_path = os.path.join(
+        pathlib.Path(__file__).parent.parent.absolute(), "cfg", config_file
+    )
     return Config(pathlib.Path(config_file_path)).update(os.environ).configure_logging()
