@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 
 import uvicorn
 from starlette.responses import JSONResponse
@@ -43,4 +44,4 @@ logging.error("Error message")
 
 if __name__ == "__main__":
     app = asyncio.run(start_application())
-    uvicorn.run(app)
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
