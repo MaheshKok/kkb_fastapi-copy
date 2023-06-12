@@ -7,15 +7,12 @@ from sqlalchemy import Float
 from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import String
-from sqlalchemy import event
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
 from app.database.models import StrategyModel
-from app.extensions.redis_cache import redis
-from app.schemas.trade import RedisTradeSchema
 
 
 class TradeModel(Base):
@@ -49,16 +46,3 @@ class TradeModel(Base):
         UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
     )
     strategy = relationship(StrategyModel, backref="trades")
-
-
-@event.listens_for(TradeModel, "after_insert")
-async def after_insert_listener(mapper, connection, target):
-    trade_key = f"{target.strategy_id}_{target.expiry}_{target.option_type}"
-    trade = RedisTradeSchema.from_orm(target).json()
-    if not await redis.exists(trade_key):
-        await redis.lpush(trade_key, trade)
-    else:
-        current_trades = await redis.lrange(trade_key, 0, -1)
-        updated_trades = current_trades + [trade]
-        await redis.delete(trade_key)
-        await redis.lpush(trade_key, *updated_trades)

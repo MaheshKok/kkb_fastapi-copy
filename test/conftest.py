@@ -6,6 +6,7 @@ import pytest_asyncio
 from asynctest import MagicMock
 from httpx import AsyncClient
 from sqlalchemy import QueuePool
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -13,6 +14,8 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import get_config
 from app.database import Base
 from app.database.base import get_db_url
+from app.database.models import TradeModel
+from app.schemas.trade import RedisTradeSchema
 from app.setup_app import get_application
 from app.utils.constants import ConfigFile
 from app.utils.constants import OptionType
@@ -201,8 +204,27 @@ async def patch_redis_delete_ongoing_trades(monkeypatch):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def patch_redis_add_ongoing_trades(monkeypatch):
+async def patch_redis_add_trades_to_new_key(monkeypatch):
+    mock_redis = MagicMock()
+    mock_redis.exists = AsyncMock(return_value=False)
+    mock_redis.lpush = AsyncMock(return_value=True)
+    monkeypatch.setattr("tasks.tasks.redis", mock_redis)
+    return mock_redis
+
+
+@pytest_asyncio.fixture(scope="function")
+async def patch_redis_add_trade_to_ongoing_trades(async_session, monkeypatch):
+    await create_open_trades(async_session=async_session, trades=10, ce_trade=True)
+    fetch_trades_query_ = await async_session.execute(select(TradeModel))
+    trade_models = fetch_trades_query_.scalars().all()
     mock_redis = MagicMock()
     mock_redis.exists = AsyncMock(return_value=True)
-    monkeypatch.setattr("app.database.models.trade.redis", mock_redis)
+    mock_redis.lrange = AsyncMock(
+        return_value=[
+            RedisTradeSchema.from_orm(trade_model).json() for trade_model in trade_models
+        ]
+    )
+    mock_redis.delete = AsyncMock(return_value=True)
+    mock_redis.lpush = AsyncMock(return_value=True)
+    monkeypatch.setattr("tasks.tasks.redis", mock_redis)
     return mock_redis

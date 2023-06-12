@@ -15,6 +15,7 @@ from app.extensions.redis_cache import redis
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.trade import CloseTradeSchema
+from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import TradeSchema
 from app.utils.option_chain import get_option_chain
 
@@ -143,6 +144,7 @@ async def task_buying_trade(trade_payload, config_file):
         premium=trade_payload.get("premium"),
         future_price=trade_payload.get("future_entry_price_received"),
     )
+    future_entry_price = await get_future_price(trade_payload["symbol"], trade_payload["expiry"])
 
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
     if not strike:
@@ -173,8 +175,26 @@ async def task_buying_trade(trade_payload, config_file):
     async with async_session_maker as async_session:
         # Use the AsyncSession to perform database operations
         # Example: Create a new entry in the database
-        trade_schema = TradeSchema(strike=strike, entry_price=entry_price, **trade_payload)
-        new_trade = TradeModel(**trade_schema.dict(exclude={"premium"}))
-        async_session.add(new_trade)
+        trade_schema = TradeSchema(
+            strike=strike,
+            entry_price=entry_price,
+            future_entry_price=future_entry_price,
+            **trade_payload,
+        )
+        trade_model = TradeModel(**trade_schema.dict(exclude={"premium"}))
+        async_session.add(trade_model)
         await async_session.commit()
+        await async_session.refresh(trade_model)
+
+        # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
+        trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
+        trade = RedisTradeSchema.from_orm(trade_model).json()
+        if not await redis.exists(trade_key):
+            await redis.lpush(trade_key, trade)
+        else:
+            current_trades = await redis.lrange(trade_key, 0, -1)
+            updated_trades = current_trades + [trade]
+            await redis.delete(trade_key)
+            await redis.lpush(trade_key, *updated_trades)
+
         return "successfully added trade to db"

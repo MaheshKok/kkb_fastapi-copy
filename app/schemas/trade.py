@@ -88,6 +88,7 @@ class TradeSchema(EntryTradeSchema):
     exit_price: Optional[float] = Field(description="Exit Price", example=450.5)
     profit: Optional[float] = Field(description="Profit", example=2500.0)
 
+    future_entry_price: float = Field(description="Future Entry Price", example=40600.5)
     future_exit_price: Optional[float] = Field(description="Future Exit Price", example=40700.5)
     future_profit: Optional[float] = Field(description="Future Profit", example=2500.0)
 
