@@ -26,6 +26,5 @@ def get_application(config_file) -> FastAPI:
     register_routers(app)
 
     # TODO: register scout and new relic
-    # await app_lifespan(app)
 
     return app
