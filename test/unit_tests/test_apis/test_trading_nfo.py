@@ -5,7 +5,7 @@ from asynctest import MagicMock
 from sqlalchemy import Select
 
 from app.database.models import StrategyModel
-from test.conftest import create_ecosystem
+from test.conftest import create_closed_trades
 from test.unit_tests.test_data import get_test_post_trade_payload
 
 
@@ -26,7 +26,7 @@ async def test_trading_nfo_options_with_invalid_strategy_id(async_client):
 async def test_trading_nfo_options_with_valid_strategy_id(
     async_session, async_client, monkeypatch
 ):
-    await create_ecosystem(async_session, users=1, strategies=1)
+    await create_closed_trades(async_session, users=1, strategies=1)
     fetch_strategy_query_ = await async_session.execute(Select(StrategyModel))
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 

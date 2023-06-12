@@ -126,6 +126,7 @@ async def task_closing_trade(trade_payload, redis_ongoing_key, redis_ongoing_tra
 
         await async_session.flush()
         await redis.delete(redis_ongoing_key)
+        return "successfully closed trades and updated the take_away_profit table with the profit and deleted the redis key"
 
 
 @celery.task(name="tasks.buying_trade")

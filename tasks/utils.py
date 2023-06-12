@@ -53,7 +53,7 @@ async def get_strike_and_exit_price_dict(trade_payload, redis_ongoing_trades) ->
 
     if broker_id := trade_payload.get("broker_id"):
         print("broker_id", broker_id)
-        # close trades in broker and get exit price
+        # TODO: close trades in broker and get exit price
         strike_exit_price_dict = {}
     else:
         # get exit price from option chain

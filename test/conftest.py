@@ -15,9 +15,11 @@ from app.database import Base
 from app.database.base import get_db_url
 from app.setup_app import get_application
 from app.utils.constants import ConfigFile
+from app.utils.constants import OptionType
 from test.factory.strategy import StrategyFactory
 from test.factory.take_away_profit import TakeAwayProfitFactory
 from test.factory.trade import CompletedTradeFactory
+from test.factory.trade import LiveTradeFactory
 from test.factory.user import UserFactory
 from test.unit_tests.test_data import get_ce_option_chain
 from test.unit_tests.test_data import get_pe_option_chain
@@ -93,7 +95,7 @@ async def async_client(async_session_maker):
         yield ac
 
 
-async def create_ecosystem(
+async def create_closed_trades(
     async_session, users=1, strategies=1, trades=0, take_away_profit=False, daily_profit=0
 ):
     for _ in range(users):
@@ -125,6 +127,46 @@ async def create_ecosystem(
                 )
 
 
+async def create_open_trades(
+    async_session,
+    users=1,
+    strategies=1,
+    trades=0,
+    take_away_profit=False,
+    daily_profit=0,
+    ce_trade=True,
+):
+    for _ in range(users):
+        user = await UserFactory(async_session=async_session)
+
+        for _ in range(strategies):
+            strategy = await StrategyFactory(
+                async_session=async_session,
+                user=user,
+                created_at=user.created_at + timedelta(days=1),
+            )
+
+            for _ in range(trades):
+                if ce_trade:
+                    await LiveTradeFactory(
+                        async_session=async_session, strategy=strategy, option_type=OptionType.CE
+                    )
+                else:
+                    await LiveTradeFactory(
+                        async_session=async_session, strategy=strategy, option_type=OptionType.PE
+                    )
+
+            if take_away_profit:
+                # Just assume there were trades in db which are closed and their profit was taken away
+                await TakeAwayProfitFactory(
+                    async_session=async_session,
+                    strategy=strategy,
+                    total_trades=trades,
+                    profit=50000.0,
+                    future_profit=75000.0,
+                )
+
+
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def patch_redis_option_chain(monkeypatch):
     async def mock_hgetall(key):
@@ -139,11 +181,20 @@ async def patch_redis_option_chain(monkeypatch):
     mock_redis = MagicMock()
     mock_redis.hgetall = AsyncMock(side_effect=mock_hgetall)
     monkeypatch.setattr("app.utils.option_chain.redis", mock_redis)
+    return mock_redis
 
+
+@pytest_asyncio.fixture(scope="function", autouse=True)
+async def patch_redis_expiry_list(monkeypatch):
     mock_redis = MagicMock()
     mock_redis.get = AsyncMock(return_value='["10 JUN 2023", "15 JUN 2023"]')
     monkeypatch.setattr("app.api.utils.redis", mock_redis)
+    return mock_redis
 
+
+@pytest_asyncio.fixture(scope="function")
+async def patch_redis_delete_ongoing_trades(monkeypatch):
     mock_redis = MagicMock()
     mock_redis.delete = AsyncMock(return_value=True)
     monkeypatch.setattr("tasks.tasks.redis", mock_redis)
+    return mock_redis
