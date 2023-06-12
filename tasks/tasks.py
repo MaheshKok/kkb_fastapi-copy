@@ -1,45 +1,131 @@
-from app.api.utils import get_strike_and_entry_price
-from app.core.config import get_config
-from app.database.base import get_async_session_maker
-from app.database.base import get_db_url
+from datetime import datetime
+
+from sqlalchemy import bindparam
+from sqlalchemy import select
+from sqlalchemy import update
+from tasks.utils import _get_async_session_maker
+from tasks.utils import get_future_price
+from tasks.utils import get_strike_and_entry_price
+from tasks.utils import get_strike_and_exit_price_dict
+
+from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
 from app.extensions.celery_tasks import celery
+from app.extensions.redis_cache import redis
+from app.schemas.enums import OptionTypeEnum
+from app.schemas.enums import PositionEnum
+from app.schemas.trade import CloseTradeSchema
 from app.schemas.trade import TradeSchema
 from app.utils.option_chain import get_option_chain
 
 
-# @celery.task(name="tasks.closing_trade")
-# def task_closing_trade(payload_data, redis_ongoing_trades, expiry):
-#     expiry_formatted = datetime.strptime(expiry, "%d %b %Y").date().strftime("%Y-%m-%d")
-#     redis_ongoing_trades_key = f"{payload_data['strategy_id']}_{expiry_formatted}_{'pe' if payload_data['option_type'] == 'ce' else 'ce'}"
-#     payload_data["expiry"] = expiry
-#     strike_exitprice_dict = {}
-#     if broker_id := payload_data.get("broker_id"):
-#         if broker_id == str(BROKER.alice_blue_id):
-#             # TODO: we need data back from alice blue to update the db and then pass it to close_ongoing_trades
-#             status, strike_exitprice_dict = close_alice_blue_trades(
-#                 expiry,
-#                 NFO_TYPE.OPTION,
-#                 redis_ongoing_trades,
-#                 payload_data,
-#             )
-#
-#             if status != "success":
-#                 return "failure"
-#
-#     return close_ongoing_trades(
-#         redis_ongoing_trades,
-#         payload_data,
-#         redis_ongoing_trades_key,
-#         broker_data=strike_exitprice_dict,
-#     )
-#
+def get_profit(entry_price, exit_price, quantity, position):
+    if position == PositionEnum.LONG:
+        profit = (exit_price - entry_price) * quantity
+    else:
+        profit = (exit_price - entry_price) * quantity
+
+    return profit
 
 
-def _get_async_session_maker(config_file):
-    config = get_config(config_file)
-    async_db_url = get_db_url(config)
-    return get_async_session_maker(async_db_url)
+@celery.task(name="tasks.closing_trade")
+async def task_closing_trade(trade_payload, redis_ongoing_key, redis_ongoing_trades, config_file):
+    strike_exit_price_dict = await get_strike_and_exit_price_dict(
+        trade_payload, redis_ongoing_trades
+    )
+    received_at = trade_payload["received_at"]
+    future_exit_price = await get_future_price(trade_payload["symbol"], trade_payload["expiry"])
+
+    async_session_maker = _get_async_session_maker(config_file)
+
+    updated_values = []
+    total_profit = 0
+    total_future_profit = 0
+    async with async_session_maker as async_session:
+        for trade in redis_ongoing_trades:
+            entry_price = trade["entry_price"]
+            quantity = trade["quantity"]
+            position = trade["position"]
+            exit_price = strike_exit_price_dict[trade["strike"]]
+            profit = get_profit(entry_price, exit_price, quantity, position)
+
+            future_entry_price = trade["future_entry_price"]
+            # if option_type is PE then position is SHORT and for CE its LONG
+            future_position = (
+                PositionEnum.SHORT
+                if trade["option_type"] == OptionTypeEnum.PE
+                else PositionEnum.LONG
+            )
+            future_profit = get_profit(
+                future_entry_price, future_exit_price, quantity, future_position
+            )
+
+            mapping = {
+                "id": trade["id"],
+                "exit_price": exit_price,
+                "profit": profit,
+                "future_exit_price": future_exit_price,
+                "future_profit": future_profit,
+                # received_exit_at is basically received_at
+                "received_at": received_at,
+            }
+            close_trade_schema = CloseTradeSchema(**mapping)
+            updated_values.append(close_trade_schema)
+            total_profit += close_trade_schema.profit
+            total_future_profit += close_trade_schema.future_profit
+
+        fetch_take_away_profit_query_ = await async_session.execute(
+            select(TakeAwayProfit).filter_by(strategy_id=trade["strategy_id"])
+        )
+        take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
+
+        if take_away_profit_model:
+            take_away_profit_model.profit += total_profit
+            take_away_profit_model.future_profit += total_future_profit
+            take_away_profit_model.total_trades += len(redis_ongoing_trades)
+            take_away_profit_model.updated_at = datetime.now()
+            await async_session.commit()
+        else:
+            take_away_profit_model = TakeAwayProfit(
+                profit=total_profit,
+                future_profit=total_future_profit,
+                strategy_id=trade["strategy_id"],
+                total_trades=len(redis_ongoing_trades),
+            )
+            async_session.add(take_away_profit_model)
+            await async_session.flush()
+
+            # Build a list of update statements for each dictionary in updated_data
+
+        update_stmt = (
+            update(TradeModel)
+            .where(TradeModel.id == bindparam("_id"))
+            .values(
+                {
+                    "exit_price": bindparam("exit_price"),
+                    "profit": bindparam("profit"),
+                    "future_exit_price": bindparam("future_exit_price"),
+                    "future_profit": bindparam("future_profit"),
+                    # received_exit_at is basically received_at
+                    "exit_received_at": bindparam("exit_received_at"),
+                }
+            )
+        )
+        for mapping in updated_values:
+            await async_session.execute(
+                update_stmt,
+                {
+                    "_id": mapping.id,
+                    "exit_price": mapping.exit_price,
+                    "profit": mapping.profit,
+                    "future_exit_price": mapping.future_exit_price,
+                    "future_profit": mapping.future_profit,
+                    "exit_received_at": mapping.exit_received_at,
+                },
+            )
+
+        await async_session.flush()
+        await redis.delete(redis_ongoing_key)
 
 
 @celery.task(name="tasks.buying_trade")
@@ -52,10 +138,9 @@ async def task_buying_trade(trade_payload, config_file):
 
     strike, entry_price = get_strike_and_entry_price(
         option_chain,
-        option_type=trade_payload["option_type"],
         strike=trade_payload.get("strike"),
         premium=trade_payload.get("premium"),
-        future_price=trade_payload.get("future_received_entry_price"),
+        future_price=trade_payload.get("future_entry_price_received"),
     )
 
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
@@ -84,10 +169,10 @@ async def task_buying_trade(trade_payload, config_file):
 
     async_session_maker = _get_async_session_maker(config_file)
 
-    async with async_session_maker() as session:
+    async with async_session_maker as async_session:
         # Use the AsyncSession to perform database operations
         # Example: Create a new entry in the database
         trade_schema = TradeSchema(strike=strike, entry_price=entry_price, **trade_payload)
         new_trade = TradeModel(**trade_schema.dict(exclude={"premium"}))
-        session.add(new_trade)
-        await session.commit()
+        async_session.add(new_trade)
+        await async_session.commit()

@@ -18,6 +18,6 @@ class TakeAwayProfitFactory(BaseFactory):
     future_profit = 36000.0
     strategy = factory.SubFactory(StrategyFactory)
 
-    created_at = factory.LazyFunction(datetime.utcnow() - timedelta(days=2))
-    updated_at = factory.LazyFunction(datetime.utcnow() - timedelta(hours=4))
+    created_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(days=2))
+    updated_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(hours=4))
     total_trades = 30

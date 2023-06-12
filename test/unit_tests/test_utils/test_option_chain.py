@@ -20,7 +20,9 @@ async def test_get_option_chain_ce(monkeypatch):
     option_chain = await get_option_chain("symbol", "expiry", option_type="CE", is_future=False)
 
     # Assertions or further tests based on the returned option_chain
-    assert option_chain == ce_option_chain
+    assert option_chain == dict(
+        sorted([(float(key), float(value)) for key, value in ce_option_chain.items()])
+    )
 
 
 @pytest.mark.asyncio
@@ -35,4 +37,6 @@ async def test_get_option_chain_pe(monkeypatch):
     option_chain = await get_option_chain("symbol", "expiry", option_type="PE", is_future=False)
 
     # Assertions or further tests based on the returned option_chain
-    assert option_chain == pe_option_chain
+    assert option_chain == dict(
+        sorted([(float(key), float(value)) for key, value in pe_option_chain.items()])
+    )

@@ -28,14 +28,15 @@ class TradeModel(Base):
     exit_price = Column(Float, nullable=True)
     profit = Column(Float, nullable=True)
 
-    future_received_entry_price = Column(Float, nullable=True)
+    future_entry_price_received = Column(Float, nullable=True)
     future_entry_price = Column(Float, nullable=True)
     future_exit_price = Column(Float, nullable=True)
     future_profit = Column(Float, nullable=True)
 
-    received_at = Column(TIMESTAMP(timezone=True), nullable=False)
-    placed_at = Column(TIMESTAMP(timezone=True), nullable=False, default=datetime.now())
-    exited_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    entry_received_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    entry_at = Column(TIMESTAMP(timezone=True), nullable=False, default=datetime.now())
+    exit_received_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    exit_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
     strike = Column(Float, nullable=True)
     option_type = Column(String, nullable=True, index=True)

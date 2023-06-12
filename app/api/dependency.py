@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import StrategyModel
 from app.extensions.redis_cache import redis
-from app.schemas.trade import TradePostSchema
+from app.schemas.trade import EntryTradeSchema
 
 
 def get_app(request: Request) -> FastAPI:
@@ -27,7 +27,7 @@ async def get_async_session(app: FastAPI = Depends(get_app)) -> AsyncSession:
 
 
 async def is_valid_strategy(
-    trade_post_schema: TradePostSchema, db: AsyncSession = Depends(get_async_session)
+    trade_post_schema: EntryTradeSchema, db: AsyncSession = Depends(get_async_session)
 ) -> Row | RowMapping:
     # TODO: Implement in memory caching for strategy_id and symbol
     # query database to check if strategy_id exists

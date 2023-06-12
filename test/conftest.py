@@ -17,7 +17,7 @@ from app.setup_app import get_application
 from app.utils.constants import ConfigFile
 from test.factory.strategy import StrategyFactory
 from test.factory.take_away_profit import TakeAwayProfitFactory
-from test.factory.trade import TradeFactory
+from test.factory.trade import CompletedTradeFactory
 from test.factory.user import UserFactory
 from test.unit_tests.test_data import get_ce_option_chain
 from test.unit_tests.test_data import get_pe_option_chain
@@ -106,25 +106,44 @@ async def create_ecosystem(
                 created_at=user.created_at + timedelta(days=1),
             )
 
+            total_profit = 0
+            total_future_profit = 0
             for _ in range(trades):
-                _ = await TradeFactory(async_session=async_session, strategy=strategy)
+                trade = await CompletedTradeFactory(
+                    async_session=async_session, strategy=strategy
+                )
+                total_profit += trade.profit
+                total_future_profit += trade.future_profit
 
             if take_away_profit:
-                TakeAwayProfitFactory(
-                    async_session=async_session, strategy=strategy, trades=trades
+                await TakeAwayProfitFactory(
+                    async_session=async_session,
+                    strategy=strategy,
+                    total_trades=trades,
+                    profit=total_profit,
+                    future_profit=total_future_profit,
                 )
 
 
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture(scope="function", autouse=True)
 async def patch_redis_option_chain(monkeypatch):
     async def mock_hgetall(key):
         # You can perform additional checks or logic based on the key if needed
         if "CE" in key:
             return get_ce_option_chain()
-        else:
+        elif "PE" in key:
             return get_pe_option_chain()
+        else:
+            return {"FUT": "44110.10"}
 
     mock_redis = MagicMock()
     mock_redis.hgetall = AsyncMock(side_effect=mock_hgetall)
-
     monkeypatch.setattr("app.utils.option_chain.redis", mock_redis)
+
+    mock_redis = MagicMock()
+    mock_redis.get = AsyncMock(return_value='["10 JUN 2023", "15 JUN 2023"]')
+    monkeypatch.setattr("app.api.utils.redis", mock_redis)
+
+    mock_redis = MagicMock()
+    mock_redis.delete = AsyncMock(return_value=True)
+    monkeypatch.setattr("tasks.tasks.redis", mock_redis)

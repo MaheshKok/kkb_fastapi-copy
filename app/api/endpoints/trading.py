@@ -10,7 +10,7 @@ from app.api.dependency import get_redis_pool
 from app.api.dependency import is_valid_strategy
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
-from app.schemas.trade import TradePostSchema
+from app.schemas.trade import EntryTradeSchema
 
 
 trading_router = APIRouter(
@@ -33,7 +33,7 @@ futures_router = APIRouter(
 @options_router.post("/options", status_code=200)
 async def post_nfo(
     request: Request,
-    trade_post_schema: TradePostSchema,
+    trade_post_schema: EntryTradeSchema,
     strategy: StrategyModel = Depends(is_valid_strategy),
     redis: Redis = Depends(get_redis_pool),
 ):

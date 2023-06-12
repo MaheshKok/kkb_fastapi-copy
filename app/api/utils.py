@@ -37,30 +37,3 @@ async def get_current_and_next_expiry(todays_date):
     )
 
     return current_expiry_date, next_expiry_date, is_today_expiry
-
-
-def get_strike_and_entry_price(
-    option_chain, option_type, strike=None, premium=None, future_price=None
-):
-    # use bisect to find the strike and its price from option chain
-    if strike:
-        if premium := option_chain.get(strike):
-            return strike, premium
-        # even if strike is not present in option chain then the closest strike will be fetched
-        # convert it to float for comparison
-        strike = float(strike)
-        for option_strike, option_strike_premium in option_chain.items():
-            if float(option_strike_premium) != 0.0 and float(option_strike) <= strike:
-                return strike, option_strike_premium
-
-    elif premium:
-        # get the strike and its price which is just less than the premium
-        for strike, strike_premium in option_chain.items():
-            if float(strike_premium) != 0.0 and float(strike_premium) <= premium:
-                return strike, strike_premium
-
-    elif future_price:
-        # TODO: to fetch the strike based on volume and open interest, add more data to option chain
-        pass
-
-    raise Exception("Either premium or strike or future_price should be provided")
