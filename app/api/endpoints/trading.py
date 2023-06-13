@@ -12,6 +12,7 @@ from app.api.dependency import is_valid_strategy
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
 from app.schemas.trade import EntryTradeSchema
+from app.utils.constants import ConfigFile
 
 
 logging.basicConfig(level=logging.INFO)
@@ -69,6 +70,6 @@ async def post_nfo(
         pass
 
     # initiate celery buy_trade
-    task_buying_trade.delay(payload)
+    task_buying_trade.delay(payload, ConfigFile.PRODUCTION)
     logger.info(f"successfully placed buy order: {payload}")
     return {"message": "Trade initiated successfully"}

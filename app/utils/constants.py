@@ -4,9 +4,9 @@ class Environment:
 
 
 class ConfigFile:
-    DEVELOPMENT = "starter.toml"
-    PRODUCTION = "starter.toml"
-    TEST = "local.toml"
+    DEVELOPMENT = "development.toml"
+    PRODUCTION = "production.toml"
+    TEST = "test.toml"
 
 
 class OptionType:
