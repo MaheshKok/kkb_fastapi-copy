@@ -42,6 +42,24 @@ class EntryTradeSchema(BaseModel):
         }
 
 
+class CeleryBuyTradeSchema(EntryTradeSchema):
+    symbol: str = Field(description="Symbol", example="BANKNIFTY")
+    expiry: date = Field(description="Expiry", example="2023-06-16")
+    entry_received_at: datetime = Field(
+        description="Received At", example="2023-05-22 05:11:01.117358"
+    )
+
+    class Config(BaseConfig):
+        orm_mode = True
+        json_encoders = {
+            datetime: lambda dt: dt.isoformat(),
+            datetime.date: lambda d: d.isoformat(),
+            uuid.UUID: str,
+            PositionEnum: lambda p: p.value,
+            OptionTypeEnum: lambda o: o.value,
+        }
+
+
 class RedisTradeSchema(EntryTradeSchema):
     # main purpose is for testing
 

@@ -4,13 +4,13 @@ from datetime import datetime
 from aioredis import Redis
 from fastapi import APIRouter
 from fastapi import Depends
-from fastapi import Request
 from tasks.tasks import task_buying_trade
 
 from app.api.dependency import get_redis_pool
 from app.api.dependency import is_valid_strategy
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
+from app.schemas.trade import CeleryBuyTradeSchema
 from app.schemas.trade import EntryTradeSchema
 from app.utils.constants import ConfigFile
 
@@ -38,21 +38,14 @@ futures_router = APIRouter(
 
 @options_router.post("/options", status_code=200)
 async def post_nfo(
-    request: Request,
     trade_post_schema: EntryTradeSchema,
     strategy: StrategyModel = Depends(is_valid_strategy),
     redis: Redis = Depends(get_redis_pool),
 ):
-    payload = await request.json()
-
     todays_date = datetime.now().date()
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
         todays_date
     )
-
-    payload["option_type"] = trade_post_schema.option_type
-    payload["symbol"] = strategy.symbol
-    payload["expiry"] = str(current_expiry_date)
 
     opposite_option_type_ongoing_trades_key = f"{trade_post_schema.strategy_id} {current_expiry_date} {'PE' if trade_post_schema.option_type == 'CE' else 'CE' }"
 
@@ -70,6 +63,11 @@ async def post_nfo(
         pass
 
     # initiate celery buy_trade
-    task_buying_trade.delay(payload, ConfigFile.PRODUCTION)
-    logger.info(f"successfully placed buy order: {payload}")
+    task_buying_trade.delay(
+        CeleryBuyTradeSchema(
+            **trade_post_schema.dict(), symbol=strategy.symbol, expiry=current_expiry_date
+        ).json(),
+        ConfigFile.PRODUCTION,
+    )
+
     return {"message": "Trade initiated successfully"}
