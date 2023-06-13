@@ -34,7 +34,7 @@ async def test_trading_nfo_options_with_valid_strategy_id(
     payload["strategy_id"] = str(strategy_model.id)
 
     mock_celery_buy_task = MagicMock()
-    mock_celery_buy_task.delay.return_value = AsyncMock()
+    mock_celery_buy_task.delay = AsyncMock(return_value=True)
     monkeypatch.setattr("app.api.endpoints.trading.task_buying_trade", mock_celery_buy_task)
 
     response = await async_client.post("/api/trading/nfo/options", json=payload)
