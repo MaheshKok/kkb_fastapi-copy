@@ -1,12 +1,12 @@
 from datetime import datetime
 
-from app.extensions.redis_cache import redis
+from app.extensions.redis_cache import async_redis
 from app.utils.constants import EDELWEISS_DATE_FORMAT
 from app.utils.in_memory_cache import current_and_next_expiry_cache
 
 
 async def get_expiry_list():
-    expiry_list = eval(await redis.get("expiry_list"))
+    expiry_list = eval(await async_redis.get("expiry_list"))
     return [datetime.strptime(expiry, EDELWEISS_DATE_FORMAT).date() for expiry in expiry_list]
 
 

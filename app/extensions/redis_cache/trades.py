@@ -3,7 +3,7 @@ import json
 from sqlalchemy import select
 
 from app.database.models import TradeModel
-from app.extensions.redis_cache import redis
+from app.extensions.redis_cache import async_redis
 from app.utils.constants import OptionType
 
 
@@ -47,20 +47,20 @@ async def cache_ongoing_trades(app):
             redis_key_trades_dict[counter_key] = []
 
         # pipeline ensures theres one round trip to redis
-        async with redis.pipeline() as pipe:
+        async with async_redis.pipeline() as pipe:
             # store ongoing trades in redis for faster access
             for key, db_trades_in_redis_structure in redis_key_trades_dict.items():
                 # this will make sure that if theres any discrepancy in db and redis, then redis will be updated
                 if not db_trades_in_redis_structure:
-                    await redis.delete(key)
+                    await async_redis.delete(key)
                     continue
 
-                redis_trades = json.loads(await redis.get(key) or "[]")
+                redis_trades = json.loads(await async_redis.get(key) or "[]")
                 # if ongoing trades are not present in redis or
                 # if the length of ongoing trades in redis is not equal to the length of ongoing trades in db
                 # then update the ongoing trades in redis
                 if not redis_trades:
-                    await redis.set(key, json.dumps(db_trades_in_redis_structure))
+                    await async_redis.set(key, json.dumps(db_trades_in_redis_structure))
                 elif redis_trades and len(redis_trades) != len(db_trades_in_redis_structure):
-                    await redis.set(key, json.dumps(db_trades_in_redis_structure))
+                    await async_redis.set(key, json.dumps(db_trades_in_redis_structure))
             await pipe.execute()

@@ -1,4 +1,4 @@
-from app.extensions.redis_cache import redis
+from app.extensions.redis_cache import async_redis
 
 
 async def get_option_chain(
@@ -11,7 +11,7 @@ async def get_option_chain(
         raise ValueError("Futures dont have option_type")
 
     future_or_option_type = "FUT" if is_future else option_type
-    option_chain = await redis.hgetall(f"{symbol} {expiry} {future_or_option_type}")
+    option_chain = await async_redis.hgetall(f"{symbol} {expiry} {future_or_option_type}")
     if option_chain:
         if option_type == "CE":
             return dict(

@@ -40,7 +40,7 @@ futures_router = APIRouter(
 async def post_nfo(
     trade_post_schema: EntryTradeSchema,
     strategy: StrategyModel = Depends(is_valid_strategy),
-    redis: Redis = Depends(get_redis_pool),
+    redis_client: Redis = Depends(get_redis_pool),
 ):
     todays_date = datetime.now().date()
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
@@ -55,7 +55,7 @@ async def post_nfo(
     # and buy new trade on BUY action,
     # To be decided in future, the name of actions
 
-    if opposite_option_type_ongoing_trades := await redis.get(
+    if opposite_option_type_ongoing_trades := await redis_client.get(
         opposite_option_type_ongoing_trades_key
     ):
         # initiate celery close_trade

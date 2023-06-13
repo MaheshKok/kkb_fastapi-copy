@@ -1,23 +1,38 @@
+import ssl
 from datetime import datetime
 
+from celery import Celery
 from sqlalchemy import bindparam
 from sqlalchemy import select
 from sqlalchemy import update
-from tasks.celery import celery
 from tasks.utils import _get_async_session_maker
 from tasks.utils import get_future_price
 from tasks.utils import get_strike_and_entry_price
 from tasks.utils import get_strike_and_exit_price_dict
 
+from app.core.config import get_config
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
-from app.extensions.redis_cache import redis
+from app.extensions.redis_cache import async_redis
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.trade import CloseTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import TradeSchema
 from app.utils.option_chain import get_option_chain
+
+
+config = get_config()
+redis_url = config.data["celery_redis"]["url"]
+
+celery = Celery(
+    "KokoBrothersBackend",
+    broker=redis_url,
+    backend=redis_url,
+    broker_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
+    redis_backend_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
+    include=["tasks.tasks"],
+)
 
 
 def get_profit(entry_price, exit_price, quantity, position):
@@ -126,7 +141,7 @@ async def task_closing_trade(trade_payload, redis_ongoing_key, redis_ongoing_tra
             )
 
         await async_session.flush()
-        await redis.delete(redis_ongoing_key)
+        await async_redis.delete(redis_ongoing_key)
         return "successfully closed trades and updated the take_away_profit table with the profit and deleted the redis key"
 
 
@@ -191,12 +206,12 @@ async def task_buying_trade(trade_payload, config_file):
         # interesting part is to get such trades i have to call lrange with 0, -1
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
         trade = RedisTradeSchema.from_orm(trade_model).json()
-        if not await redis.exists(trade_key):
-            await redis.lpush(trade_key, trade)
+        if not await async_redis.exists(trade_key):
+            await async_redis.lpush(trade_key, trade)
         else:
-            current_trades = await redis.lrange(trade_key, 0, -1)
+            current_trades = await async_redis.lrange(trade_key, 0, -1)
             updated_trades = current_trades + [trade]
-            await redis.delete(trade_key)
-            await redis.lpush(trade_key, *updated_trades)
+            await async_redis.delete(trade_key)
+            await async_redis.lpush(trade_key, *updated_trades)
 
         return "successfully added trade to db"

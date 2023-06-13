@@ -3,7 +3,7 @@ import json
 
 import httpx
 
-from app.extensions.redis_cache import redis
+from app.extensions.redis_cache import async_redis
 
 
 async def update_expiry_list(dpNm):
@@ -26,7 +26,7 @@ async def update_expiry_list(dpNm):
                 )
             )[0]["exp"][0]["expLst"]
 
-            await redis.set("expiry_list", json.dumps(expiry_list))
+            await async_redis.set("expiry_list", json.dumps(expiry_list))
             return expiry_list
         except Exception as e:
             # push error to sentry
