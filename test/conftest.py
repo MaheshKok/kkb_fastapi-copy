@@ -183,7 +183,7 @@ async def patch_redis_option_chain(monkeypatch):
 
     mock_redis = MagicMock()
     mock_redis.hgetall = AsyncMock(side_effect=mock_hgetall)
-    monkeypatch.setattr("app.utils.option_chain.redis", mock_redis)
+    monkeypatch.setattr("app.utils.option_chain.async_redis", mock_redis)
     return mock_redis
 
 
@@ -191,7 +191,7 @@ async def patch_redis_option_chain(monkeypatch):
 async def patch_redis_expiry_list(monkeypatch):
     mock_redis = MagicMock()
     mock_redis.get = AsyncMock(return_value='["10 JUN 2023", "15 JUN 2023"]')
-    monkeypatch.setattr("app.api.utils.redis", mock_redis)
+    monkeypatch.setattr("app.api.utils.async_redis", mock_redis)
     return mock_redis
 
 
@@ -199,7 +199,7 @@ async def patch_redis_expiry_list(monkeypatch):
 async def patch_redis_delete_ongoing_trades(monkeypatch):
     mock_redis = MagicMock()
     mock_redis.delete = AsyncMock(return_value=True)
-    monkeypatch.setattr("tasks.tasks.redis", mock_redis)
+    monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
     return mock_redis
 
 
@@ -208,7 +208,7 @@ async def patch_redis_add_trades_to_new_key(monkeypatch):
     mock_redis = MagicMock()
     mock_redis.exists = AsyncMock(return_value=False)
     mock_redis.lpush = AsyncMock(return_value=True)
-    monkeypatch.setattr("tasks.tasks.redis", mock_redis)
+    monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
     return mock_redis
 
 
@@ -226,5 +226,5 @@ async def patch_redis_add_trade_to_ongoing_trades(async_session, monkeypatch):
     )
     mock_redis.delete = AsyncMock(return_value=True)
     mock_redis.lpush = AsyncMock(return_value=True)
-    monkeypatch.setattr("tasks.tasks.redis", mock_redis)
+    monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
     return mock_redis

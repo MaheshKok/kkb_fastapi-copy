@@ -14,7 +14,7 @@ async def test_get_option_chain_ce(monkeypatch):
     mock_redis = MagicMock()
     mock_redis.hgetall = AsyncMock(return_value=ce_option_chain)
 
-    monkeypatch.setattr("app.utils.option_chain.redis", mock_redis)
+    monkeypatch.setattr("app.utils.option_chain.async_redis", mock_redis)
 
     # Call the function that uses redis.hgetall
     option_chain = await get_option_chain("symbol", "expiry", option_type="CE", is_future=False)
@@ -31,7 +31,7 @@ async def test_get_option_chain_pe(monkeypatch):
     mock_redis = MagicMock()
     mock_redis.hgetall = AsyncMock(return_value=pe_option_chain)
 
-    monkeypatch.setattr("app.utils.option_chain.redis", mock_redis)
+    monkeypatch.setattr("app.utils.option_chain.async_redis", mock_redis)
 
     # Call the function that uses redis.hgetall
     option_chain = await get_option_chain("symbol", "expiry", option_type="PE", is_future=False)
