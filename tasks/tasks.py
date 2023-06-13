@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import bindparam
 from sqlalchemy import select
 from sqlalchemy import update
+from tasks.celery import celery
 from tasks.utils import _get_async_session_maker
 from tasks.utils import get_future_price
 from tasks.utils import get_strike_and_entry_price
@@ -10,7 +11,6 @@ from tasks.utils import get_strike_and_exit_price_dict
 
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
-from app.extensions.celery_tasks import celery
 from app.extensions.redis_cache import redis
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
