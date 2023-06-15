@@ -1,12 +1,20 @@
 import asyncio
 import json
 
+import aioredis
 import httpx
 
-from app.extensions.redis_cache import async_redis
+from app.core.config import get_config
 
 
-async def update_expiry_list(dpNm):
+async def update_expiry_list(
+    config,
+    dpNm,
+):
+    async_redis = aioredis.StrictRedis.from_url(
+        config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+    )
+
     # for BankNifty and Nifty dpNm is INDX OPT
     # analyse the expiry list for other symbol
     headers = {
@@ -36,7 +44,8 @@ async def update_expiry_list(dpNm):
 
 
 if __name__ == "__main__":
-    asyncio.run(update_expiry_list("INDX OPT"))
+    config = get_config()
+    asyncio.run(update_expiry_list(config, "INDX OPT"))
 
 
 # its profiling code

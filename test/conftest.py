@@ -1,12 +1,12 @@
 from datetime import timedelta
 from unittest.mock import AsyncMock
 
+import aioredis
 import pytest as pytest
 import pytest_asyncio
 from asynctest import MagicMock
 from httpx import AsyncClient
 from sqlalchemy import QueuePool
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -14,8 +14,6 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import get_config
 from app.database import Base
 from app.database.base import get_db_url
-from app.database.models import TradeModel
-from app.schemas.trade import RedisTradeSchema
 from app.setup_app import get_application
 from app.utils.constants import ConfigFile
 from app.utils.constants import OptionType
@@ -28,6 +26,68 @@ from test.unit_tests.test_data import get_ce_option_chain
 from test.unit_tests.test_data import get_pe_option_chain
 
 
+@pytest_asyncio.fixture(scope="function")
+async def test_async_redis():
+    # try to make this fixture as session based instead of function based
+    test_config = get_config(ConfigFile.TEST)
+    _test_async_redis = await aioredis.StrictRedis.from_url(
+        test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+    )
+    # update redis with necessary data i.e expiry list, option chain etc
+    # await update_expiry_list(test_config, "INDX OPT")
+    #
+    # current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
+    #     test_async_redis, datetime.now().date()
+    # )
+    #
+    # prod_config = get_config()
+    # prod_async_redis = await aioredis.StrictRedis.from_url(
+    #     prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+    # )
+    # # add keys for future price as well
+    # keys = [
+    #     f"BANKNIFTY {current_expiry_date} CE",
+    #     f"BANKNIFTY {current_expiry_date} PE",
+    #     f"BANKNIFTY {next_expiry_date} CE",
+    #     f"BANKNIFTY {next_expiry_date} PE",
+    #     f"NIFTY {current_expiry_date} CE",
+    #     f"NIFTY {current_expiry_date} PE",
+    #     f"NIFTY {next_expiry_date} CE",
+    #     f"NIFTY {next_expiry_date} PE",
+    # ]
+    #
+    # monthly_expiry = None
+    # current_month_number = datetime.now().date().month
+    # expiry_list = await get_expiry_list(test_async_redis)
+    # for index, expiry_date in enumerate(expiry_list):
+    #     if expiry_date.month > current_month_number:
+    #         break
+    #     monthly_expiry = expiry_date
+    #
+    # if monthly_expiry:
+    #     keys.append(f"BANKNIFTY {monthly_expiry} FUT")
+    #     keys.append(f"NIFTY {monthly_expiry} FUT")
+    #
+    # start_time = datetime.now()
+    # print(f"start updating redis with option_chain: {start_time}")
+    # all_option_chain = {}
+    # async with prod_async_redis.pipeline() as pipe:
+    #     for key in keys:
+    #         option_chain = await prod_async_redis.hgetall(key)
+    #         if option_chain:
+    #             all_option_chain[key] = option_chain
+    # await pipe.execute()
+    #
+    # async with test_async_redis.pipeline() as pipe:
+    #     for key, option_chain in all_option_chain.items():
+    #         for strike, premium in option_chain.items():
+    #             await test_async_redis.hset(key, strike, premium)
+    # await pipe.execute()
+    #
+    # print(f"Time taken to update redis: {datetime.now() - start_time}")
+    return _test_async_redis
+
+
 @pytest.fixture(scope="function")
 def test_config():
     config = get_config(ConfigFile.TEST)
@@ -35,7 +95,7 @@ def test_config():
 
 
 @pytest_asyncio.fixture(scope="function")
-async def async_engine(test_config):
+async def test_async_engine(test_config):
     async_db_url = get_db_url(test_config)
     engine = create_async_engine(
         async_db_url,
@@ -59,25 +119,25 @@ async def async_engine(test_config):
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def db_cleanup(async_engine):
-    async with async_engine.begin() as conn:
+async def db_cleanup(test_async_engine):
+    async with test_async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     yield
 
-    async with async_engine.begin() as conn:
+    async with test_async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
 
 @pytest_asyncio.fixture(scope="function")
-async def async_session_maker(async_engine):
-    async_session_ = sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=True)
+async def test_async_session_maker(test_async_engine):
+    async_session_ = sessionmaker(test_async_engine, class_=AsyncSession, expire_on_commit=True)
     yield async_session_
 
 
 @pytest_asyncio.fixture(scope="function")
-async def async_session(async_session_maker):
-    async with async_session_maker() as async_session:
+async def test_async_session(test_async_session_maker):
+    async with test_async_session_maker() as async_session:
         try:
             yield async_session
             await async_session.commit()
@@ -89,12 +149,19 @@ async def async_session(async_session_maker):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def async_client(async_session_maker):
+async def test_app(test_async_session_maker, test_async_redis):
     app = get_application(ConfigFile.TEST)  # pragma: no cover
-    app.state.async_session_maker = async_session_maker  # pragma: no cover
+    app.state.async_session_maker = test_async_session_maker  # pragma: no cover
+    app.state.async_redis = test_async_redis  # pragma: no cover
+    yield app
 
+
+@pytest_asyncio.fixture(scope="function")
+async def test_async_client(test_app):
     # TODO: figure it out how to dynamically set the base_url
-    async with AsyncClient(app=app, base_url="http://localhost:8080/") as ac:  # pragma: no cover
+    async with AsyncClient(
+        app=test_app, base_url="http://localhost:8080/"
+    ) as ac:  # pragma: no cover
         yield ac
 
 
@@ -171,7 +238,7 @@ async def create_open_trades(
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def patch_redis_option_chain(monkeypatch):
+async def patch_redis_option_chain(test_app, monkeypatch):
     async def mock_hgetall(key):
         # You can perform additional checks or logic based on the key if needed
         if "CE" in key:
@@ -183,48 +250,50 @@ async def patch_redis_option_chain(monkeypatch):
 
     mock_redis = MagicMock()
     mock_redis.hgetall = AsyncMock(side_effect=mock_hgetall)
-    monkeypatch.setattr("app.utils.option_chain.async_redis", mock_redis)
+    test_app.state.async_redis = mock_redis
+    # monkeypatch.setattr("app.utils.option_chain.async_redis", mock_redis)
     return mock_redis
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def patch_redis_expiry_list(monkeypatch):
+async def patch_redis_expiry_list(test_app, monkeypatch):
     mock_redis = MagicMock()
     mock_redis.get = AsyncMock(return_value='["10 JUN 2023", "15 JUN 2023"]')
-    monkeypatch.setattr("app.api.utils.async_redis", mock_redis)
+    test_app.state.async_redis = mock_redis
+    # monkeypatch.setattr("app.api.utils.async_redis", mock_redis)
     return mock_redis
 
 
-@pytest_asyncio.fixture(scope="function")
-async def patch_redis_delete_ongoing_trades(monkeypatch):
-    mock_redis = MagicMock()
-    mock_redis.delete = AsyncMock(return_value=True)
-    monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
-    return mock_redis
-
-
-@pytest_asyncio.fixture(scope="function")
-async def patch_redis_add_trades_to_new_key(monkeypatch):
-    mock_redis = MagicMock()
-    mock_redis.exists = AsyncMock(return_value=False)
-    mock_redis.lpush = AsyncMock(return_value=True)
-    monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
-    return mock_redis
-
-
-@pytest_asyncio.fixture(scope="function")
-async def patch_redis_add_trade_to_ongoing_trades(async_session, monkeypatch):
-    await create_open_trades(async_session=async_session, trades=10, ce_trade=True)
-    fetch_trades_query_ = await async_session.execute(select(TradeModel))
-    trade_models = fetch_trades_query_.scalars().all()
-    mock_redis = MagicMock()
-    mock_redis.exists = AsyncMock(return_value=True)
-    mock_redis.lrange = AsyncMock(
-        return_value=[
-            RedisTradeSchema.from_orm(trade_model).json() for trade_model in trade_models
-        ]
-    )
-    mock_redis.delete = AsyncMock(return_value=True)
-    mock_redis.lpush = AsyncMock(return_value=True)
-    monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
-    return mock_redis
+# @pytest_asyncio.fixture(scope="function")
+# async def patch_redis_delete_ongoing_trades(monkeypatch):
+#     mock_redis = MagicMock()
+#     mock_redis.delete = AsyncMock(return_value=True)
+#     monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
+#     return mock_redis
+#
+#
+# @pytest_asyncio.fixture(scope="function")
+# async def patch_redis_add_trades_to_new_key(monkeypatch):
+#     mock_redis = MagicMock()
+#     mock_redis.exists = AsyncMock(return_value=False)
+#     mock_redis.lpush = AsyncMock(return_value=True)
+#     monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
+#     return mock_redis
+#
+#
+# @pytest_asyncio.fixture(scope="function")
+# async def patch_redis_add_trade_to_ongoing_trades(test_async_session, monkeypatch):
+#     await create_open_trades(async_session=test_async_session, trades=10, ce_trade=True)
+#     fetch_trades_query_ = await test_async_session.execute(select(TradeModel))
+#     trade_models = fetch_trades_query_.scalars().all()
+#     mock_redis = MagicMock()
+#     mock_redis.exists = AsyncMock(return_value=True)
+#     mock_redis.lrange = AsyncMock(
+#         return_value=[
+#             RedisTradeSchema.from_orm(trade_model).json() for trade_model in trade_models
+#         ]
+#     )
+#     mock_redis.delete = AsyncMock(return_value=True)
+#     mock_redis.lpush = AsyncMock(return_value=True)
+#     monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
+#     return mock_redis

@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from fastapi import Depends
 from tasks.tasks import task_buying_trade
 
-from app.api.dependency import get_redis_pool
+from app.api.dependency import get_async_redis
 from app.api.dependency import is_valid_strategy
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
@@ -40,11 +40,11 @@ futures_router = APIRouter(
 async def post_nfo(
     trade_post_schema: EntryTradeSchema,
     strategy: StrategyModel = Depends(is_valid_strategy),
-    redis_client: Redis = Depends(get_redis_pool),
+    async_redis: Redis = Depends(get_async_redis),
 ):
     todays_date = datetime.now().date()
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-        todays_date
+        async_redis, todays_date
     )
 
     opposite_option_type_ongoing_trades_key = f"{trade_post_schema.strategy_id} {current_expiry_date} {'PE' if trade_post_schema.option_type == 'CE' else 'CE' }"
@@ -55,7 +55,7 @@ async def post_nfo(
     # and buy new trade on BUY action,
     # To be decided in future, the name of actions
 
-    if opposite_option_type_ongoing_trades := await redis_client.get(
+    if opposite_option_type_ongoing_trades := await async_redis.get(
         opposite_option_type_ongoing_trades_key
     ):
         # initiate celery close_trade

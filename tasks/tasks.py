@@ -6,6 +6,7 @@ from sqlalchemy import bindparam
 from sqlalchemy import select
 from sqlalchemy import update
 from tasks.utils import _get_async_session_maker
+from tasks.utils import get_async_redis
 from tasks.utils import get_future_price
 from tasks.utils import get_strike_and_entry_price
 from tasks.utils import get_strike_and_exit_price_dict
@@ -13,7 +14,6 @@ from tasks.utils import get_strike_and_exit_price_dict
 from app.core.config import get_config
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
-from app.extensions.redis_cache import async_redis
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.trade import CloseTradeSchema
@@ -46,11 +46,15 @@ def get_profit(entry_price, exit_price, quantity, position):
 
 @celery.task(name="tasks.closing_trade")
 async def task_closing_trade(trade_payload, redis_ongoing_key, redis_ongoing_trades, config_file):
+    async_redis = await get_async_redis(config_file)
+
     strike_exit_price_dict = await get_strike_and_exit_price_dict(
-        trade_payload, redis_ongoing_trades
+        async_redis, trade_payload, redis_ongoing_trades
     )
     received_at = trade_payload["received_at"]
-    future_exit_price = await get_future_price(trade_payload["symbol"], trade_payload["expiry"])
+    future_exit_price = await get_future_price(
+        async_redis, trade_payload["symbol"], trade_payload["expiry"]
+    )
 
     async_session_maker = _get_async_session_maker(config_file)
 
@@ -147,7 +151,10 @@ async def task_closing_trade(trade_payload, redis_ongoing_key, redis_ongoing_tra
 
 @celery.task(name="tasks.buying_trade")
 async def task_buying_trade(trade_payload, config_file):
+    async_redis = await get_async_redis(config_file)
+
     option_chain = await get_option_chain(
+        async_redis,
         trade_payload["symbol"],
         expiry=trade_payload["expiry"],
         option_type=trade_payload["option_type"],
@@ -159,7 +166,9 @@ async def task_buying_trade(trade_payload, config_file):
         premium=trade_payload.get("premium"),
         future_price=trade_payload.get("future_entry_price_received"),
     )
-    future_entry_price = await get_future_price(trade_payload["symbol"], trade_payload["expiry"])
+    future_entry_price = await get_future_price(
+        async_redis, trade_payload["symbol"], trade_payload["expiry"]
+    )
 
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
     if not strike:
@@ -204,6 +213,7 @@ async def task_buying_trade(trade_payload, config_file):
         # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
         # it works i confirmed this with python_console with dummy data,
         # interesting part is to get such trades i have to call lrange with 0, -1
+        async_redis = await get_async_redis(config_file)
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
         trade = RedisTradeSchema.from_orm(trade_model).json()
         if not await async_redis.exists(trade_key):

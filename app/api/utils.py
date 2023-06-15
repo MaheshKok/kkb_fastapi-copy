@@ -1,23 +1,22 @@
 from datetime import datetime
 
-from app.extensions.redis_cache import async_redis
 from app.utils.constants import EDELWEISS_DATE_FORMAT
 from app.utils.in_memory_cache import current_and_next_expiry_cache
 
 
-async def get_expiry_list():
+async def get_expiry_list(async_redis):
     expiry_list = eval(await async_redis.get("expiry_list"))
     return [datetime.strptime(expiry, EDELWEISS_DATE_FORMAT).date() for expiry in expiry_list]
 
 
-async def get_current_and_next_expiry(todays_date):
+async def get_current_and_next_expiry(async_redis, todays_date):
     if todays_date in current_and_next_expiry_cache:
         return current_and_next_expiry_cache[todays_date]
 
     is_today_expiry = False
     current_expiry_date = None
     next_expiry_date = None
-    expiry_list = await get_expiry_list()
+    expiry_list = await get_expiry_list(async_redis)
     for index, expiry_date in enumerate(expiry_list):
         if todays_date > expiry_date:
             continue

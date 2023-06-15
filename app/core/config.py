@@ -84,7 +84,7 @@ class Config:
         return self
 
 
-def get_config(config_file: str = ConfigFile.PRODUCTION):
+def get_config(config_file: str = ConfigFile.PRODUCTION) -> Config:
     config_file_path = os.path.join(
         pathlib.Path(__file__).parent.parent.absolute(), "cfg", config_file
     )

@@ -3,11 +3,10 @@ import json
 from sqlalchemy import select
 
 from app.database.models import TradeModel
-from app.extensions.redis_cache import async_redis
 from app.utils.constants import OptionType
 
 
-async def cache_ongoing_trades(app):
+async def cache_ongoing_trades(app, async_redis):
     """
     fetch all ongoing trades using filter exited_at=None from db using sqlalchemy
     create an empty dict redis_key_trades_dict ={}

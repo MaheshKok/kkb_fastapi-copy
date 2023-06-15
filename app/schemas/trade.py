@@ -127,5 +127,6 @@ class TradeSchema(EntryTradeSchema):
         # it will be fetched from strategy and attached to the payload that will go in TradeSchema,
         return {
             **values,
+            "received_at": values.pop("entry_received_at"),
             "instrument": f"{values['symbol']}{values['expiry'].strftime('%d%b%y').upper()}{values['strike']}{values['option_type']}",
         }

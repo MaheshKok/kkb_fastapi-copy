@@ -8,26 +8,26 @@ from test.factory.user import UserFactory
 
 
 @pytest.mark.asyncio
-async def test_trade_factory(async_session):
-    user = await UserFactory(async_session=async_session)
-    strategy = await StrategyFactory(async_session=async_session, user=user)
+async def test_trade_factory(test_async_session):
+    user = await UserFactory(async_session=test_async_session)
+    strategy = await StrategyFactory(async_session=test_async_session, user=user)
 
     for _ in range(10):
-        _ = await CompletedTradeFactory(async_session=async_session, strategy=strategy)
+        _ = await CompletedTradeFactory(async_session=test_async_session, strategy=strategy)
 
-    result = await async_session.execute(select(TradeModel))
+    result = await test_async_session.execute(select(TradeModel))
     assert len(result.all()) == 10
 
 
 @pytest.mark.asyncio
-async def test_trade_factory_with_invalid_position(async_session):
-    user = await UserFactory(async_session=async_session)
-    strategy = await StrategyFactory(async_session=async_session, user=user)
+async def test_trade_factory_with_invalid_position(test_async_session):
+    user = await UserFactory(async_session=test_async_session)
+    strategy = await StrategyFactory(async_session=test_async_session, user=user)
 
     for _ in range(10):
         _ = await CompletedTradeFactory(
-            async_session=async_session, strategy=strategy, position="INVALID"
+            async_session=test_async_session, strategy=strategy, position="INVALID"
         )
 
-    result = await async_session.execute(select(TradeModel))
+    result = await test_async_session.execute(select(TradeModel))
     assert len(result.all()) == 10

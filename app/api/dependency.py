@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import StrategyModel
-from app.extensions.redis_cache import async_redis
 from app.schemas.trade import EntryTradeSchema
 
 
@@ -40,8 +39,5 @@ async def is_valid_strategy(
     return strategy_db
 
 
-async def get_redis_pool() -> Redis:
-    try:
-        yield async_redis
-    finally:
-        await async_redis.close()
+async def get_async_redis(app: FastAPI = Depends(get_app)) -> Redis:
+    yield app.state.async_redis

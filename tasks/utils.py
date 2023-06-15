@@ -1,11 +1,15 @@
 from contextlib import asynccontextmanager
 
+import aioredis
+
 from app.core.config import get_config
 from app.database.base import get_async_session_maker
 from app.database.base import get_db_url
 from app.utils.option_chain import get_option_chain
 
 
+# somehow can we use app.state somehow to get the async_session_maker and get_async_redis
+# then we can manage the cleanup automatically as it has been done in lifespan
 @asynccontextmanager
 async def _get_async_session_maker(config_file):
     config = get_config(config_file)
@@ -23,24 +27,34 @@ async def _get_async_session_maker(config_file):
         await async_session.close()
 
 
+async def get_async_redis(config_file) -> aioredis.StrictRedis:
+    config = get_config(config_file)
+    async_redis = await aioredis.StrictRedis.from_url(
+        config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+    )
+    return async_redis
+
+
 async def get_exit_price_from_option_chain(
-    redis_ongoing_trades, symbol, expiry_date, option_type
+    async_redis, redis_ongoing_trades, symbol, expiry_date, option_type
 ):
     # reason for using set comprehension, we want the exit_price for all distinct strikes
     strikes = {trade["strike"] for trade in redis_ongoing_trades}
-    option_chain = await get_option_chain(symbol, expiry_date, option_type)
+    option_chain = await get_option_chain(async_redis, symbol, expiry_date, option_type)
     return {strike: option_chain[strike] for strike in strikes}
 
 
-async def get_future_price(symbol, expiry_date):
+async def get_future_price(async_redis, symbol, expiry_date):
     # get future price from redis
     # TODO: compute future price from argument expiry_data
 
-    future_option_chain = await get_option_chain(symbol, expiry_date, is_future=True)
+    future_option_chain = await get_option_chain(async_redis, symbol, expiry_date, is_future=True)
     return float(future_option_chain["FUT"])
 
 
-async def get_strike_and_exit_price_dict(trade_payload, redis_ongoing_trades) -> dict:
+async def get_strike_and_exit_price_dict(
+    async_redis, trade_payload, redis_ongoing_trades
+) -> dict:
     symbol = trade_payload["symbol"]
     expiry_date = trade_payload["expiry"]
     option_type = trade_payload["option_type"]
@@ -58,7 +72,7 @@ async def get_strike_and_exit_price_dict(trade_payload, redis_ongoing_trades) ->
     else:
         # get exit price from option chain
         strike_exit_price_dict = await get_exit_price_from_option_chain(
-            redis_ongoing_trades, symbol, expiry_date, ongoing_trades_option_type
+            async_redis, redis_ongoing_trades, symbol, expiry_date, ongoing_trades_option_type
         )
 
     return strike_exit_price_dict
