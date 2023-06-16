@@ -1,3 +1,4 @@
+from datetime import datetime
 from unittest.mock import AsyncMock
 
 import aioredis
@@ -10,7 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.api.utils import get_current_and_next_expiry
+from app.api.utils import get_expiry_list
 from app.core.config import get_config
+from app.cron.update_fno_expiry import update_expiry_list
 from app.database import Base
 from app.database.base import get_db_url
 from app.setup_app import get_application
@@ -19,18 +23,79 @@ from test.unit_tests.test_data import get_ce_option_chain
 from test.unit_tests.test_data import get_pe_option_chain
 
 
-@pytest.fixture(scope="session")
-async def test_async_redis():
+@pytest.fixture(scope="session", autouse=True)
+async def setup_redis():
     # try to make this fixture as session based instead of function based
     test_config = get_config(ConfigFile.TEST)
     _test_async_redis = await aioredis.StrictRedis.from_url(
         test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
     )
     # update redis with necessary data i.e expiry list, option chain etc
+    await update_expiry_list(test_config, "INDX OPT")
+
+    current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
+        _test_async_redis, datetime.now().date()
+    )
+
+    prod_config = get_config()
+    prod_async_redis = await aioredis.StrictRedis.from_url(
+        prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+    )
+    # add keys for future price as well
+    keys = [
+        f"BANKNIFTY {current_expiry_date} CE",
+        f"BANKNIFTY {current_expiry_date} PE",
+        f"BANKNIFTY {next_expiry_date} CE",
+        f"BANKNIFTY {next_expiry_date} PE",
+        f"NIFTY {current_expiry_date} CE",
+        f"NIFTY {current_expiry_date} PE",
+        f"NIFTY {next_expiry_date} CE",
+        f"NIFTY {next_expiry_date} PE",
+    ]
+
+    monthly_expiry = None
+    current_month_number = datetime.now().date().month
+    expiry_list = await get_expiry_list(_test_async_redis)
+    for _, expiry_date in enumerate(expiry_list):
+        if expiry_date.month > current_month_number:
+            break
+        monthly_expiry = expiry_date
+
+    if monthly_expiry:
+        keys.append(f"BANKNIFTY {monthly_expiry} FUT")
+        keys.append(f"NIFTY {monthly_expiry} FUT")
+
+    start_time = datetime.now()
+    print(f"start updating redis with option_chain: {start_time}")
+    all_option_chain = {}
+    async with prod_async_redis.pipeline() as pipe:
+        for key in keys:
+            option_chain = await prod_async_redis.hgetall(key)
+            if option_chain:
+                all_option_chain[key] = option_chain
+    await pipe.execute()
+
+    async with _test_async_redis.pipeline() as pipe:
+        for key, option_chain in all_option_chain.items():
+            for strike, premium in option_chain.items():
+                await _test_async_redis.hset(key, strike, premium)
+    await pipe.execute()
+
+    print(f"Time taken to update redis: {datetime.now() - start_time}")
+
+
+@pytest_asyncio.fixture(scope="function")
+async def test_async_redis():
+    # try to make this fixture as session based instead of function based
+    test_config = get_config(ConfigFile.TEST)
+    _test_async_redis = await aioredis.StrictRedis.from_url(
+        test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+    )
+    # # update redis with necessary data i.e expiry list, option chain etc
     # await update_expiry_list(test_config, "INDX OPT")
     #
     # current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-    #     test_async_redis, datetime.now().date()
+    #     _test_async_redis, datetime.now().date()
     # )
     #
     # prod_config = get_config()
@@ -51,7 +116,7 @@ async def test_async_redis():
     #
     # monthly_expiry = None
     # current_month_number = datetime.now().date().month
-    # expiry_list = await get_expiry_list(test_async_redis)
+    # expiry_list = await get_expiry_list(_test_async_redis)
     # for index, expiry_date in enumerate(expiry_list):
     #     if expiry_date.month > current_month_number:
     #         break
@@ -71,14 +136,14 @@ async def test_async_redis():
     #             all_option_chain[key] = option_chain
     # await pipe.execute()
     #
-    # async with test_async_redis.pipeline() as pipe:
+    # async with _test_async_redis.pipeline() as pipe:
     #     for key, option_chain in all_option_chain.items():
     #         for strike, premium in option_chain.items():
-    #             await test_async_redis.hset(key, strike, premium)
+    #             await _test_async_redis.hset(key, strike, premium)
     # await pipe.execute()
     #
     # print(f"Time taken to update redis: {datetime.now() - start_time}")
-    return _test_async_redis
+    yield _test_async_redis
 
 
 @pytest.fixture(scope="session")
@@ -147,6 +212,15 @@ async def test_app(test_async_session_maker, test_async_redis):
     app.state.async_session_maker = test_async_session_maker  # pragma: no cover
     app.state.async_redis = test_async_redis  # pragma: no cover
     yield app
+
+    # cleanup redis after test
+    # remove all stored trades and leave option chain and expiry list for other unit tests
+    async with test_async_redis.pipeline() as pipe:
+        for key in await test_async_redis.keys():
+            if "BANKNIFTY" in key or "NIFTY" in key or "expiry_list" in key:
+                continue
+            await test_async_redis.delete(key)
+    await pipe.execute()
 
 
 @pytest_asyncio.fixture(scope="function")

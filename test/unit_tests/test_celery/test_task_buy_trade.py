@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from sqlalchemy import Select
 from tasks.tasks import task_buying_trade
@@ -7,12 +9,15 @@ from app.database.models.strategy import StrategyModel
 from app.utils.constants import ConfigFile
 
 
+# import nest_asyncio
+#
+# nest_asyncio.apply()
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("option_type", ["CE", "PE"], ids=["CE Options", "PE Options"])
 async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
-    test_async_session,
-    option_type,
-    celery_buy_task_payload,
+    test_async_session, option_type, celery_buy_task_payload, test_async_redis
 ):
     if option_type == "PE":
         celery_buy_task_payload["option_type"] = "PE"
@@ -31,6 +36,10 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
     trade_model = trades[0]
     assert trade_model.strategy.id == strategy_model.id
     assert trade_model.entry_price <= celery_buy_task_payload["premium"]
+    key = f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}"
+    result = await test_async_redis.lrange(key, 0, -1)
+    assert len(result) == 1
+    assert json.loads(result[0])["id"] == str(trade_model.id)
 
 
 @pytest.mark.asyncio

@@ -64,3 +64,4 @@ redis==4.5.1
 asynctest~=0.13.0
 newrelic==8.8.0
 gunicorn==20.1.0
+nest_asyncio==1.5.6
