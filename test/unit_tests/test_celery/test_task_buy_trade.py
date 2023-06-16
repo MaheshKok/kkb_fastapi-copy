@@ -12,17 +12,15 @@ from app.utils.constants import ConfigFile
 async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
     test_async_session,
     option_type,
-    get_task_trade_payload,
+    celery_buy_task_payload,
 ):
-    test_trade_data = get_task_trade_payload
-
     if option_type == "PE":
-        test_trade_data["option_type"] = "PE"
+        celery_buy_task_payload["option_type"] = "PE"
 
     fetch_strategy_query_ = await test_async_session.execute(Select(StrategyModel))
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
-    await task_buying_trade(test_trade_data, ConfigFile.TEST)
+    await task_buying_trade(celery_buy_task_payload, ConfigFile.TEST)
 
     await test_async_session.flush()
     fetch_trades_query_ = await test_async_session.execute(
@@ -32,26 +30,25 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
     assert len(trades) == 11
     trade_model = trades[0]
     assert trade_model.strategy.id == strategy_model.id
-    assert trade_model.entry_price <= test_trade_data["premium"]
+    assert trade_model.entry_price <= celery_buy_task_payload["premium"]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("option_type", ["CE", "PE"], ids=["CE Options", "PE Options"])
 async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
-    test_async_session, test_async_redis, option_type, get_task_trade_payload
+    test_async_session, test_async_redis, option_type, celery_buy_task_payload
 ):
-    test_trade_data = get_task_trade_payload
     if option_type == "PE":
-        test_trade_data["option_type"] = "PE"
+        celery_buy_task_payload["option_type"] = "PE"
 
     # We dont need to create closed trades here explicitly
-    # because get_task_trade_payload already takes care of it
+    # because get_test_celery_buy_task_payload already takes care of it
 
     # query database for strategy
     fetch_strategy_query_ = await test_async_session.execute(Select(StrategyModel))
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
-    await task_buying_trade(test_trade_data, ConfigFile.TEST)
+    await task_buying_trade(celery_buy_task_payload, ConfigFile.TEST)
 
     await test_async_session.flush()
     # the top most trade is the one which is just created
@@ -62,7 +59,7 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
     assert len(trades) == 11
     trade_model = trades[0]
     assert trade_model.strategy.id == strategy_model.id
-    assert trade_model.entry_price <= test_trade_data["premium"]
+    assert trade_model.entry_price <= celery_buy_task_payload["premium"]
 
     # trades are being added to redis
 
@@ -72,20 +69,19 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
 )
 @pytest.mark.asyncio
 async def test_buy_trade_for_strike(
-    test_async_session, payload_strike, test_async_redis, get_task_trade_payload
+    test_async_session, payload_strike, test_async_redis, celery_buy_task_payload
 ):
-    test_trade_data = get_task_trade_payload
-    del test_trade_data["premium"]
-    test_trade_data["strike"] = payload_strike
+    del celery_buy_task_payload["premium"]
+    celery_buy_task_payload["strike"] = payload_strike
 
     # We dont need to create closed trades here explicitly
-    # because get_task_trade_payload already takes care of it
+    # because get_test_celery_buy_task_payload already takes care of it
 
     # query database for stragey
     fetch_strategy_query_ = await test_async_session.execute(Select(StrategyModel))
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
-    await task_buying_trade(test_trade_data, ConfigFile.TEST)
+    await task_buying_trade(celery_buy_task_payload, ConfigFile.TEST)
 
     await test_async_session.flush()
     # the top most trade is the one which is just created

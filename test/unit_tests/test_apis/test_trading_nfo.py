@@ -5,8 +5,8 @@ from asynctest import MagicMock
 from sqlalchemy import Select
 
 from app.database.models import StrategyModel
-from test.conftest import create_closed_trades
 from test.unit_tests.test_data import get_test_post_trade_payload
+from test.utils import create_closed_trades
 
 
 @pytest.mark.asyncio

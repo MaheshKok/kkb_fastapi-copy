@@ -7,8 +7,8 @@ import pytest
 
 from app.database.models import StrategyModel
 from app.schemas.enums import PositionEnum
+from test.factory import UserFactory
 from test.factory.base_factory import BaseFactory
-from test.factory.user import UserFactory
 
 
 @pytest.mark.asyncio
@@ -27,5 +27,4 @@ class StrategyFactory(BaseFactory):
     name = factory.Sequence(lambda n: f"strategy_{n}")
 
     user = factory.SubFactory(UserFactory)
-
     created_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(days=n))

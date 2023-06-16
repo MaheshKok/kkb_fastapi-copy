@@ -12,8 +12,8 @@ from app.database.models import TradeModel
 from app.database.models.strategy import StrategyModel
 from app.schemas.trade import RedisTradeSchema
 from app.utils.constants import ConfigFile
-from test.conftest import create_open_trades
 from test.unit_tests.test_data import get_test_post_trade_payload
+from test.utils import create_open_trades
 
 
 @pytest.mark.asyncio

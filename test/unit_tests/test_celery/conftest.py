@@ -1,18 +1,16 @@
 from datetime import datetime
 
-import pytest
 import pytest_asyncio
 from sqlalchemy import Select
 
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
-from test.conftest import create_closed_trades
 from test.unit_tests.test_data import get_test_post_trade_payload
+from test.utils import create_closed_trades
 
 
-@pytest.mark.asyncio
 @pytest_asyncio.fixture(scope="function")
-async def get_task_trade_payload(test_async_session, test_async_redis):
+async def celery_buy_task_payload(test_async_session, test_async_redis):
     post_trade_payload = get_test_post_trade_payload()
 
     await create_closed_trades(test_async_session, users=1, strategies=1, trades=10)
