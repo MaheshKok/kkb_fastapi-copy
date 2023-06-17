@@ -1,10 +1,9 @@
+import logging
 from datetime import datetime
-from unittest.mock import AsyncMock
 
 import aioredis
 import pytest as pytest
 import pytest_asyncio
-from asynctest import MagicMock
 from httpx import AsyncClient
 from sqlalchemy import QueuePool
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,13 +18,10 @@ from app.database import Base
 from app.database.base import get_db_url
 from app.setup_app import get_application
 from app.utils.constants import ConfigFile
-from test.unit_tests.test_data import get_ce_option_chain
-from test.unit_tests.test_data import get_pe_option_chain
 
 
 @pytest.fixture(scope="session", autouse=True)
 async def setup_redis():
-    # try to make this fixture as session based instead of function based
     test_config = get_config(ConfigFile.TEST)
     _test_async_redis = await aioredis.StrictRedis.from_url(
         test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
@@ -33,6 +29,7 @@ async def setup_redis():
     # update redis with necessary data i.e expiry list, option chain etc
     await update_expiry_list(test_config, "INDX OPT")
 
+    logging.info(f"Updated redis with expiry list: {datetime.now()}")
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
         _test_async_redis, datetime.now().date()
     )
@@ -66,7 +63,7 @@ async def setup_redis():
         keys.append(f"NIFTY {monthly_expiry} FUT")
 
     start_time = datetime.now()
-    print(f"start updating redis with option_chain: {start_time}")
+    logging.info(f"start updating redis with option_chain: {start_time}")
     all_option_chain = {}
     async with prod_async_redis.pipeline() as pipe:
         for key in keys:
@@ -74,6 +71,7 @@ async def setup_redis():
             if option_chain:
                 all_option_chain[key] = option_chain
     await pipe.execute()
+    logging.info(f"pulled option chain from prod redis: {datetime.now()}")
 
     async with _test_async_redis.pipeline() as pipe:
         for key, option_chain in all_option_chain.items():
@@ -81,68 +79,15 @@ async def setup_redis():
                 await _test_async_redis.hset(key, strike, premium)
     await pipe.execute()
 
-    print(f"Time taken to update redis: {datetime.now() - start_time}")
+    logging.info(f"Time taken to update redis: {datetime.now() - start_time}")
 
 
 @pytest_asyncio.fixture(scope="function")
 async def test_async_redis():
-    # try to make this fixture as session based instead of function based
     test_config = get_config(ConfigFile.TEST)
     _test_async_redis = await aioredis.StrictRedis.from_url(
         test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
     )
-    # # update redis with necessary data i.e expiry list, option chain etc
-    # await update_expiry_list(test_config, "INDX OPT")
-    #
-    # current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-    #     _test_async_redis, datetime.now().date()
-    # )
-    #
-    # prod_config = get_config()
-    # prod_async_redis = await aioredis.StrictRedis.from_url(
-    #     prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
-    # )
-    # # add keys for future price as well
-    # keys = [
-    #     f"BANKNIFTY {current_expiry_date} CE",
-    #     f"BANKNIFTY {current_expiry_date} PE",
-    #     f"BANKNIFTY {next_expiry_date} CE",
-    #     f"BANKNIFTY {next_expiry_date} PE",
-    #     f"NIFTY {current_expiry_date} CE",
-    #     f"NIFTY {current_expiry_date} PE",
-    #     f"NIFTY {next_expiry_date} CE",
-    #     f"NIFTY {next_expiry_date} PE",
-    # ]
-    #
-    # monthly_expiry = None
-    # current_month_number = datetime.now().date().month
-    # expiry_list = await get_expiry_list(_test_async_redis)
-    # for index, expiry_date in enumerate(expiry_list):
-    #     if expiry_date.month > current_month_number:
-    #         break
-    #     monthly_expiry = expiry_date
-    #
-    # if monthly_expiry:
-    #     keys.append(f"BANKNIFTY {monthly_expiry} FUT")
-    #     keys.append(f"NIFTY {monthly_expiry} FUT")
-    #
-    # start_time = datetime.now()
-    # print(f"start updating redis with option_chain: {start_time}")
-    # all_option_chain = {}
-    # async with prod_async_redis.pipeline() as pipe:
-    #     for key in keys:
-    #         option_chain = await prod_async_redis.hgetall(key)
-    #         if option_chain:
-    #             all_option_chain[key] = option_chain
-    # await pipe.execute()
-    #
-    # async with _test_async_redis.pipeline() as pipe:
-    #     for key, option_chain in all_option_chain.items():
-    #         for strike, premium in option_chain.items():
-    #             await _test_async_redis.hset(key, strike, premium)
-    # await pipe.execute()
-    #
-    # print(f"Time taken to update redis: {datetime.now() - start_time}")
     yield _test_async_redis
 
 
@@ -232,31 +177,31 @@ async def test_async_client(test_app):
         yield ac
 
 
-@pytest_asyncio.fixture(scope="function", autouse=True)
-async def patch_redis_option_chain(test_app, monkeypatch):
-    async def mock_hgetall(key):
-        # You can perform additional checks or logic based on the key if needed
-        if "CE" in key:
-            return get_ce_option_chain()
-        elif "PE" in key:
-            return get_pe_option_chain()
-        else:
-            return {"FUT": "44110.10"}
-
-    mock_redis = MagicMock()
-    mock_redis.hgetall = AsyncMock(side_effect=mock_hgetall)
-    test_app.state.async_redis = mock_redis
-    # monkeypatch.setattr("app.utils.option_chain.async_redis", mock_redis)
-    return mock_redis
-
-
-@pytest_asyncio.fixture(scope="function", autouse=True)
-async def patch_redis_expiry_list(test_app, monkeypatch):
-    mock_redis = MagicMock()
-    mock_redis.get = AsyncMock(return_value='["10 JUN 2023", "15 JUN 2023"]')
-    test_app.state.async_redis = mock_redis
-    # monkeypatch.setattr("app.api.utils.async_redis", mock_redis)
-    return mock_redis
+# @pytest_asyncio.fixture(scope="function", autouse=True)
+# async def patch_redis_option_chain(test_app, monkeypatch):
+#     async def mock_hgetall(key):
+#         # You can perform additional checks or logic based on the key if needed
+#         if "CE" in key:
+#             return get_ce_option_chain()
+#         elif "PE" in key:
+#             return get_pe_option_chain()
+#         else:
+#             return {"FUT": "44110.10"}
+#
+#     mock_redis = MagicMock()
+#     mock_redis.hgetall = AsyncMock(side_effect=mock_hgetall)
+#     test_app.state.async_redis = mock_redis
+#     # monkeypatch.setattr("app.utils.option_chain.async_redis", mock_redis)
+#     return mock_redis
+#
+#
+# @pytest_asyncio.fixture(scope="function", autouse=True)
+# async def patch_redis_expiry_list(test_app, monkeypatch):
+#     mock_redis = MagicMock()
+#     mock_redis.get = AsyncMock(return_value='["10 JUN 2023", "15 JUN 2023"]')
+#     test_app.state.async_redis = mock_redis
+#     # monkeypatch.setattr("app.api.utils.async_redis", mock_redis)
+#     return mock_redis
 
 
 # @pytest_asyncio.fixture(scope="function")

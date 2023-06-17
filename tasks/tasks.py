@@ -1,3 +1,4 @@
+import json
 import ssl
 from datetime import datetime
 
@@ -45,7 +46,10 @@ def get_profit(entry_price, exit_price, quantity, position):
 
 
 @celery.task(name="tasks.closing_trade")
-async def task_closing_trade(trade_payload, redis_ongoing_key, redis_ongoing_trades, config_file):
+async def task_closing_trade(
+    trade_payload, redis_ongoing_key, redis_ongoing_trades_json_list, config_file
+):
+    redis_ongoing_trades = [json.loads(trade) for trade in redis_ongoing_trades_json_list]
     async_redis = await get_async_redis(config_file)
 
     strike_exit_price_dict = await get_strike_and_exit_price_dict(

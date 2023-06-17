@@ -70,6 +70,11 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
     assert trade_model.strategy.id == strategy_model.id
     assert trade_model.entry_price <= celery_buy_task_payload["premium"]
 
+    key = f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}"
+    result = await test_async_redis.lrange(key, 0, -1)
+    assert len(result) == 1
+    assert json.loads(result[0])["id"] == str(trade_model.id)
+
     # trades are being added to redis
 
 
@@ -102,3 +107,8 @@ async def test_buy_trade_for_strike(
     trade_model = trades[0]
     assert trade_model.strategy.id == strategy_model.id
     assert trade_model.strike <= float(payload_strike)
+
+    key = f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}"
+    result = await test_async_redis.lrange(key, 0, -1)
+    assert len(result) == 1
+    assert json.loads(result[0])["id"] == str(trade_model.id)
