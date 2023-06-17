@@ -1,13 +1,5 @@
 ENVIRONMENT = "test"
 
-#[db]
-#host = "l8yc5u.stackhero-network.com"
-#port = "5432"
-#database = "test"
-#username = "admin"
-#password = "V7Bqqlbzx6zX9VAmcC0355dzZVNHdiYa"
-
-
 [db]
 host = "localhost"
 port = "5432"
@@ -15,9 +7,9 @@ database = "test"
 username = "postgres"
 password = "postgres"
 
+[celery_redis]
+url = "rediss://default:eb1101f635b44826807ba6992778829d@us1-right-muskox-39790.upstash.io:39790"
+
 
 [cache_redis]
 url = "redis://default:PaXXc09TmCTTdZ5krEk7GIQ1BYs6CtUr@redis-11831.c52.us-east-1-4.ec2.cloud.redislabs.com:11831"
-
-[celery_redis]
-url = "rediss://default:eb1101f635b44826807ba6992778829d@us1-right-muskox-39790.upstash.io:39790"

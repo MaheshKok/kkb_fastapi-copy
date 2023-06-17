@@ -7,8 +7,10 @@ database = "trading"
 username = "admin"
 password = "V7Bqqlbzx6zX9VAmcC0355dzZVNHdiYa"
 
-[cache_redis]
-url = "redis://:9jm85p9z1m28zf8v34jr8x7dgpw5hgar6pacs4trfbfe3rk78t2t@professional-owl-c222061bfc.redisgreen.net:11042"
 
 [celery_redis]
-url = "rediss://default:eb1101f635b44826807ba6992778829d@us1-right-muskox-39790.upstash.io:39790"
+url = "rediss://default:b58c9fd58a274c08a1eef6bfcc0a1a7f@us1-complete-halibut-37733.upstash.io:37733"
+
+
+[cache_redis]
+url = "redis://:9jm85p9z1m28zf8v34jr8x7dgpw5hgar6pacs4trfbfe3rk78t2t@professional-owl-c222061bfc.redisgreen.net:11042"

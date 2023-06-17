@@ -14,11 +14,8 @@ app = get_application(ConfigFile.PRODUCTION)
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s]: %(message)s",
-    handlers=[
-        logging.StreamHandler(),  # Log to console
-    ],
+    level=logging.WARNING,
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 # Log a sample message
