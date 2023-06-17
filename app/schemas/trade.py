@@ -29,6 +29,9 @@ class EntryTradeSchema(BaseModel):
     premium: Optional[float] = Field(description="Premium", example=350.0)
     strike: Optional[float] = Field(description="Strike", example=42500.0, default=0.0)
     position: PositionEnum = Field(description="Position", example="LONG")
+    broker_id: Optional[uuid.UUID] = Field(
+        description="Broker ID", example="dd9acef9-e6c4-4792-9d43-d266b4d685c3", default=None
+    )
 
     class Config:
         example = {

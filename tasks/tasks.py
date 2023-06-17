@@ -1,3 +1,4 @@
+import asyncio
 import json
 import ssl
 from datetime import datetime
@@ -17,6 +18,7 @@ from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
+from app.schemas.trade import CeleryBuyTradeSchema
 from app.schemas.trade import CloseTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import TradeSchema
@@ -33,6 +35,7 @@ celery = Celery(
     broker_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
     redis_backend_use_ssl={"ssl_cert_reqs": ssl.CERT_NONE},
     include=["tasks.tasks"],
+    broker_connection_retry_on_startup=True,
 )
 
 
@@ -154,36 +157,47 @@ async def task_closing_trade(
 
 
 @celery.task(name="tasks.buying_trade")
-async def task_buying_trade(trade_payload, config_file):
+def task_buying_trade(trade_payload, config_file):
+    # Create a new event loop
+    loop = asyncio.new_event_loop()
+
+    # Set the event loop as the default for the current context
+    asyncio.set_event_loop(loop)
+
+    # Use the event loop to run the asynchronous function
+    result = loop.run_until_complete(execute_celery_buy_async_task(trade_payload, config_file))
+
+    # Return the result
+    return result
+
+
+async def execute_celery_buy_async_task(trade_payload_json, config_file):
+    trade_payload_schema = CeleryBuyTradeSchema(**json.loads(trade_payload_json))
     async_redis = await get_async_redis(config_file)
 
     option_chain = await get_option_chain(
         async_redis,
-        trade_payload["symbol"],
-        expiry=trade_payload["expiry"],
-        option_type=trade_payload["option_type"],
+        trade_payload_schema.symbol,
+        expiry=trade_payload_schema.expiry,
+        option_type=trade_payload_schema.option_type,
     )
 
     strike, entry_price = get_strike_and_entry_price(
         option_chain,
-        strike=trade_payload.get("strike"),
-        premium=trade_payload.get("premium"),
-        future_price=trade_payload.get("future_entry_price_received"),
+        strike=trade_payload_schema.strike,
+        premium=trade_payload_schema.premium,
+        future_price=trade_payload_schema.future_entry_price_received,
     )
+
     future_entry_price = await get_future_price(
-        async_redis, trade_payload["symbol"], trade_payload["expiry"]
+        async_redis, trade_payload_schema.symbol, trade_payload_schema.expiry
     )
 
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
     if not strike:
         return None
 
-    # if we already have a strike in the payload then remove it
-    # as we have successfully fetched the available strike from option_chain
-    if "strike" in trade_payload:
-        trade_payload.pop("strike")
-
-    if broker_id := trade_payload.get("broker_id"):
+    if broker_id := trade_payload_schema.broker_id:
         print("broker_id", broker_id)
         # TODO: fix this for alice blue
         # status, entry_price = buy_alice_blue_trades(
@@ -198,6 +212,13 @@ async def task_buying_trade(trade_payload, config_file):
         #     # Order not successful so dont place it in db
         #     return None
 
+    # if we already have a strike in the payload then remove it
+    # as we have successfully fetched the available strike from option_chain
+
+    del trade_payload_schema.strike
+    del trade_payload_schema.premium
+    del trade_payload_schema.broker_id
+
     async_session_maker = _get_async_session_maker(config_file)
 
     async with async_session_maker as async_session:
@@ -207,9 +228,10 @@ async def task_buying_trade(trade_payload, config_file):
             strike=strike,
             entry_price=entry_price,
             future_entry_price=future_entry_price,
-            **trade_payload,
+            **trade_payload_schema.dict(),
         )
-        trade_model = TradeModel(**trade_schema.dict(exclude={"premium"}))
+
+        trade_model = TradeModel(**trade_schema.dict(exclude={"premium", "broker_id"}))
         async_session.add(trade_model)
         await async_session.commit()
         await async_session.refresh(trade_model)

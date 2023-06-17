@@ -63,7 +63,8 @@ async def post_nfo(
         pass
 
     # initiate celery buy_trade
-    await task_buying_trade.delay(
+
+    task_buying_trade.delay(
         CeleryBuyTradeSchema(
             **trade_post_schema.dict(), symbol=strategy.symbol, expiry=current_expiry_date
         ).json(),

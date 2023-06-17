@@ -13,7 +13,7 @@ from test.utils import create_open_trades
 
 
 @pytest_asyncio.fixture(scope="function")
-async def celery_buy_task_payload(test_async_session, test_async_redis):
+async def celery_buy_task_payload_dict(test_async_session, test_async_redis):
     post_trade_payload = get_test_post_trade_payload()
 
     await create_closed_trades(test_async_session, users=1, strategies=1, trades=10)
