@@ -114,7 +114,9 @@ class TradeSchema(EntryTradeSchema):
     future_profit: Optional[float] = Field(description="Future Profit", example=2500.0)
 
     entry_at: str = Field(
-        description="Placed At", default=datetime.now(), example="2023-05-22 05:11:04.117358+00"
+        description="Placed At",
+        default_factory=datetime.utcnow,
+        example="2023-05-22 05:11:04.117358+00",
     )
     exit_at: Optional[str] = Field(
         description="Exited At", example="2023-05-22 06:25:03.117358+00"
