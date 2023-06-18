@@ -30,19 +30,19 @@ async def cache_ongoing_trades(app, async_redis):
         # key should be combination of three columns strategy_id, expiry and option_type
         # then we can avoid the for loop and the redis_key_trades_dict
 
-        result = await session.execute(select(TradeModel).filter_by(exit_at=None))
-        db_ongoing_trades = result.scalars().all()
+        live_trades_query = await session.execute(select(TradeModel).filter_by(exit_at=None))
+        ongoing_trades_model = live_trades_query.scalars().all()
         redis_key_trades_dict = {}
-        for ongoing_trade in db_ongoing_trades:
-            key = (
-                f"{ongoing_trade.strategy_id} {ongoing_trade.expiry} {ongoing_trade.option_type}"
-            )
+        for ongoing_trade_model in ongoing_trades_model:
+            redis_key = f"{ongoing_trade_model.strategy_id} {ongoing_trade_model.expiry} {ongoing_trade_model.option_type}"
 
-            redis_key_trades_dict[key] = redis_key_trades_dict.get(key, []) + [ongoing_trade]
+            redis_key_trades_dict[redis_key] = redis_key_trades_dict.get(redis_key, []) + [
+                ongoing_trade_model
+            ]
 
             # counter_key is used to store the counter trade for the ongoing trade
             # if the ongoing trade is CE then the counter trade is PE and vice versa
-            counter_key = f"{ongoing_trade.strategy_id} {ongoing_trade.expiry} {OptionType.CE if ongoing_trade.option_type == OptionType.PE else OptionType.PE}"
+            counter_key = f"{ongoing_trade_model.strategy_id} {ongoing_trade_model.expiry} {OptionType.CE if ongoing_trade_model.option_type == OptionType.PE else OptionType.PE}"
             redis_key_trades_dict[counter_key] = []
 
         # pipeline ensures theres one round trip to redis
@@ -54,7 +54,7 @@ async def cache_ongoing_trades(app, async_redis):
                     await async_redis.delete(key)
                     continue
 
-                redis_trades = json.loads(await async_redis.get(key) or "[]")
+                redis_trades = await async_redis.lrange(key, 0, -1)
                 # if ongoing trades are not present in redis or
                 # if the length of ongoing trades in redis is not equal to the length of ongoing trades in db
                 # then update the ongoing trades in redis

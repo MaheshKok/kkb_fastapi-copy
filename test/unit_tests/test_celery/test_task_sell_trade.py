@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy import Select
 from sqlalchemy import select
-from tasks.tasks import task_closing_trade
+from tasks.tasks import execute_celery_exit_async_task
 
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
@@ -13,9 +13,9 @@ from test.unit_tests.test_celery.conftest import celery_sell_task_args
 async def test_sell_ce_trade_without_take_away_profit(test_async_session, test_async_redis):
     (
         strategy_model,
-        post_trade_payload,
+        payload_json,
         redis_ongoing_key,
-        redis_ongoing_trades,
+        redis_trades_json,
     ) = await celery_sell_task_args(
         test_async_session, test_async_redis, take_away_profit=False, ce_trade=True
     )
@@ -29,8 +29,8 @@ async def test_sell_ce_trade_without_take_away_profit(test_async_session, test_a
 
     assert await test_async_redis.exists(redis_ongoing_key)
 
-    await task_closing_trade(
-        post_trade_payload, redis_ongoing_key, redis_ongoing_trades, ConfigFile.TEST
+    await execute_celery_exit_async_task(
+        payload_json, redis_ongoing_key, redis_trades_json, ConfigFile.TEST
     )
 
     await test_async_session.flush()
@@ -53,9 +53,9 @@ async def test_sell_ce_trade_without_take_away_profit(test_async_session, test_a
 async def test_sell_ce_trade_updating_take_away_profit(test_async_session, test_async_redis):
     (
         strategy_model,
-        post_trade_payload,
+        payload_json,
         redis_ongoing_key,
-        redis_ongoing_trades,
+        redis_trades_json,
     ) = await celery_sell_task_args(
         test_async_session, test_async_redis, take_away_profit=True, ce_trade=True
     )
@@ -70,8 +70,8 @@ async def test_sell_ce_trade_updating_take_away_profit(test_async_session, test_
 
     assert await test_async_redis.exists(redis_ongoing_key)
 
-    await task_closing_trade(
-        post_trade_payload, redis_ongoing_key, redis_ongoing_trades, ConfigFile.TEST
+    await execute_celery_exit_async_task(
+        payload_json, redis_ongoing_key, redis_trades_json, ConfigFile.TEST
     )
 
     fetch_trades_query_ = await test_async_session.execute(Select(TradeModel))
@@ -100,9 +100,9 @@ async def test_sell_ce_trade_updating_take_away_profit(test_async_session, test_
 async def test_sell_pe_trade_without_take_away_profit(test_async_redis, test_async_session):
     (
         strategy_model,
-        post_trade_payload,
+        payload_json,
         redis_ongoing_key,
-        redis_ongoing_trades,
+        redis_trades_json,
     ) = await celery_sell_task_args(
         test_async_session, test_async_redis, take_away_profit=False, ce_trade=False
     )
@@ -116,8 +116,8 @@ async def test_sell_pe_trade_without_take_away_profit(test_async_redis, test_asy
 
     assert await test_async_redis.exists(redis_ongoing_key)
 
-    await task_closing_trade(
-        post_trade_payload, redis_ongoing_key, redis_ongoing_trades, ConfigFile.TEST
+    await execute_celery_exit_async_task(
+        payload_json, redis_ongoing_key, redis_trades_json, ConfigFile.TEST
     )
 
     await test_async_session.flush()
@@ -140,9 +140,9 @@ async def test_sell_pe_trade_without_take_away_profit(test_async_redis, test_asy
 async def test_sell_pe_trade_updating_take_away_profit(test_async_session, test_async_redis):
     (
         strategy_model,
-        post_trade_payload,
+        payload_json,
         redis_ongoing_key,
-        redis_ongoing_trades,
+        redis_trades_json,
     ) = await celery_sell_task_args(
         test_async_session, test_async_redis, take_away_profit=True, ce_trade=False
     )
@@ -157,8 +157,8 @@ async def test_sell_pe_trade_updating_take_away_profit(test_async_session, test_
 
     assert await test_async_redis.exists(redis_ongoing_key)
 
-    await task_closing_trade(
-        post_trade_payload, redis_ongoing_key, redis_ongoing_trades, ConfigFile.TEST
+    await execute_celery_exit_async_task(
+        payload_json, redis_ongoing_key, redis_trades_json, ConfigFile.TEST
     )
 
     fetch_trades_query_ = await test_async_session.execute(Select(TradeModel))

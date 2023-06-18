@@ -18,10 +18,10 @@ from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
-from app.schemas.trade import CeleryBuyTradeSchema
-from app.schemas.trade import CloseTradeSchema
+from app.schemas.trade import CeleryTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import TradeSchema
+from app.schemas.trade import TradeUpdateValuesSchema
 from app.utils.option_chain import get_option_chain
 
 
@@ -48,19 +48,38 @@ def get_profit(entry_price, exit_price, quantity, position):
     return profit
 
 
-@celery.task(name="tasks.closing_trade")
-async def task_closing_trade(
-    trade_payload, redis_ongoing_key, redis_ongoing_trades_json_list, config_file
+@celery.task(name="tasks.exiting_trades")
+def task_exiting_trades(payload_json, redis_ongoing_key, exiting_trades_json, config_file):
+    # Create a new event loop
+    loop = asyncio.new_event_loop()
+
+    # Set the event loop as the default for the current context
+    asyncio.set_event_loop(loop)
+
+    # Use the event loop to run the asynchronous function
+    result = loop.run_until_complete(
+        execute_celery_exit_async_task(
+            payload_json, redis_ongoing_key, exiting_trades_json, config_file
+        )
+    )
+
+    # Return the result
+    return result
+
+
+async def execute_celery_exit_async_task(
+    payload_json, redis_ongoing_key, exiting_trades_json, config_file
 ):
-    redis_ongoing_trades = [json.loads(trade) for trade in redis_ongoing_trades_json_list]
+    celery_trade_schema = CeleryTradeSchema(**json.loads(payload_json))
+    exiting_trades = [json.loads(trade) for trade in json.loads(exiting_trades_json)]
     async_redis = await get_async_redis(config_file)
 
     strike_exit_price_dict = await get_strike_and_exit_price_dict(
-        async_redis, trade_payload, redis_ongoing_trades
+        async_redis, celery_trade_schema, exiting_trades
     )
-    received_at = trade_payload["received_at"]
+
     future_exit_price = await get_future_price(
-        async_redis, trade_payload["symbol"], trade_payload["expiry"]
+        async_redis, celery_trade_schema.symbol, celery_trade_schema.expiry
     )
 
     async_session_maker = _get_async_session_maker(config_file)
@@ -69,7 +88,7 @@ async def task_closing_trade(
     total_profit = 0
     total_future_profit = 0
     async with async_session_maker as async_session:
-        for trade in redis_ongoing_trades:
+        for trade in exiting_trades:
             entry_price = trade["entry_price"]
             quantity = trade["quantity"]
             position = trade["position"]
@@ -93,10 +112,10 @@ async def task_closing_trade(
                 "profit": profit,
                 "future_exit_price": future_exit_price,
                 "future_profit": future_profit,
-                # received_exit_at is basically received_at
-                "received_at": received_at,
+                # received_exit_at is basically the signal received at
+                "received_at": celery_trade_schema.entry_received_at,
             }
-            close_trade_schema = CloseTradeSchema(**mapping)
+            close_trade_schema = TradeUpdateValuesSchema(**mapping)
             updated_values.append(close_trade_schema)
             total_profit += close_trade_schema.profit
             total_future_profit += close_trade_schema.future_profit
@@ -109,7 +128,7 @@ async def task_closing_trade(
         if take_away_profit_model:
             take_away_profit_model.profit += total_profit
             take_away_profit_model.future_profit += total_future_profit
-            take_away_profit_model.total_trades += len(redis_ongoing_trades)
+            take_away_profit_model.total_trades += len(exiting_trades)
             take_away_profit_model.updated_at = datetime.now()
             await async_session.commit()
         else:
@@ -117,7 +136,7 @@ async def task_closing_trade(
                 profit=total_profit,
                 future_profit=total_future_profit,
                 strategy_id=trade["strategy_id"],
-                total_trades=len(redis_ongoing_trades),
+                total_trades=len(exiting_trades),
             )
             async_session.add(take_away_profit_model)
             await async_session.flush()
@@ -157,7 +176,7 @@ async def task_closing_trade(
 
 
 @celery.task(name="tasks.buying_trade")
-def task_buying_trade(trade_payload, config_file):
+def task_buying_trade(payload_json, config_file):
     # Create a new event loop
     loop = asyncio.new_event_loop()
 
@@ -165,39 +184,39 @@ def task_buying_trade(trade_payload, config_file):
     asyncio.set_event_loop(loop)
 
     # Use the event loop to run the asynchronous function
-    result = loop.run_until_complete(execute_celery_buy_async_task(trade_payload, config_file))
+    result = loop.run_until_complete(execute_celery_buy_async_task(payload_json, config_file))
 
     # Return the result
     return result
 
 
 async def execute_celery_buy_async_task(trade_payload_json, config_file):
-    trade_payload_schema = CeleryBuyTradeSchema(**json.loads(trade_payload_json))
+    payload_schema = CeleryTradeSchema(**json.loads(trade_payload_json))
     async_redis = await get_async_redis(config_file)
 
     option_chain = await get_option_chain(
         async_redis,
-        trade_payload_schema.symbol,
-        expiry=trade_payload_schema.expiry,
-        option_type=trade_payload_schema.option_type,
+        payload_schema.symbol,
+        expiry=payload_schema.expiry,
+        option_type=payload_schema.option_type,
     )
 
     strike, entry_price = get_strike_and_entry_price(
         option_chain,
-        strike=trade_payload_schema.strike,
-        premium=trade_payload_schema.premium,
-        future_price=trade_payload_schema.future_entry_price_received,
+        strike=payload_schema.strike,
+        premium=payload_schema.premium,
+        future_price=payload_schema.future_entry_price_received,
     )
 
     future_entry_price = await get_future_price(
-        async_redis, trade_payload_schema.symbol, trade_payload_schema.expiry
+        async_redis, payload_schema.symbol, payload_schema.expiry
     )
 
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
     if not strike:
         return None
 
-    if broker_id := trade_payload_schema.broker_id:
+    if broker_id := payload_schema.broker_id:
         print("broker_id", broker_id)
         # TODO: fix this for alice blue
         # status, entry_price = buy_alice_blue_trades(
@@ -215,9 +234,9 @@ async def execute_celery_buy_async_task(trade_payload_json, config_file):
     # if we already have a strike in the payload then remove it
     # as we have successfully fetched the available strike from option_chain
 
-    del trade_payload_schema.strike
-    del trade_payload_schema.premium
-    del trade_payload_schema.broker_id
+    del payload_schema.strike
+    del payload_schema.premium
+    del payload_schema.broker_id
 
     async_session_maker = _get_async_session_maker(config_file)
 
@@ -228,7 +247,7 @@ async def execute_celery_buy_async_task(trade_payload_json, config_file):
             strike=strike,
             entry_price=entry_price,
             future_entry_price=future_entry_price,
-            **trade_payload_schema.dict(),
+            **payload_schema.dict(),
         )
 
         trade_model = TradeModel(**trade_schema.dict(exclude={"premium", "broker_id"}))

@@ -6,7 +6,7 @@ from tasks.tasks import execute_celery_buy_async_task
 
 from app.database.models import TradeModel
 from app.database.models.strategy import StrategyModel
-from app.schemas.trade import CeleryBuyTradeSchema
+from app.schemas.trade import CeleryTradeSchema
 from app.utils.constants import ConfigFile
 
 
@@ -22,7 +22,7 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
     await execute_celery_buy_async_task(
-        CeleryBuyTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
+        CeleryTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
     )
 
     await test_async_session.flush()
@@ -56,7 +56,7 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
     await execute_celery_buy_async_task(
-        CeleryBuyTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
+        CeleryTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
     )
 
     await test_async_session.flush()
@@ -96,7 +96,7 @@ async def test_buy_trade_for_strike(
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
     await execute_celery_buy_async_task(
-        CeleryBuyTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
+        CeleryTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
     )
 
     await test_async_session.flush()

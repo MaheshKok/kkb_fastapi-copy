@@ -45,7 +45,7 @@ class EntryTradeSchema(BaseModel):
         }
 
 
-class CeleryBuyTradeSchema(EntryTradeSchema):
+class CeleryTradeSchema(EntryTradeSchema):
     symbol: str = Field(description="Symbol", example="BANKNIFTY")
     expiry: date = Field(description="Expiry", example="2023-06-16")
     entry_received_at: datetime = Field(
@@ -87,7 +87,7 @@ class RedisTradeSchema(EntryTradeSchema):
         }
 
 
-class CloseTradeSchema(BaseModel):
+class TradeUpdateValuesSchema(BaseModel):
     id: uuid.UUID = Field(description="Trade ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3")
     exit_price: float = Field(description="Exit Price", example=450.5)
     profit: float = Field(description="Profit", example=2500.0)

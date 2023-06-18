@@ -5,6 +5,7 @@ import aioredis
 from app.core.config import get_config
 from app.database.base import get_async_session_maker
 from app.database.base import get_db_url
+from app.schemas.trade import CeleryTradeSchema
 from app.utils.option_chain import get_option_chain
 
 
@@ -53,26 +54,26 @@ async def get_future_price(async_redis, symbol, expiry_date):
 
 
 async def get_strike_and_exit_price_dict(
-    async_redis, trade_payload, redis_ongoing_trades
+    async_redis, celery_trade_schema: CeleryTradeSchema, redis_ongoing_trades
 ) -> dict:
-    symbol = trade_payload["symbol"]
-    expiry_date = trade_payload["expiry"]
-    option_type = trade_payload["option_type"]
-
     # Reason being trade_payload is an entry trade and we want to close all ongoing trades of opposite option_type
-    ongoing_trades_option_type = "PE" if option_type == "CE" else "CE"
+    ongoing_trades_option_type = "PE" if celery_trade_schema.option_type == "CE" else "CE"
 
     # TODO: Uncomment if i cant send dict as an argument via celery task
     # redis_ongoing_trades_key = f"{trade_payload['strategy_id']} {expiry_date} {'pe' if trade_payload['option_type'] == 'ce' else 'ce'}"
 
-    if broker_id := trade_payload.get("broker_id"):
-        print("broker_id", broker_id)
+    if celery_trade_schema.broker_id:
+        print("broker_id", celery_trade_schema.broker_id)
         # TODO: close trades in broker and get exit price
         strike_exit_price_dict = {}
     else:
         # get exit price from option chain
         strike_exit_price_dict = await get_exit_price_from_option_chain(
-            async_redis, redis_ongoing_trades, symbol, expiry_date, ongoing_trades_option_type
+            async_redis,
+            redis_ongoing_trades,
+            celery_trade_schema.symbol,
+            celery_trade_schema.expiry,
+            ongoing_trades_option_type,
         )
 
     return strike_exit_price_dict

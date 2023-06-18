@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 import pytest_asyncio
@@ -6,6 +7,7 @@ from sqlalchemy import Select
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
+from app.schemas.trade import CeleryTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from test.unit_tests.test_data import get_test_post_trade_payload
 from test.utils import create_closed_trades
@@ -63,9 +65,15 @@ async def celery_sell_task_args(
     post_trade_payload["symbol"] = strategy_model.symbol
     post_trade_payload["expiry"] = current_expiry_date
     post_trade_payload["option_type"] = "PE" if ce_trade else "CE"
+    post_trade_payload["entry_received_at"] = post_trade_payload.pop("received_at")
 
     redis_key = f"{strategy_model.id} {trade_models[0].expiry} {trade_models[0].option_type}"
     redis_trades = [RedisTradeSchema.from_orm(trade).json() for trade in trade_models]
 
     await test_async_redis.lpush(redis_key, *redis_trades)
-    return strategy_model, post_trade_payload, redis_key, redis_trades
+    return (
+        strategy_model,
+        CeleryTradeSchema(**post_trade_payload).json(),
+        redis_key,
+        json.dumps(redis_trades),
+    )
