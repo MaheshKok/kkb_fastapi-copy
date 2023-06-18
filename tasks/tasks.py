@@ -87,39 +87,38 @@ async def execute_celery_exit_async_task(
     updated_values = []
     total_profit = 0
     total_future_profit = 0
+
+    for trade in exiting_trades:
+        entry_price = trade["entry_price"]
+        quantity = trade["quantity"]
+        position = trade["position"]
+        exit_price = strike_exit_price_dict[trade["strike"]]
+        profit = get_profit(entry_price, exit_price, quantity, position)
+
+        future_entry_price = trade["future_entry_price"]
+        # if option_type is PE then position is SHORT and for CE its LONG
+        future_position = (
+            PositionEnum.SHORT if trade["option_type"] == OptionTypeEnum.PE else PositionEnum.LONG
+        )
+        future_profit = get_profit(
+            future_entry_price, future_exit_price, quantity, future_position
+        )
+
+        mapping = {
+            "id": trade["id"],
+            "exit_price": exit_price,
+            "profit": profit,
+            "future_exit_price": future_exit_price,
+            "future_profit": future_profit,
+            # received_exit_at is basically the signal received at
+            "received_at": celery_trade_schema.entry_received_at,
+        }
+        close_trade_schema = TradeUpdateValuesSchema(**mapping)
+        updated_values.append(close_trade_schema)
+        total_profit += close_trade_schema.profit
+        total_future_profit += close_trade_schema.future_profit
+
     async with async_session_maker as async_session:
-        for trade in exiting_trades:
-            entry_price = trade["entry_price"]
-            quantity = trade["quantity"]
-            position = trade["position"]
-            exit_price = strike_exit_price_dict[trade["strike"]]
-            profit = get_profit(entry_price, exit_price, quantity, position)
-
-            future_entry_price = trade["future_entry_price"]
-            # if option_type is PE then position is SHORT and for CE its LONG
-            future_position = (
-                PositionEnum.SHORT
-                if trade["option_type"] == OptionTypeEnum.PE
-                else PositionEnum.LONG
-            )
-            future_profit = get_profit(
-                future_entry_price, future_exit_price, quantity, future_position
-            )
-
-            mapping = {
-                "id": trade["id"],
-                "exit_price": exit_price,
-                "profit": profit,
-                "future_exit_price": future_exit_price,
-                "future_profit": future_profit,
-                # received_exit_at is basically the signal received at
-                "received_at": celery_trade_schema.entry_received_at,
-            }
-            close_trade_schema = TradeUpdateValuesSchema(**mapping)
-            updated_values.append(close_trade_schema)
-            total_profit += close_trade_schema.profit
-            total_future_profit += close_trade_schema.future_profit
-
         fetch_take_away_profit_query_ = await async_session.execute(
             select(TakeAwayProfit).filter_by(strategy_id=trade["strategy_id"])
         )
@@ -170,9 +169,9 @@ async def execute_celery_exit_async_task(
                 },
             )
 
-        await async_session.flush()
+        await async_session.commit()
         await async_redis.delete(redis_ongoing_key)
-        return "successfully closed trades and updated the take_away_profit table with the profit and deleted the redis key"
+    return "successfully closed trades and updated the take_away_profit table with the profit and deleted the redis key"
 
 
 @celery.task(name="tasks.buying_trade")
@@ -269,4 +268,4 @@ async def execute_celery_buy_async_task(trade_payload_json, config_file):
             await async_redis.delete(trade_key)
             await async_redis.lpush(trade_key, *updated_trades)
 
-        return "successfully added trade to db"
+    return "successfully added trade to db"

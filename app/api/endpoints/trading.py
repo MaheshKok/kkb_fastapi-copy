@@ -61,16 +61,19 @@ async def post_nfo(
         **trade_post_schema.dict(), symbol=strategy.symbol, expiry=current_expiry_date
     ).json()
 
-    if exiting_trades := await async_redis.lrange(exiting_trades_key, 0, -1):
-        exiting_trades_json = json.dumps(exiting_trades)
-        # initiate celery close_trade
-        print(f"found: {len(exiting_trades)} trades to be closed")
-        task_exiting_trades.delay(
-            celery_trade_payload_json,
-            exiting_trades_key,
-            exiting_trades_json,
-            ConfigFile.PRODUCTION,
-        )
+    try:
+        if exiting_trades := await async_redis.lrange(exiting_trades_key, 0, -1):
+            exiting_trades_json = json.dumps(exiting_trades)
+            # initiate celery close_trade
+            print(f"found: {len(exiting_trades)} trades to be closed")
+            task_exiting_trades.delay(
+                celery_trade_payload_json,
+                exiting_trades_key,
+                exiting_trades_json,
+                ConfigFile.PRODUCTION,
+            )
+    except Exception as e:
+        logging.info(f"Exception: {e}")
 
     # initiate celery buy_trade
 

@@ -18,25 +18,22 @@ def get_app(request: Request) -> FastAPI:
 
 async def get_async_session(app: FastAPI = Depends(get_app)) -> AsyncSession:
     async_session = app.state.async_session_maker()
-    try:
-        async with async_session.begin():
-            yield async_session
-    finally:
-        await async_session.close()
+    yield async_session
 
 
 async def is_valid_strategy(
-    trade_post_schema: EntryTradeSchema, db: AsyncSession = Depends(get_async_session)
+    trade_post_schema: EntryTradeSchema, async_session: AsyncSession = Depends(get_async_session)
 ) -> Row | RowMapping:
     # TODO: Implement in memory caching for strategy_id and symbol
-    # query database to check if strategy_id exists
-    _query = select(StrategyModel).where(StrategyModel.id == trade_post_schema.strategy_id)
-    result = await db.execute(_query)
-    strategy_db = result.scalars().one_or_none()
+    async with async_session.begin():
+        # query database to check if strategy_id exists
+        _query = select(StrategyModel).where(StrategyModel.id == trade_post_schema.strategy_id)
+        result = await async_session.execute(_query)
+        strategy_model = result.scalars().one_or_none()
 
-    if not strategy_db:
+    if not strategy_model:
         raise HTTPException(status_code=400, detail="Invalid strategy_id")
-    return strategy_db
+    return strategy_model
 
 
 async def get_async_redis(app: FastAPI = Depends(get_app)) -> Redis:
