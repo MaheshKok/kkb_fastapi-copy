@@ -1,39 +1,5 @@
-from contextlib import asynccontextmanager
-
-import aioredis
-
-from app.core.config import get_config
-from app.database.base import get_async_session_maker
-from app.database.base import get_db_url
 from app.schemas.trade import CeleryTradeSchema
 from app.utils.option_chain import get_option_chain
-
-
-# somehow can we use app.state somehow to get the async_session_maker and get_async_redis
-# then we can manage the cleanup automatically as it has been done in lifespan
-@asynccontextmanager
-async def _get_async_session_maker(config_file):
-    config = get_config(config_file)
-    async_db_url = get_db_url(config)
-    async_session_maker = get_async_session_maker(async_db_url)
-    async_session = async_session_maker()
-
-    try:
-        yield async_session
-        await async_session.commit()
-    except Exception as e:
-        await async_session.rollback()
-        raise e
-    finally:
-        await async_session.close()
-
-
-async def get_async_redis(config_file) -> aioredis.StrictRedis:
-    config = get_config(config_file)
-    async_redis = await aioredis.StrictRedis.from_url(
-        config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
-    )
-    return async_redis
 
 
 async def get_exit_price_from_option_chain(

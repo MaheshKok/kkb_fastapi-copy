@@ -3,18 +3,15 @@ import os
 
 import uvicorn
 
-from app.setup_app import get_application
+from app.create_app import get_app
 from app.utils.constants import ConfigFile
 
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-app = get_application(ConfigFile.PRODUCTION)
+app = get_app(ConfigFile.PRODUCTION)
 
 # Configure logging
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 

@@ -5,18 +5,18 @@ import aioredis
 import pytest as pytest
 import pytest_asyncio
 from httpx import AsyncClient
-from sqlalchemy import QueuePool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import QueuePool
 
 from app.api.utils import get_current_and_next_expiry
 from app.api.utils import get_expiry_list
 from app.core.config import get_config
+from app.create_app import get_app
 from app.cron.update_fno_expiry import update_expiry_list
 from app.database import Base
 from app.database.base import get_db_url
-from app.setup_app import get_application
 from app.utils.constants import ConfigFile
 
 
@@ -153,7 +153,7 @@ async def test_async_session(test_async_session_maker):
 
 @pytest_asyncio.fixture(scope="function")
 async def test_app(test_async_session_maker, test_async_redis):
-    app = get_application(ConfigFile.TEST)  # pragma: no cover
+    app = get_app(ConfigFile.TEST)  # pragma: no cover
     app.state.async_session_maker = test_async_session_maker  # pragma: no cover
     app.state.async_redis = test_async_redis  # pragma: no cover
     yield app

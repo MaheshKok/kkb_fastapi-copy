@@ -2,7 +2,7 @@ import json
 
 import pytest
 from sqlalchemy import Select
-from tasks.tasks import execute_celery_buy_async_task
+from tasks.execution import execute_celery_buy_trade_task
 
 from app.database.models import TradeModel
 from app.database.models.strategy import StrategyModel
@@ -21,7 +21,7 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
     fetch_strategy_query_ = await test_async_session.execute(Select(StrategyModel))
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
-    await execute_celery_buy_async_task(
+    await execute_celery_buy_trade_task(
         CeleryTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
     )
 
@@ -55,7 +55,7 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
     fetch_strategy_query_ = await test_async_session.execute(Select(StrategyModel))
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
-    await execute_celery_buy_async_task(
+    await execute_celery_buy_trade_task(
         CeleryTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
     )
 
@@ -95,7 +95,7 @@ async def test_buy_trade_for_strike(
     fetch_strategy_query_ = await test_async_session.execute(Select(StrategyModel))
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
-    await execute_celery_buy_async_task(
+    await execute_celery_buy_trade_task(
         CeleryTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
     )
 

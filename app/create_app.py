@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi_sa.middleware import DBSessionMiddleware
 
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.trading import options_router
@@ -13,12 +14,15 @@ def register_routers(app: FastAPI):
     pass
 
 
-def get_application(config_file) -> FastAPI:
+def get_app(config_file) -> FastAPI:
     config = get_config(config_file)
     app = FastAPI(
         title="Trading System API", debug=True, lifespan=lifespan
     )  # change debug based on environment
     app.state.config = config
+    app.add_middleware(
+        DBSessionMiddleware,
+    )
 
     # Add middleware, event handlers, etc. here
 

@@ -3,11 +3,10 @@ from fastapi import Depends
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
-from sqlalchemy import Row
-from sqlalchemy import RowMapping
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.base import db
 from app.database.models import StrategyModel
 from app.schemas.trade import EntryTradeSchema
 
@@ -21,15 +20,11 @@ async def get_async_session(app: FastAPI = Depends(get_app)) -> AsyncSession:
     yield async_session
 
 
-async def is_valid_strategy(
-    trade_post_schema: EntryTradeSchema, async_session: AsyncSession = Depends(get_async_session)
-) -> Row | RowMapping:
-    # TODO: Implement in memory caching for strategy_id and symbol
-    async with async_session.begin():
-        # query database to check if strategy_id exists
-        _query = select(StrategyModel).where(StrategyModel.id == trade_post_schema.strategy_id)
-        result = await async_session.execute(_query)
-        strategy_model = result.scalars().one_or_none()
+async def is_valid_strategy(trade_post_schema: EntryTradeSchema):
+    # query database to check if strategy_id exists
+    _query = select(StrategyModel).where(StrategyModel.id == trade_post_schema.strategy_id)
+    result = await db.session.execute(_query)
+    strategy_model = result.scalars().one_or_none()
 
     if not strategy_model:
         raise HTTPException(status_code=400, detail="Invalid strategy_id")
