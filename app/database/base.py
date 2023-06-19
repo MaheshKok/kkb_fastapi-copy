@@ -47,7 +47,20 @@ async def lifespan(app):
     async_db_url = get_db_url(app.state.config)
     # app.state.async_session_maker = get_async_session_maker(async_db_url)
 
-    db.init(async_db_url)
+    db.init(
+        async_db_url,
+        engine_kw={
+            # "echo": False,  # print all SQL statements
+            "pool_pre_ping": True,
+            # feature will normally emit SQL equivalent to “SELECT 1” each time a connection is checked out from the pool
+            "pool_size": 80,  # number of connections to keep open at a time
+            "max_overflow": 100,  # number of connections to allow to be opened above pool_size
+            "connect_args": {
+                "prepared_statement_cache_size": 0,  # disable prepared statement cache
+                "statement_cache_size": 0,  # disable statement cache
+            },
+        },
+    )
     async_redis = get_redis_client(app.state.config)
     app.state.async_redis = async_redis
 
