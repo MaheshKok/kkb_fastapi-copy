@@ -4,10 +4,9 @@ from datetime import datetime
 import aioredis
 import pytest as pytest
 import pytest_asyncio
+from fastapi_sa.database import db
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
 from app.api.utils import get_current_and_next_expiry
@@ -132,29 +131,27 @@ async def db_cleanup(test_async_engine):
         await conn.run_sync(Base.metadata.drop_all)
 
 
-@pytest_asyncio.fixture(scope="function")
-async def test_async_session_maker(test_async_engine):
-    async_session_ = sessionmaker(test_async_engine, class_=AsyncSession, expire_on_commit=True)
-    yield async_session_
+@pytest.fixture()
+def db_session_ctx(test_config):
+    async_db_url = get_db_url(test_config)
+    db.init(async_db_url)
+
+    """db session context"""
+    token = db.set_session_ctx()
+    yield
+    db.reset_session_ctx(token)
 
 
-@pytest_asyncio.fixture(scope="function")
-async def test_async_session(test_async_session_maker):
-    async with test_async_session_maker() as async_session:
-        try:
-            yield async_session
-            await async_session.commit()
-        except Exception as e:  # pragma: no cover
-            await async_session.rollback()
-            raise e
-        finally:
-            await async_session.close()
+@pytest.fixture(autouse=True)
+async def test_async_session(db_session_ctx):
+    """session fixture"""
+    async with db.session.begin():
+        yield db.session
 
 
 @pytest_asyncio.fixture(scope="function")
 async def test_app(test_async_session_maker, test_async_redis):
     app = get_app(ConfigFile.TEST)  # pragma: no cover
-    app.state.async_session_maker = test_async_session_maker  # pragma: no cover
     app.state.async_redis = test_async_redis  # pragma: no cover
     yield app
 

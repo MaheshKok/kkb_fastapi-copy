@@ -1,4 +1,5 @@
 import pytest
+from fastapi_sa.database import db
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -7,21 +8,22 @@ from test.factory.user import UserFactory
 
 
 @pytest.mark.asyncio
-async def test_user_factory(test_async_session):
+async def test_user_factory():
     for _ in range(10):
-        await UserFactory(async_session=test_async_session)
+        await UserFactory()
 
-    result = await test_async_session.execute(select(User))
-    assert len(result.all()) == 10
+    async with db():
+        result = await db.session.scalars(select(User))
+        assert len(result.all()) == 10
 
 
 @pytest.mark.asyncio
-async def test_user_factory_invalid_async_session(test_async_session):
+async def test_user_factory_invalid_async_session():
     with pytest.raises(SQLAlchemyError) as exc:
-        user = await UserFactory(async_session=test_async_session)
+        user = await UserFactory()
         assert user is not None
 
         # try to create user with same id
-        await UserFactory(async_session=test_async_session, id=user.id)
+        await UserFactory(id=user.id)
 
     assert exc.typename == "IntegrityError"
