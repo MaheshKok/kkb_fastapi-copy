@@ -20,10 +20,15 @@ async def test_user_factory():
 @pytest.mark.asyncio
 async def test_user_factory_invalid_async_session():
     with pytest.raises(SQLAlchemyError) as exc:
-        user = await UserFactory()
-        assert user is not None
+        user_model = await UserFactory()
+        assert user_model is not None
 
-        # try to create user with same id
-        await UserFactory(id=user.id)
+        async with db():
+            user_model = await db.session.scalar(select(User))
+            assert user_model is not None
+
+            # await test_async_session.refresh(user_model)
+            # try to create user with same id
+            await UserFactory(id=user_model.id)
 
     assert exc.typename == "IntegrityError"
