@@ -4,17 +4,20 @@ from datetime import timedelta
 
 import factory
 import pytest
+from async_factory_boy.factory.sqlalchemy import AsyncSQLAlchemyFactory
 
 from app.database.models import StrategyModel
 from app.schemas.enums import PositionEnum
-from test.factory.base_factory import BaseFactory
+from test.conftest import sc_session
 from test.factory.user import UserFactory
 
 
 @pytest.mark.asyncio
-class StrategyFactory(BaseFactory):
+class StrategyFactory(AsyncSQLAlchemyFactory):
     class Meta:
         model = StrategyModel
+        sqlalchemy_session_persistence = "commit"
+        sqlalchemy_session = sc_session
 
     id = factory.LazyFunction(uuid.uuid4)
     exchange = "NFO"

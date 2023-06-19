@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from asynctest import MagicMock
-from sqlalchemy import Select
+from sqlalchemy import select
 
 from app.database.models import StrategyModel
 from test.unit_tests.test_data import get_test_post_trade_payload
@@ -24,11 +24,10 @@ async def test_trading_nfo_options_with_invalid_strategy_id(test_async_client):
 
 @pytest.mark.asyncio
 async def test_trading_nfo_options_with_valid_strategy_id(
-    test_async_session, test_async_client, monkeypatch
+    test_async_client, monkeypatch, test_async_session
 ):
-    await create_closed_trades(test_async_session, users=1, strategies=1)
-    fetch_strategy_query_ = await test_async_session.execute(Select(StrategyModel))
-    strategy_model = fetch_strategy_query_.scalars().one_or_none()
+    await create_closed_trades(users=1, strategies=1)
+    strategy_model = await test_async_session.scalar(select(StrategyModel))
 
     payload = get_test_post_trade_payload()
     payload["strategy_id"] = str(strategy_model.id)

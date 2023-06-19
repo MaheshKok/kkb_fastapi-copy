@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 
@@ -6,7 +7,10 @@ import pytest as pytest
 import pytest_asyncio
 from fastapi_sa.database import db
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import scoped_session
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
 from app.api.utils import get_current_and_next_expiry
@@ -81,6 +85,37 @@ async def setup_redis():
     logging.info(f"Time taken to update redis: {datetime.now() - start_time}")
 
 
+engine = create_async_engine(get_db_url(get_config(ConfigFile.TEST)))
+async_session = sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
+sc_session = scoped_session(async_session)
+
+
+@pytest.fixture(scope="session")
+def event_loop(request):
+    """Create an instance of the default event loop for each test case."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+
+# @pytest_asyncio.fixture(scope="function", autouse=True)  # (scope="session")
+# async def db_session() -> AsyncSession:
+#     async with engine.begin() as connection:
+#         await connection.run_sync(Base.metadata.drop_all)
+#         await connection.run_sync(Base.metadata.create_all)
+#
+#         async with async_session(bind=connection) as session:
+#             yield session
+#             await session.flush()
+#             await session.rollback()
+
+
 @pytest_asyncio.fixture(scope="function")
 async def test_async_redis():
     test_config = get_config(ConfigFile.TEST)
@@ -150,7 +185,7 @@ async def test_async_session(db_session_ctx):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_app(test_async_session_maker, test_async_redis):
+async def test_app(test_async_redis):
     app = get_app(ConfigFile.TEST)  # pragma: no cover
     app.state.async_redis = test_async_redis  # pragma: no cover
     yield app

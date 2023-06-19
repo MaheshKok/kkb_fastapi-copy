@@ -49,14 +49,13 @@ async def create_open_trades(
 
 
 async def create_closed_trades(
-    async_session, users=1, strategies=1, trades=0, take_away_profit=False, daily_profit=0
+    users=1, strategies=1, trades=0, take_away_profit=False, daily_profit=0
 ):
     for _ in range(users):
-        user = await UserFactory(async_session=async_session)
+        user = await UserFactory()
 
         for _ in range(strategies):
             strategy = await StrategyFactory(
-                async_session=async_session,
                 user=user,
                 created_at=user.created_at + timedelta(days=1),
             )
@@ -64,15 +63,12 @@ async def create_closed_trades(
             total_profit = 0
             total_future_profit = 0
             for _ in range(trades):
-                trade = await CompletedTradeFactory(
-                    async_session=async_session, strategy=strategy
-                )
+                trade = await CompletedTradeFactory(strategy=strategy)
                 total_profit += trade.profit
                 total_future_profit += trade.future_profit
 
             if take_away_profit:
                 await TakeAwayProfitFactory(
-                    async_session=async_session,
                     strategy=strategy,
                     total_trades=trades,
                     profit=total_profit,

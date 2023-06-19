@@ -3,15 +3,18 @@ from datetime import datetime
 from datetime import timedelta
 
 import factory
+from async_factory_boy.factory.sqlalchemy import AsyncSQLAlchemyFactory
 
 from app.database.models import TakeAwayProfit
-from test.factory.base_factory import BaseFactory
+from test.conftest import sc_session
 from test.factory.strategy import StrategyFactory
 
 
-class TakeAwayProfitFactory(BaseFactory):
+class TakeAwayProfitFactory(AsyncSQLAlchemyFactory):
     class Meta:
         model = TakeAwayProfit
+        sqlalchemy_session_persistence = "commit"
+        sqlalchemy_session = sc_session
 
     id = factory.LazyFunction(uuid.uuid4)
     profit = 12000.0

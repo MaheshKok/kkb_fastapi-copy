@@ -3,11 +3,12 @@ from datetime import datetime
 from datetime import timedelta
 
 import factory
+from async_factory_boy.factory.sqlalchemy import AsyncSQLAlchemyFactory
 
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
-from test.factory.base_factory import BaseFactory
+from test.conftest import sc_session
 from test.factory.strategy import StrategyFactory
 
 
@@ -25,9 +26,11 @@ def generate_instrument():
     return f"BANKNIFTY{expiry_date_formated}43000CE"
 
 
-class LiveTradeFactory(BaseFactory):
+class LiveTradeFactory(AsyncSQLAlchemyFactory):
     class Meta:
         model = TradeModel
+        sqlalchemy_session_persistence = "commit"
+        sqlalchemy_session = sc_session
 
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)
@@ -51,9 +54,11 @@ class LiveTradeFactory(BaseFactory):
     strategy = factory.SubFactory(StrategyFactory)
 
 
-class CompletedTradeFactory(BaseFactory):
+class CompletedTradeFactory(AsyncSQLAlchemyFactory):
     class Meta:
         model = TradeModel
+        sqlalchemy_session_persistence = "commit"
+        sqlalchemy_session = sc_session
 
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)
