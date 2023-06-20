@@ -11,6 +11,7 @@ from tasks.utils import get_strike_and_entry_price
 from tasks.utils import get_strike_and_exit_price_dict
 
 from app.core.config import get_config
+from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
@@ -42,7 +43,7 @@ def get_profit(entry_price, exit_price, quantity, position):
 def init_db(config_file):
     config = get_config(config_file)
     async_db_url = get_db_url(config)
-    db.init(async_db_url)
+    db.init(async_db_url, engine_kw=engine_kw)
 
 
 async def execute_celery_buy_trade_task(trade_payload_json, config_file):
