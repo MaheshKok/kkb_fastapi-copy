@@ -11,7 +11,6 @@ from tasks.tasks import task_exiting_trades
 from app.api.dependency import get_async_redis
 from app.api.dependency import is_valid_strategy
 from app.api.utils import get_current_and_next_expiry
-from app.database.models import StrategyModel
 from app.schemas.trade import CeleryTradeSchema
 from app.schemas.trade import EntryTradeSchema
 from app.utils.constants import ConfigFile
@@ -41,7 +40,7 @@ futures_router = APIRouter(
 @options_router.post("/options", status_code=200)
 async def post_nfo(
     trade_post_schema: EntryTradeSchema,
-    strategy: StrategyModel = Depends(is_valid_strategy),
+    _: bool = Depends(is_valid_strategy),
     async_redis: Redis = Depends(get_async_redis),
 ):
     todays_date = datetime.now().date()
@@ -58,7 +57,7 @@ async def post_nfo(
     # To be decided in future, the name of actions
 
     celery_trade_payload_json = CeleryTradeSchema(
-        **trade_post_schema.dict(), symbol=strategy.symbol, expiry=current_expiry_date
+        **trade_post_schema.dict(), expiry=current_expiry_date
     ).json()
 
     try:

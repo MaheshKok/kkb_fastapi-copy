@@ -13,6 +13,7 @@ from app.schemas.enums import PositionEnum
 
 
 class EntryTradeSchema(BaseModel):
+    symbol: str = Field(description="Symbol", example="BANKNIFTY")
     quantity: int = Field(description="Quantity", example=25)
     future_entry_price_received: float = Field(description="Future Entry Price", example=40600.5)
     strategy_id: uuid.UUID = Field(
@@ -35,6 +36,7 @@ class EntryTradeSchema(BaseModel):
 
     class Config:
         example = {
+            "symbol": "BANKNIFTY",
             "quantity": 25,
             "future_entry_price_received": 40600.5,
             "strategy_id": "0d478355-1439-4f73-a72c-04bb0b3917c7",
@@ -46,7 +48,6 @@ class EntryTradeSchema(BaseModel):
 
 
 class CeleryTradeSchema(EntryTradeSchema):
-    symbol: str = Field(description="Symbol", example="BANKNIFTY")
     expiry: date = Field(description="Expiry", example="2023-06-16")
     entry_received_at: datetime = Field(
         description="Received At", example="2023-05-22 05:11:01.117358"
@@ -75,8 +76,12 @@ class RedisTradeSchema(EntryTradeSchema):
     entry_received_at: datetime = Field(
         description="Received At", example="2023-05-22 05:11:01.117358"
     )
+    # the reason i am making it as optional even though its being inherited from
+    # EntryTradeSchema, because when i use from_orm then TradeModel doesnt have symbol and validation fails
+    symbol: Optional[str] = Field(description="Symbol", example="BANKNIFTY")
 
     class Config(BaseConfig):
+        exclude = {"symbol"}
         orm_mode = True
         json_encoders = {
             datetime: lambda dt: dt.isoformat(),

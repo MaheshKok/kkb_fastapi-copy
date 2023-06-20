@@ -106,7 +106,7 @@ async def execute_celery_buy_trade_task(trade_payload_json, config_file):
             **payload_schema.dict(),
         )
 
-        trade_model = TradeModel(**trade_schema.dict(exclude={"premium", "broker_id"}))
+        trade_model = TradeModel(**trade_schema.dict(exclude={"premium", "broker_id", "symbol"}))
         db.session.add(trade_model)
         await db.session.flush()
         await db.session.refresh(trade_model)
