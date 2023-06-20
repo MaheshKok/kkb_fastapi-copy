@@ -2,6 +2,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from asynctest import MagicMock
+from fastapi_sa.database import db
 from sqlalchemy import select
 
 from app.database.models import StrategyModel
@@ -23,14 +24,13 @@ async def test_trading_nfo_options_with_invalid_strategy_id(test_async_client):
 
 
 @pytest.mark.asyncio
-async def test_trading_nfo_options_with_valid_strategy_id(
-    test_async_client, monkeypatch, test_async_session
-):
+async def test_trading_nfo_options_with_valid_strategy_id(test_async_client, monkeypatch):
     await create_closed_trades(users=1, strategies=1)
-    strategy_model = await test_async_session.scalar(select(StrategyModel))
 
-    payload = get_test_post_trade_payload()
-    payload["strategy_id"] = str(strategy_model.id)
+    async with db():
+        strategy_model = await db.session.scalar(select(StrategyModel))
+        payload = get_test_post_trade_payload()
+        payload["strategy_id"] = str(strategy_model.id)
 
     mock_celery_buy_task = MagicMock()
     mock_celery_buy_task.delay = AsyncMock(return_value=True)

@@ -2,7 +2,8 @@ import json
 from datetime import datetime
 
 import pytest_asyncio
-from sqlalchemy import Select
+from fastapi_sa.database import db
+from sqlalchemy import select
 
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
@@ -18,22 +19,25 @@ from test.utils import create_open_trades
 async def celery_buy_task_payload_dict(test_async_session, test_async_redis):
     post_trade_payload = get_test_post_trade_payload()
 
-    await create_closed_trades(test_async_session, users=1, strategies=1, trades=10)
+    await create_closed_trades(users=1, strategies=1, trades=10)
     # query database for stragey
 
-    fetch_strategy_query_ = await test_async_session.execute(Select(StrategyModel))
-    strategy_model = fetch_strategy_query_.scalars().one_or_none()
+    async with db():
+        fetch_strategy_query_ = await db.session.execute(select(StrategyModel))
+        strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
-    current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-        test_async_redis, datetime.now().date()
-    )
+        (
+            current_expiry_date,
+            next_expiry_date,
+            is_today_expiry,
+        ) = await get_current_and_next_expiry(test_async_redis, datetime.now().date())
 
-    post_trade_payload["entry_received_at"] = post_trade_payload.pop("received_at")
-    post_trade_payload["strategy_id"] = strategy_model.id
-    post_trade_payload["symbol"] = strategy_model.symbol
-    post_trade_payload["expiry"] = current_expiry_date
+        post_trade_payload["entry_received_at"] = post_trade_payload.pop("received_at")
+        post_trade_payload["strategy_id"] = strategy_model.id
+        post_trade_payload["symbol"] = strategy_model.symbol
+        post_trade_payload["expiry"] = current_expiry_date
 
-    return post_trade_payload
+        return post_trade_payload
 
 
 async def celery_sell_task_args(
@@ -50,11 +54,11 @@ async def celery_sell_task_args(
     post_trade_payload = get_test_post_trade_payload()
 
     # query database for stragey
-    fetch_strategy_query_ = await test_async_session.execute(Select(StrategyModel))
+    fetch_strategy_query_ = await test_async_session.execute(select(StrategyModel))
     strategy_model = fetch_strategy_query_.scalars().one_or_none()
     await test_async_session.flush()
 
-    fetch_trade_query_ = await test_async_session.execute(Select(TradeModel))
+    fetch_trade_query_ = await test_async_session.execute(select(TradeModel))
     trade_models = fetch_trade_query_.scalars().all()
 
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
