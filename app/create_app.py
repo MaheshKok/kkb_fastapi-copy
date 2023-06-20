@@ -20,7 +20,7 @@ def register_routers(app: FastAPI):
     pass
 
 
-async def get_num_connections():
+def get_num_connections():
     return db.engine.pool.status()
 
 
