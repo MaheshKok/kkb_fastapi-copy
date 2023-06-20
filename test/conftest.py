@@ -1,6 +1,4 @@
 import asyncio
-import logging
-from datetime import datetime
 
 import aioredis
 import pytest as pytest
@@ -13,76 +11,79 @@ from sqlalchemy.orm import scoped_session
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
-from app.api.utils import get_current_and_next_expiry
-from app.api.utils import get_expiry_list
 from app.core.config import get_config
 from app.create_app import get_app
-from app.cron.update_fno_expiry import update_expiry_list
 from app.database import Base
+from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.utils.constants import ConfigFile
 
 
-@pytest.fixture(scope="session", autouse=True)
-async def setup_redis():
-    test_config = get_config(ConfigFile.TEST)
-    _test_async_redis = await aioredis.StrictRedis.from_url(
-        test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
-    )
-    # update redis with necessary data i.e expiry list, option chain etc
-    await update_expiry_list(test_config, "INDX OPT")
-
-    logging.info(f"Updated redis with expiry list: {datetime.now()}")
-    current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-        _test_async_redis, datetime.now().date()
-    )
-
-    prod_config = get_config()
-    prod_async_redis = await aioredis.StrictRedis.from_url(
-        prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
-    )
-    # add keys for future price as well
-    keys = [
-        f"BANKNIFTY {current_expiry_date} CE",
-        f"BANKNIFTY {current_expiry_date} PE",
-        f"BANKNIFTY {next_expiry_date} CE",
-        f"BANKNIFTY {next_expiry_date} PE",
-        f"NIFTY {current_expiry_date} CE",
-        f"NIFTY {current_expiry_date} PE",
-        f"NIFTY {next_expiry_date} CE",
-        f"NIFTY {next_expiry_date} PE",
-    ]
-
-    monthly_expiry = None
-    current_month_number = datetime.now().date().month
-    expiry_list = await get_expiry_list(_test_async_redis)
-    for _, expiry_date in enumerate(expiry_list):
-        if expiry_date.month > current_month_number:
-            break
-        monthly_expiry = expiry_date
-
-    if monthly_expiry:
-        keys.append(f"BANKNIFTY {monthly_expiry} FUT")
-        keys.append(f"NIFTY {monthly_expiry} FUT")
-
-    start_time = datetime.now()
-    logging.info(f"start updating redis with option_chain: {start_time}")
-    all_option_chain = {}
-    async with prod_async_redis.pipeline() as pipe:
-        for key in keys:
-            option_chain = await prod_async_redis.hgetall(key)
-            if option_chain:
-                all_option_chain[key] = option_chain
-    await pipe.execute()
-    logging.info(f"pulled option chain from prod redis: {datetime.now()}")
-
-    async with _test_async_redis.pipeline() as pipe:
-        for key, option_chain in all_option_chain.items():
-            for strike, premium in option_chain.items():
-                await _test_async_redis.hset(key, strike, premium)
-    await pipe.execute()
-
-    logging.info(f"Time taken to update redis: {datetime.now() - start_time}")
+# import logging
+# from datetime import datetime
+# from app.api.utils import get_current_and_next_expiry
+# from app.api.utils import get_expiry_list
+# from app.cron.update_fno_expiry import update_expiry_list
+# @pytest.fixture(scope="session", autouse=True)
+# async def setup_redis():
+#     test_config = get_config(ConfigFile.TEST)
+#     _test_async_redis = await aioredis.StrictRedis.from_url(
+#         test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+#     )
+#     # update redis with necessary data i.e expiry list, option chain etc
+#     await update_expiry_list(test_config, "INDX OPT")
+#
+#     logging.info(f"Updated redis with expiry list: {datetime.now()}")
+#     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
+#         _test_async_redis, datetime.now().date()
+#     )
+#
+#     prod_config = get_config()
+#     prod_async_redis = await aioredis.StrictRedis.from_url(
+#         prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+#     )
+#     # add keys for future price as well
+#     keys = [
+#         f"BANKNIFTY {current_expiry_date} CE",
+#         f"BANKNIFTY {current_expiry_date} PE",
+#         f"BANKNIFTY {next_expiry_date} CE",
+#         f"BANKNIFTY {next_expiry_date} PE",
+#         f"NIFTY {current_expiry_date} CE",
+#         f"NIFTY {current_expiry_date} PE",
+#         f"NIFTY {next_expiry_date} CE",
+#         f"NIFTY {next_expiry_date} PE",
+#     ]
+#
+#     monthly_expiry = None
+#     current_month_number = datetime.now().date().month
+#     expiry_list = await get_expiry_list(_test_async_redis)
+#     for _, expiry_date in enumerate(expiry_list):
+#         if expiry_date.month > current_month_number:
+#             break
+#         monthly_expiry = expiry_date
+#
+#     if monthly_expiry:
+#         keys.append(f"BANKNIFTY {monthly_expiry} FUT")
+#         keys.append(f"NIFTY {monthly_expiry} FUT")
+#
+#     start_time = datetime.now()
+#     logging.info(f"start updating redis with option_chain: {start_time}")
+#     all_option_chain = {}
+#     async with prod_async_redis.pipeline() as pipe:
+#         for key in keys:
+#             option_chain = await prod_async_redis.hgetall(key)
+#             if option_chain:
+#                 all_option_chain[key] = option_chain
+#     await pipe.execute()
+#     logging.info(f"pulled option chain from prod redis: {datetime.now()}")
+#
+#     async with _test_async_redis.pipeline() as pipe:
+#         for key, option_chain in all_option_chain.items():
+#             for strike, premium in option_chain.items():
+#                 await _test_async_redis.hset(key, strike, premium)
+#     await pipe.execute()
+#
+#     logging.info(f"Time taken to update redis: {datetime.now() - start_time}")
 
 
 engine = create_async_engine(get_db_url(get_config(ConfigFile.TEST)))
@@ -169,7 +170,7 @@ async def db_cleanup(test_async_engine):
 @pytest.fixture()
 def db_session_ctx(test_config):
     async_db_url = get_db_url(test_config)
-    db.init(async_db_url)
+    db.init(async_db_url, engine_kw=engine_kw)
 
     """db session context"""
     token = db.set_session_ctx()
