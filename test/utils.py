@@ -9,7 +9,6 @@ from test.factory.user import UserFactory
 
 
 async def create_open_trades(
-    async_session,
     users=1,
     strategies=1,
     trades=0,
@@ -18,29 +17,23 @@ async def create_open_trades(
     ce_trade=True,
 ):
     for _ in range(users):
-        user = await UserFactory(async_session=async_session)
+        user = await UserFactory()
 
         for _ in range(strategies):
             strategy = await StrategyFactory(
-                async_session=async_session,
                 user=user,
                 created_at=user.created_at + timedelta(days=1),
             )
 
             for _ in range(trades):
                 if ce_trade:
-                    await LiveTradeFactory(
-                        async_session=async_session, strategy=strategy, option_type=OptionType.CE
-                    )
+                    await LiveTradeFactory(strategy=strategy, option_type=OptionType.CE)
                 else:
-                    await LiveTradeFactory(
-                        async_session=async_session, strategy=strategy, option_type=OptionType.PE
-                    )
+                    await LiveTradeFactory(strategy=strategy, option_type=OptionType.PE)
 
             if take_away_profit:
                 # Just assume there were trades in db which are closed and their profit was taken away
                 await TakeAwayProfitFactory(
-                    async_session=async_session,
                     strategy=strategy,
                     total_trades=trades,
                     profit=50000.0,
