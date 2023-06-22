@@ -24,6 +24,8 @@ async def is_valid_strategy(
     trade_post_schema: EntryTradeSchema, async_redis: Redis = Depends(get_async_redis)
 ):
     # TODO: check redis cache if strategy_id exists
+    # its working, 1 sec 10 trades, now change celery redis to memtera or something else
+    # as upstash is cancelling or some other reason
     # strategy_list = await async_redis.lrange("strategy_list", 0, -1)
     # if trade_post_schema.strategy_id not in strategy_list:
     #     raise HTTPException(status_code=400, detail="Invalid strategy_id")

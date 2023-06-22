@@ -56,7 +56,7 @@ async def cache_ongoing_trades(async_redis):
                     await async_redis.delete(key)
                     continue
 
-                redis_trades_schema_list = [
+                redis_trades_schema_json_list = [
                     RedisTradeSchema.from_orm(trade_model).json() for trade_model in trade_models
                 ]
 
@@ -65,9 +65,9 @@ async def cache_ongoing_trades(async_redis):
                 # if the length of ongoing trades in redis is not equal to the length of ongoing trades in db
                 # then update the ongoing trades in redis
                 if not trades_in_redis:
-                    await async_redis.lpush(key, json.dumps(redis_trades_schema_list))
+                    await async_redis.rpush(key, json.dumps(redis_trades_schema_json_list))
                 elif trades_in_redis and len(trades_in_redis) != len(trade_models):
                     await async_redis.delete(key)
-                    await async_redis.lpush(key, *redis_trades_schema_list)
+                    await async_redis.lpush(key, *redis_trades_schema_json_list)
 
         await pipe.execute()

@@ -35,7 +35,7 @@ def get_profit(entry_price, exit_price, quantity, position):
     if position == PositionEnum.LONG:
         profit = (exit_price - entry_price) * quantity
     else:
-        profit = (exit_price - entry_price) * quantity
+        profit = (entry_price - exit_price) * quantity
 
     return profit
 
@@ -47,8 +47,6 @@ def init_db(config_file):
 
 
 async def execute_celery_buy_trade_task(trade_payload_json, config_file):
-    init_db(config_file)
-
     payload_schema = CeleryTradeSchema(**json.loads(trade_payload_json))
     async_redis = await get_async_redis(config_file)
 
@@ -116,13 +114,7 @@ async def execute_celery_buy_trade_task(trade_payload_json, config_file):
         async_redis = await get_async_redis(config_file)
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
         trade = RedisTradeSchema.from_orm(trade_model).json()
-        if not await async_redis.exists(trade_key):
-            await async_redis.lpush(trade_key, trade)
-        else:
-            current_trades = await async_redis.lrange(trade_key, 0, -1)
-            updated_trades = current_trades + [trade]
-            await async_redis.delete(trade_key)
-            await async_redis.lpush(trade_key, *updated_trades)
+        await async_redis.rpush(trade_key, trade)
 
     return "successfully added trade to db"
 
@@ -130,8 +122,6 @@ async def execute_celery_buy_trade_task(trade_payload_json, config_file):
 async def execute_celery_exit_trade_task(
     payload_json, redis_ongoing_key, exiting_trades_json, config_file
 ):
-    init_db(config_file)
-
     celery_trade_schema = CeleryTradeSchema(**json.loads(payload_json))
     exiting_trades = [json.loads(trade) for trade in json.loads(exiting_trades_json)]
     async_redis = await get_async_redis(config_file)
