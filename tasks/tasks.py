@@ -5,10 +5,8 @@ from celery import Celery
 from celery.signals import worker_process_init
 from tasks.execution import execute_celery_buy_trade_task
 from tasks.execution import execute_celery_exit_trade_task
-from tasks.execution import init_db
 
 from app.core.config import get_config
-from app.utils.constants import ConfigFile
 
 
 config = get_config()
@@ -29,7 +27,8 @@ celery_app = Celery(
 @worker_process_init.connect
 def on_worker_init(**kwargs):
     # Connect to the database using connect_to_db
-    init_db(ConfigFile.PRODUCTION)
+    # init_db(ConfigFile.PRODUCTION)
+    pass
 
 
 @celery_app.task(name="tasks.exiting_trades")

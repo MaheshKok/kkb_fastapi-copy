@@ -1,16 +1,20 @@
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi_sa.database import db
-from fastapi_sa.middleware import DBSessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.base import RequestResponseEndpoint
 
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.trading import options_router
 from app.core.config import get_config
-from app.database.base import lifespan
+from app.database.base import engine_kw
+from app.database.base import get_db_url
+from app.database.base import get_redis_client
+from app.extensions.redis_cache.on_start import cache_ongoing_trades
 
 
 def register_routers(app: FastAPI):
@@ -40,6 +44,25 @@ class ConnectionLoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+@asynccontextmanager
+async def lifespan(app):
+    async_db_url = get_db_url(app.state.config)
+
+    db.init(async_db_url, engine_kw=engine_kw)
+    async_redis = get_redis_client(app.state.config)
+    app.state.async_redis = async_redis
+
+    # create a task to cache ongoing trades in Redis
+    asyncio.create_task(cache_ongoing_trades(async_redis))
+
+    try:
+        yield
+    finally:
+        # Close the connection when the application shuts down
+        await app.state.async_redis.close()
+        await app.state.async_session_maker.kw["bind"].dispose()
+
+
 def get_app(config_file) -> FastAPI:
     config = get_config(config_file)
     app = FastAPI(
@@ -48,9 +71,9 @@ def get_app(config_file) -> FastAPI:
     app.state.config = config
 
     # Add middleware, event handlers, etc. here
-    app.add_middleware(
-        DBSessionMiddleware,
-    )
+    # app.add_middleware(
+    #     DBSessionMiddleware,
+    # )
     app.add_middleware(ConnectionLoggingMiddleware)
 
     # Include routers

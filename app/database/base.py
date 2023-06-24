@@ -1,8 +1,4 @@
-import asyncio
-from contextlib import asynccontextmanager
-
 import aioredis
-from fastapi_sa.database import db
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -10,7 +6,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
 from app.core.config import Config
-from app.extensions.redis_cache.on_start import cache_ongoing_trades
 
 
 engine_kw = {
@@ -53,22 +48,3 @@ def get_redis_client(config: Config) -> aioredis.StrictRedis:
     return aioredis.StrictRedis.from_url(
         config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
     )
-
-
-@asynccontextmanager
-async def lifespan(app):
-    async_db_url = get_db_url(app.state.config)
-
-    db.init(async_db_url, engine_kw=engine_kw)
-    async_redis = get_redis_client(app.state.config)
-    app.state.async_redis = async_redis
-
-    # create a task to cache ongoing trades in Redis
-    asyncio.create_task(cache_ongoing_trades(async_redis))
-
-    try:
-        yield
-    finally:
-        # Close the connection when the application shuts down
-        await app.state.async_redis.close()
-        await app.state.async_session_maker.kw["bind"].dispose()

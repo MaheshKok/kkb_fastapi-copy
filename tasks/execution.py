@@ -22,6 +22,7 @@ from app.schemas.trade import CeleryTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import TradeSchema
 from app.schemas.trade import TradeUpdateValuesSchema
+from app.utils.constants import ConfigFile
 from app.utils.option_chain import get_option_chain
 
 
@@ -47,6 +48,8 @@ def init_db(config_file):
 
 
 async def execute_celery_buy_trade_task(trade_payload_json, config_file):
+    init_db(ConfigFile.PRODUCTION)
+
     payload_schema = CeleryTradeSchema(**json.loads(trade_payload_json))
     async_redis = await get_async_redis(config_file)
 
@@ -122,6 +125,8 @@ async def execute_celery_buy_trade_task(trade_payload_json, config_file):
 async def execute_celery_exit_trade_task(
     payload_json, redis_ongoing_key, exiting_trades_json, config_file
 ):
+    init_db(ConfigFile.PRODUCTION)
+
     celery_trade_schema = CeleryTradeSchema(**json.loads(payload_json))
     exiting_trades = [json.loads(trade) for trade in json.loads(exiting_trades_json)]
     async_redis = await get_async_redis(config_file)
