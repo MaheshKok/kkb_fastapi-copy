@@ -22,7 +22,6 @@ from app.schemas.trade import CeleryTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import TradeSchema
 from app.schemas.trade import TradeUpdateValuesSchema
-from app.utils.constants import ConfigFile
 from app.utils.option_chain import get_option_chain
 
 
@@ -109,13 +108,15 @@ async def execute_celery_buy_trade_task(trade_payload_json, config_file):
         db.session.add(trade_model)
         await db.session.flush()
         await db.session.refresh(trade_model)
+        logging.info(f"{trade_model.id} added to db")
         # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
         # it works i confirmed this with python_console with dummy data,
         # interesting part is to get such trades i have to call lrange with 0, -1
         async_redis = await get_async_redis(config_file)
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
-        trade = RedisTradeSchema.from_orm(trade_model).json()
-        await async_redis.rpush(trade_key, trade)
+        redis_trade_schema = RedisTradeSchema.from_orm(trade_model).json()
+        await async_redis.rpush(trade_key, redis_trade_schema)
+        logging.info(f"{trade_model.id} added to redis")
 
     return "successfully added trade to db"
 
@@ -123,8 +124,6 @@ async def execute_celery_buy_trade_task(trade_payload_json, config_file):
 async def execute_celery_exit_trade_task(
     payload_json, redis_ongoing_key, exiting_trades_json, config_file
 ):
-    init_db(ConfigFile.PRODUCTION)
-
     celery_trade_schema = CeleryTradeSchema(**json.loads(payload_json))
     exiting_trades = [json.loads(trade) for trade in json.loads(exiting_trades_json)]
     async_redis = await get_async_redis(config_file)

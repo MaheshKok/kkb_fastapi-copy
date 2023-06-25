@@ -6,7 +6,7 @@ from aioredis import Redis
 from fastapi import APIRouter
 from fastapi import Depends
 from tasks.execution import execute_celery_buy_trade_task
-from tasks.tasks import task_exiting_trades
+from tasks.execution import execute_celery_exit_trade_task
 
 from app.api.dependency import get_async_redis
 from app.api.dependency import is_valid_strategy
@@ -64,8 +64,8 @@ async def post_nfo(
         if exiting_trades := await async_redis.lrange(exiting_trades_key, 0, -1):
             exiting_trades_json = json.dumps(exiting_trades)
             # initiate celery close_trade
-            print(f"found: {len(exiting_trades)} trades to be closed")
-            task_exiting_trades.delay(
+            logging.info(f"Total: {len(exiting_trades)} trades to be closed")
+            await execute_celery_exit_trade_task(
                 celery_trade_payload_json,
                 exiting_trades_key,
                 exiting_trades_json,
@@ -75,12 +75,6 @@ async def post_nfo(
         logging.info(f"Exception: {e}")
 
     # initiate celery buy_trade
-
-    # task_buying_trade.delay(
-    #     celery_trade_payload_json,
-    #     ConfigFile.PRODUCTION,
-    # )
-
     await execute_celery_buy_trade_task(
         celery_trade_payload_json,
         ConfigFile.PRODUCTION,
