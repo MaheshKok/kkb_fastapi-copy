@@ -5,7 +5,6 @@ from tasks.execution import execute_celery_exit_trade_task
 
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
-from app.utils.constants import ConfigFile
 from test.unit_tests.test_celery.conftest import celery_sell_task_args
 
 
@@ -27,7 +26,7 @@ async def test_celery_sell_trade_without_take_away_profit(
     async with db():
         (
             strategy_model_id,
-            payload_json,
+            signal_payload_schema,
             redis_ongoing_key,
             redis_trades_json,
         ) = await celery_sell_task_args(
@@ -44,7 +43,7 @@ async def test_celery_sell_trade_without_take_away_profit(
         assert await test_async_redis.exists(redis_ongoing_key)
 
         await execute_celery_exit_trade_task(
-            payload_json, redis_ongoing_key, redis_trades_json, ConfigFile.TEST
+            signal_payload_schema, redis_ongoing_key, redis_trades_json, test_async_redis
         )
 
         fetch_trades_query_ = await db.session.execute(select(TradeModel))
@@ -87,7 +86,7 @@ async def test_celery_sell_trade_updating_takeaway_profit(
     async with db():
         (
             strategy_model_id,
-            payload_json,
+            signal_payload_schema,
             redis_ongoing_key,
             redis_trades_json,
         ) = await celery_sell_task_args(test_async_redis, take_away_profit=True, ce_trade=False)
@@ -103,7 +102,7 @@ async def test_celery_sell_trade_updating_takeaway_profit(
         assert await test_async_redis.exists(redis_ongoing_key)
 
         await execute_celery_exit_trade_task(
-            payload_json, redis_ongoing_key, redis_trades_json, ConfigFile.TEST
+            signal_payload_schema, redis_ongoing_key, redis_trades_json, test_async_redis
         )
 
         fetch_trades_query_ = await db.session.execute(select(TradeModel))

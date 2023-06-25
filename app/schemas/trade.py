@@ -12,7 +12,7 @@ from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 
 
-class EntryTradeSchema(BaseModel):
+class SignalPayloadSchema(BaseModel):
     symbol: str = Field(description="Symbol", example="BANKNIFTY")
     quantity: int = Field(description="Quantity", example=25)
     future_entry_price_received: float = Field(description="Future Entry Price", example=40600.5)
@@ -23,16 +23,14 @@ class EntryTradeSchema(BaseModel):
         description="Option Type",
         example="CE",
     )
-
-    entry_received_at: datetime = Field(
-        description="Received At", example="2023-05-22 05:11:01.117358", alias="received_at"
-    )
+    received_at: datetime = Field(description="Received At", example="2023-05-22 05:11:01.117358")
     premium: Optional[float] = Field(description="Premium", example=350.0)
     strike: Optional[float] = Field(description="Strike", example=42500.0, default=0.0)
     position: PositionEnum = Field(description="Position", example="LONG")
     broker_id: Optional[uuid.UUID] = Field(
         description="Broker ID", example="dd9acef9-e6c4-4792-9d43-d266b4d685c3", default=None
     )
+    expiry: Optional[date] = Field(description="Expiry", example="2023-06-16")
 
     class Config:
         example = {
@@ -47,24 +45,7 @@ class EntryTradeSchema(BaseModel):
         }
 
 
-class CeleryTradeSchema(EntryTradeSchema):
-    expiry: date = Field(description="Expiry", example="2023-06-16")
-    entry_received_at: datetime = Field(
-        description="Received At", example="2023-05-22 05:11:01.117358"
-    )
-
-    class Config(BaseConfig):
-        orm_mode = True
-        json_encoders = {
-            datetime: lambda dt: dt.isoformat(),
-            datetime.date: lambda d: d.isoformat(),
-            uuid.UUID: str,
-            PositionEnum: lambda p: p.value,
-            OptionTypeEnum: lambda o: o.value,
-        }
-
-
-class RedisTradeSchema(EntryTradeSchema):
+class RedisTradeSchema(SignalPayloadSchema):
     # main purpose is for testing
 
     id: uuid.UUID = Field(description="Trade ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3")
@@ -79,9 +60,12 @@ class RedisTradeSchema(EntryTradeSchema):
     # the reason i am making it as optional even though its being inherited from
     # EntryTradeSchema, because when i use from_orm then TradeModel doesnt have symbol and validation fails
     symbol: Optional[str] = Field(description="Symbol", example="BANKNIFTY")
+    received_at: Optional[datetime] = Field(
+        description="Received At", example="2023-05-22 05:11:01.117358"
+    )
 
     class Config(BaseConfig):
-        exclude = {"symbol"}
+        exclude = {"symbol", "receive_at"}
         orm_mode = True
         json_encoders = {
             datetime: lambda dt: dt.isoformat(),
@@ -106,7 +90,7 @@ class TradeUpdateValuesSchema(BaseModel):
     )
 
 
-class TradeSchema(EntryTradeSchema):
+class TradeSchema(SignalPayloadSchema):
     class Config:
         orm_mode = True
 
@@ -131,12 +115,15 @@ class TradeSchema(EntryTradeSchema):
 
     instrument: str = Field(description="Instrument name", example="BANKNIFTY27APR23FUT")
 
+    entry_received_at: datetime = Field(
+        description="Received At", example="2023-05-22 05:11:01.117358", alias="received_at"
+    )
+
     @root_validator(pre=True)
     def populate_instrument(cls, values):
         # even though we dont have a out symbol field,
         # it will be fetched from strategy and attached to the payload that will go in TradeSchema,
         return {
             **values,
-            "received_at": values.pop("entry_received_at"),
             "instrument": f"{values['symbol']}{values['expiry'].strftime('%d%b%y').upper()}{values['strike']}{values['option_type']}",
         }

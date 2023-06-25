@@ -11,9 +11,7 @@ from tasks.execution import execute_celery_exit_trade_task
 from app.api.dependency import get_async_redis
 from app.api.dependency import is_valid_strategy
 from app.api.utils import get_current_and_next_expiry
-from app.schemas.trade import CeleryTradeSchema
-from app.schemas.trade import EntryTradeSchema
-from app.utils.constants import ConfigFile
+from app.schemas.trade import SignalPayloadSchema
 
 
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +37,7 @@ futures_router = APIRouter(
 
 @options_router.post("/options", status_code=200)
 async def post_nfo(
-    trade_post_schema: EntryTradeSchema,
+    signal_payload_schema: SignalPayloadSchema,
     _: bool = Depends(is_valid_strategy),
     async_redis: Redis = Depends(get_async_redis),
 ):
@@ -48,7 +46,7 @@ async def post_nfo(
         async_redis, todays_date
     )
 
-    exiting_trades_key = f"{trade_post_schema.strategy_id} {current_expiry_date} {'PE' if trade_post_schema.option_type == 'CE' else 'CE' }"
+    exiting_trades_key = f"{signal_payload_schema.strategy_id} {current_expiry_date} {'PE' if signal_payload_schema.option_type == 'CE' else 'CE' }"
 
     # TODO: in future decide based on strategy new column, strategy_type:
     # if strategy_position is "every" then close all ongoing trades and buy new trade
@@ -56,28 +54,23 @@ async def post_nfo(
     # and buy new trade on BUY action,
     # To be decided in future, the name of actions
 
-    celery_trade_payload_json = CeleryTradeSchema(
-        **trade_post_schema.dict(), expiry=current_expiry_date
-    ).json()
-
+    signal_payload_schema.expiry = current_expiry_date
     try:
         if exiting_trades := await async_redis.lrange(exiting_trades_key, 0, -1):
             exiting_trades_json = json.dumps(exiting_trades)
             # initiate celery close_trade
             logging.info(f"Total: {len(exiting_trades)} trades to be closed")
             await execute_celery_exit_trade_task(
-                celery_trade_payload_json,
+                signal_payload_schema,
                 exiting_trades_key,
                 exiting_trades_json,
-                ConfigFile.PRODUCTION,
+                async_redis,
             )
     except Exception as e:
         logging.info(f"Exception: {e}")
 
     # initiate celery buy_trade
-    await execute_celery_buy_trade_task(
-        celery_trade_payload_json,
-        ConfigFile.PRODUCTION,
+    return await execute_celery_buy_trade_task(
+        signal_payload_schema,
+        async_redis,
     )
-
-    return {"message": "Trade initiated successfully"}

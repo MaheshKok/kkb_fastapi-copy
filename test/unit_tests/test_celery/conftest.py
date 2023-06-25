@@ -8,15 +8,15 @@ from sqlalchemy import select
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
-from app.schemas.trade import CeleryTradeSchema
 from app.schemas.trade import RedisTradeSchema
+from app.schemas.trade import SignalPayloadSchema
 from test.unit_tests.test_data import get_test_post_trade_payload
 from test.utils import create_closed_trades
 from test.utils import create_open_trades
 
 
 @pytest_asyncio.fixture(scope="function")
-async def celery_buy_task_payload_dict(test_async_session, test_async_redis):
+async def celery_buy_task_payload_dict(test_async_redis):
     post_trade_payload = get_test_post_trade_payload()
 
     await create_closed_trades(users=1, strategies=1, trades=10)
@@ -32,7 +32,6 @@ async def celery_buy_task_payload_dict(test_async_session, test_async_redis):
             is_today_expiry,
         ) = await get_current_and_next_expiry(test_async_redis, datetime.now().date())
 
-        post_trade_payload["entry_received_at"] = post_trade_payload.pop("received_at")
         post_trade_payload["strategy_id"] = strategy_model.id
         post_trade_payload["symbol"] = strategy_model.symbol
         post_trade_payload["expiry"] = current_expiry_date
@@ -68,7 +67,6 @@ async def celery_sell_task_args(test_async_redis, take_away_profit=False, ce_tra
         post_trade_payload["symbol"] = strategy_model.symbol
         post_trade_payload["expiry"] = current_expiry_date
         post_trade_payload["option_type"] = "PE" if ce_trade else "CE"
-        post_trade_payload["entry_received_at"] = post_trade_payload.pop("received_at")
 
         redis_key = f"{strategy_model.id} {trade_models[0].expiry} {trade_models[0].option_type}"
         redis_trades = [RedisTradeSchema.from_orm(trade).json() for trade in trade_models]
@@ -76,7 +74,7 @@ async def celery_sell_task_args(test_async_redis, take_away_profit=False, ce_tra
         await test_async_redis.lpush(redis_key, *redis_trades)
         return (
             strategy_model.id,
-            CeleryTradeSchema(**post_trade_payload).json(),
+            SignalPayloadSchema(**post_trade_payload),
             redis_key,
             json.dumps(redis_trades),
         )

@@ -15,10 +15,8 @@ from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
-from app.extensions.redis_cache.utils import get_async_redis
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
-from app.schemas.trade import CeleryTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import TradeSchema
 from app.schemas.trade import TradeUpdateValuesSchema
@@ -46,33 +44,30 @@ def init_db(config_file):
     db.init(async_db_url, engine_kw=engine_kw)
 
 
-async def execute_celery_buy_trade_task(trade_payload_json, config_file):
-    payload_schema = CeleryTradeSchema(**json.loads(trade_payload_json))
-    async_redis = await get_async_redis(config_file)
-
+async def execute_celery_buy_trade_task(signal_payload_schema, async_redis):
     option_chain = await get_option_chain(
         async_redis,
-        payload_schema.symbol,
-        expiry=payload_schema.expiry,
-        option_type=payload_schema.option_type,
+        signal_payload_schema.symbol,
+        expiry=signal_payload_schema.expiry,
+        option_type=signal_payload_schema.option_type,
     )
 
     strike, entry_price = get_strike_and_entry_price(
         option_chain,
-        strike=payload_schema.strike,
-        premium=payload_schema.premium,
-        future_price=payload_schema.future_entry_price_received,
+        strike=signal_payload_schema.strike,
+        premium=signal_payload_schema.premium,
+        future_price=signal_payload_schema.future_entry_price_received,
     )
 
     future_entry_price = await get_future_price(
-        async_redis, payload_schema.symbol, payload_schema.expiry
+        async_redis, signal_payload_schema.symbol, signal_payload_schema.expiry
     )
 
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
     if not strike:
         return None
 
-    if broker_id := payload_schema.broker_id:
+    if broker_id := signal_payload_schema.broker_id:
         print("broker_id", broker_id)
         # TODO: fix this for alice blue
         # status, entry_price = buy_alice_blue_trades(
@@ -90,9 +85,9 @@ async def execute_celery_buy_trade_task(trade_payload_json, config_file):
     # if we already have a strike in the payload then remove it
     # as we have successfully fetched the available strike from option_chain
 
-    del payload_schema.strike
-    del payload_schema.premium
-    del payload_schema.broker_id
+    del signal_payload_schema.strike
+    del signal_payload_schema.premium
+    del signal_payload_schema.broker_id
 
     async with db():
         # Use the AsyncSession to perform database operations
@@ -101,10 +96,12 @@ async def execute_celery_buy_trade_task(trade_payload_json, config_file):
             strike=strike,
             entry_price=entry_price,
             future_entry_price=future_entry_price,
-            **payload_schema.dict(),
+            **signal_payload_schema.dict(),
         )
 
-        trade_model = TradeModel(**trade_schema.dict(exclude={"premium", "broker_id", "symbol"}))
+        trade_model = TradeModel(
+            **trade_schema.dict(exclude={"premium", "broker_id", "symbol", "received_at"})
+        )
         db.session.add(trade_model)
         await db.session.flush()
         await db.session.refresh(trade_model)
@@ -112,9 +109,8 @@ async def execute_celery_buy_trade_task(trade_payload_json, config_file):
         # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
         # it works i confirmed this with python_console with dummy data,
         # interesting part is to get such trades i have to call lrange with 0, -1
-        async_redis = await get_async_redis(config_file)
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
-        redis_trade_schema = RedisTradeSchema.from_orm(trade_model).json()
+        redis_trade_schema = RedisTradeSchema.from_orm(trade_model).json(exclude={"received_at"})
         await async_redis.rpush(trade_key, redis_trade_schema)
         logging.info(f"{trade_model.id} added to redis")
 
@@ -122,18 +118,16 @@ async def execute_celery_buy_trade_task(trade_payload_json, config_file):
 
 
 async def execute_celery_exit_trade_task(
-    payload_json, redis_ongoing_key, exiting_trades_json, config_file
+    signal_payload_schema, redis_ongoing_key, exiting_trades_json, async_redis
 ):
-    celery_trade_schema = CeleryTradeSchema(**json.loads(payload_json))
     exiting_trades = [json.loads(trade) for trade in json.loads(exiting_trades_json)]
-    async_redis = await get_async_redis(config_file)
 
     strike_exit_price_dict = await get_strike_and_exit_price_dict(
-        async_redis, celery_trade_schema, exiting_trades
+        async_redis, signal_payload_schema, exiting_trades
     )
 
     future_exit_price = await get_future_price(
-        async_redis, celery_trade_schema.symbol, celery_trade_schema.expiry
+        async_redis, signal_payload_schema.symbol, signal_payload_schema.expiry
     )
 
     updated_values = []
@@ -162,8 +156,7 @@ async def execute_celery_exit_trade_task(
             "profit": profit,
             "future_exit_price": future_exit_price,
             "future_profit": future_profit,
-            # received_exit_at is basically the signal received at
-            "received_at": celery_trade_schema.entry_received_at,
+            "received_at": signal_payload_schema.received_at,
         }
         close_trade_schema = TradeUpdateValuesSchema(**mapping)
         updated_values.append(close_trade_schema)

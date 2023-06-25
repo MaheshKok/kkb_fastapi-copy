@@ -7,8 +7,7 @@ from tasks.execution import execute_celery_buy_trade_task
 
 from app.database.models import TradeModel
 from app.database.models.strategy import StrategyModel
-from app.schemas.trade import CeleryTradeSchema
-from app.utils.constants import ConfigFile
+from app.schemas.trade import SignalPayloadSchema
 
 
 @pytest.mark.asyncio
@@ -20,7 +19,7 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
         celery_buy_task_payload_dict["option_type"] = "PE"
 
     await execute_celery_buy_trade_task(
-        CeleryTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
+        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis
     )
 
     async with db():
@@ -53,7 +52,7 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
     # because get_test_celery_buy_task_payload_dict already takes care of it
 
     await execute_celery_buy_trade_task(
-        CeleryTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
+        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis
     )
 
     # query database for strategy
@@ -92,7 +91,7 @@ async def test_buy_trade_for_strike(
     # because get_test_celery_buy_task_payload_dict already takes care of it
 
     await execute_celery_buy_trade_task(
-        CeleryTradeSchema(**celery_buy_task_payload_dict).json(), ConfigFile.TEST
+        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis
     )
 
     async with db():

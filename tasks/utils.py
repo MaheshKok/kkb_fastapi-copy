@@ -1,4 +1,4 @@
-from app.schemas.trade import CeleryTradeSchema
+from app.schemas.trade import SignalPayloadSchema
 from app.utils.option_chain import get_option_chain
 
 
@@ -20,16 +20,16 @@ async def get_future_price(async_redis, symbol, expiry_date):
 
 
 async def get_strike_and_exit_price_dict(
-    async_redis, celery_trade_schema: CeleryTradeSchema, redis_ongoing_trades
+    async_redis, signal_payload_schema: SignalPayloadSchema, redis_ongoing_trades
 ) -> dict:
     # Reason being trade_payload is an entry trade and we want to close all ongoing trades of opposite option_type
-    ongoing_trades_option_type = "PE" if celery_trade_schema.option_type == "CE" else "CE"
+    ongoing_trades_option_type = "PE" if signal_payload_schema.option_type == "CE" else "CE"
 
     # TODO: Uncomment if i cant send dict as an argument via celery task
     # redis_ongoing_trades_key = f"{trade_payload['strategy_id']} {expiry_date} {'pe' if trade_payload['option_type'] == 'ce' else 'ce'}"
 
-    if celery_trade_schema.broker_id:
-        print("broker_id", celery_trade_schema.broker_id)
+    if signal_payload_schema.broker_id:
+        print("broker_id", signal_payload_schema.broker_id)
         # TODO: close trades in broker and get exit price
         strike_exit_price_dict = {}
     else:
@@ -37,8 +37,8 @@ async def get_strike_and_exit_price_dict(
         strike_exit_price_dict = await get_exit_price_from_option_chain(
             async_redis,
             redis_ongoing_trades,
-            celery_trade_schema.symbol,
-            celery_trade_schema.expiry,
+            signal_payload_schema.symbol,
+            signal_payload_schema.expiry,
             ongoing_trades_option_type,
         )
 

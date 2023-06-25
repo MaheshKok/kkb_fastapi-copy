@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.trade import EntryTradeSchema
+from app.schemas.trade import SignalPayloadSchema
 
 
 def get_app(request: Request) -> FastAPI:
@@ -21,7 +21,7 @@ async def get_async_redis(app: FastAPI = Depends(get_app)) -> Redis:
 
 
 async def is_valid_strategy(
-    trade_post_schema: EntryTradeSchema, async_redis: Redis = Depends(get_async_redis)
+    signal_payload_schema: SignalPayloadSchema, async_redis: Redis = Depends(get_async_redis)
 ):
     # TODO: check redis cache if strategy_id exists
     # its working, 1 sec 10 trades, now change celery redis to memtera or something else
