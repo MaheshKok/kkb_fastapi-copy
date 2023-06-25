@@ -5,7 +5,7 @@ from datetime import datetime
 from aioredis import Redis
 from fastapi import APIRouter
 from fastapi import Depends
-from tasks.tasks import task_buying_trade
+from tasks.execution import execute_celery_buy_trade_task
 from tasks.tasks import task_exiting_trades
 
 from app.api.dependency import get_async_redis
@@ -76,7 +76,12 @@ async def post_nfo(
 
     # initiate celery buy_trade
 
-    task_buying_trade.delay(
+    # task_buying_trade.delay(
+    #     celery_trade_payload_json,
+    #     ConfigFile.PRODUCTION,
+    # )
+
+    await execute_celery_buy_trade_task(
         celery_trade_payload_json,
         ConfigFile.PRODUCTION,
     )

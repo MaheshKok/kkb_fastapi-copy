@@ -69,6 +69,12 @@ def get_app(config_file) -> FastAPI:
         title="Trading System API", debug=True, lifespan=lifespan
     )  # change debug based on environment
     app.state.config = config
+    async_db_url = get_db_url(app.state.config)
+
+    db.init(async_db_url, engine_kw=engine_kw)
+
+    async_redis = get_redis_client(app.state.config)
+    app.state.async_redis = async_redis
 
     # Add middleware, event handlers, etc. here
     # app.add_middleware(

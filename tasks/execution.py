@@ -48,8 +48,6 @@ def init_db(config_file):
 
 
 async def execute_celery_buy_trade_task(trade_payload_json, config_file):
-    init_db(ConfigFile.PRODUCTION)
-
     payload_schema = CeleryTradeSchema(**json.loads(trade_payload_json))
     async_redis = await get_async_redis(config_file)
 
