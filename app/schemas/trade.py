@@ -76,7 +76,7 @@ class RedisTradeSchema(SignalPayloadSchema):
         }
 
 
-class TradeUpdateValuesSchema(BaseModel):
+class ExitTradeSchema(BaseModel):
     id: uuid.UUID = Field(description="Trade ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3")
     exit_price: float = Field(description="Exit Price", example=450.5)
     profit: float = Field(description="Profit", example=2500.0)

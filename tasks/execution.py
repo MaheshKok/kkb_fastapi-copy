@@ -17,9 +17,9 @@ from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
+from app.schemas.trade import ExitTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import TradeSchema
-from app.schemas.trade import TradeUpdateValuesSchema
 from app.utils.option_chain import get_option_chain
 
 
@@ -158,10 +158,10 @@ async def execute_celery_exit_trade_task(
             "future_profit": future_profit,
             "received_at": signal_payload_schema.received_at,
         }
-        close_trade_schema = TradeUpdateValuesSchema(**mapping)
-        updated_values.append(close_trade_schema)
-        total_profit += close_trade_schema.profit
-        total_future_profit += close_trade_schema.future_profit
+        exit_trade_schema = ExitTradeSchema(**mapping)
+        updated_values.append(exit_trade_schema)
+        total_profit += exit_trade_schema.profit
+        total_future_profit += exit_trade_schema.future_profit
 
     async with db():
         fetch_take_away_profit_query_ = await db.session.execute(
@@ -198,6 +198,7 @@ async def execute_celery_exit_trade_task(
                     "future_profit": bindparam("future_profit"),
                     # received_exit_at is basically received_at
                     "exit_received_at": bindparam("exit_received_at"),
+                    "exit_at": bindparam("exit_at"),
                 }
             )
         )
@@ -211,6 +212,7 @@ async def execute_celery_exit_trade_task(
                     "future_exit_price": mapping.future_exit_price,
                     "future_profit": mapping.future_profit,
                     "exit_received_at": mapping.exit_received_at,
+                    "exit_at": mapping.exit_at,
                 },
             )
 
