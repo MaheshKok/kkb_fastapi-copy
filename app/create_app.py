@@ -44,12 +44,32 @@ class ConnectionLoggingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def get_app(config_file) -> FastAPI:
+    config = get_config(config_file)
+    app = FastAPI(
+        title="Trading System API", debug=True, lifespan=lifespan
+    )  # change debug based on environment
+    app.state.config = config
+    # Add middleware, event handlers, etc. here
+
+    # Include routers
+    register_routers(app)
+
+    # TODO: register scout and new relic
+
+    return app
+
+
+# TODO: if you want lifespan to work then consider moving it to another file
 @asynccontextmanager
 async def lifespan(app):
+    logging.info("Application startup")
     async_db_url = get_db_url(app.state.config)
 
     db.init(async_db_url, engine_kw=engine_kw)
+    logging.info("Initialized database")
     async_redis = get_redis_client(app.state.config)
+    logging.info("Initialized redis")
     app.state.async_redis = async_redis
 
     # create a task to cache ongoing trades in Redis
@@ -58,33 +78,8 @@ async def lifespan(app):
     try:
         yield
     finally:
+        logging.info("Application shutdown")
         # Close the connection when the application shuts down
+        await db.close()
         await app.state.async_redis.close()
         await app.state.async_session_maker.kw["bind"].dispose()
-
-
-def get_app(config_file) -> FastAPI:
-    config = get_config(config_file)
-    app = FastAPI(
-        title="Trading System API", debug=True, lifespan=lifespan
-    )  # change debug based on environment
-    app.state.config = config
-    async_db_url = get_db_url(app.state.config)
-
-    db.init(async_db_url, engine_kw=engine_kw)
-
-    async_redis = get_redis_client(app.state.config)
-    app.state.async_redis = async_redis
-
-    # Add middleware, event handlers, etc. here
-    # app.add_middleware(
-    #     DBSessionMiddleware,
-    # )
-    app.add_middleware(ConnectionLoggingMiddleware)
-
-    # Include routers
-    register_routers(app)
-
-    # TODO: register scout and new relic
-
-    return app

@@ -1,4 +1,5 @@
 import json
+import logging
 
 from fastapi_sa.database import db
 from sqlalchemy import select
@@ -71,3 +72,4 @@ async def cache_ongoing_trades(async_redis):
                     await async_redis.lpush(key, *redis_trades_schema_json_list)
 
         await pipe.execute()
+        logging.info("Ongoing trades cached in redis")

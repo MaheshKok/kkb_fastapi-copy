@@ -125,3 +125,10 @@ async def test_celery_sell_trade_updating_takeaway_profit(
 
         # key has been removed from redis
         assert not await test_async_redis.exists(redis_ongoing_key)
+
+
+# TODO: assert exit_at, profit, future_profit, exit_received_at < exit_at ,
+# TODO: you havent yet deducted brokerage fees and govt charges which are approximately 60
+# TODO: add cron jobs like update yesterdays profit
+# unit test for all edge case like two days holidays consecutive
+#
