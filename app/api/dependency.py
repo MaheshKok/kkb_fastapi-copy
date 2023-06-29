@@ -40,6 +40,6 @@ async def get_strategy_schema(
     return StrategySchema(**json.loads(redis_strategy))
 
 
-async def get_async_client() -> AsyncClient:
+async def get_async_httpx_client() -> AsyncClient:
     async with AsyncClient() as client:
         yield client

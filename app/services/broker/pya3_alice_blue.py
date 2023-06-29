@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import json
 import logging
+from collections import defaultdict
 
 import httpx
 from aioredis import Redis
@@ -20,6 +21,7 @@ from app.database.models import BrokerModel
 from app.schemas.broker import BrokerSchema
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import StrategySchema
+from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from app.utils.constants import ALICE_BLUE_DATE_FORMAT
 from app.utils.constants import FUT
@@ -32,10 +34,10 @@ log = logging.getLogger(__name__)
 
 class Pya3Aliceblue(Aliceblue):
     def __init__(
-        self, user_id, api_key, async_client, base=None, session_id=None, disable_ssl=False
+        self, user_id, api_key, async_httpx_client, base=None, session_id=None, disable_ssl=False
     ):
         super().__init__(user_id, api_key, base, session_id, disable_ssl)
-        self.async_client = async_client
+        self.async_httpx_client = async_httpx_client
 
     async def _get(self, sub_url, data=None):
         """Get method declaration"""
@@ -63,9 +65,9 @@ class Pya3Aliceblue(Aliceblue):
         }
         try:
             if req_type == "POST":
-                response = await self.async_client.post(method, json=data, headers=_headers)
+                response = await self.async_httpx_client.post(method, json=data, headers=_headers)
             elif req_type == "GET":
-                response = await self.async_client.get(method, headers=_headers)
+                response = await self.async_httpx_client.get(method, headers=_headers)
             else:
                 return {"stat": "Not_ok", "emsg": "Invalid request type", "encKey": None}
 
@@ -506,7 +508,7 @@ class Pya3Aliceblue(Aliceblue):
     #         return inst, token_full_name_dict
 
 
-async def get_pya3_obj(async_redis_client, broker_id, async_client) -> Pya3Aliceblue:
+async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya3Aliceblue:
     broker_json = await async_redis_client.get(broker_id)
 
     if broker_json:
@@ -533,7 +535,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_client) -> Pya3Alice
         user_id=broker_schema.username,
         api_key=broker_schema.api_key,
         session_id=broker_schema.access_token,
-        async_client=async_client,
+        async_httpx_client=async_httpx_client,
     )
     return pya3_obj
 
@@ -542,7 +544,7 @@ async def buy_alice_blue_trades(
     signal_payload_schema: SignalPayloadSchema,
     strategy_schema: StrategySchema,
     async_redis_client: Redis,
-    async_client: AsyncClient,
+    async_httpx_client: AsyncClient,
 ):
     """
     assumptions
@@ -555,7 +557,7 @@ async def buy_alice_blue_trades(
     """
 
     pya3_obj = await get_pya3_obj(
-        async_redis_client, str(strategy_schema.broker_id), async_client
+        async_redis_client, str(strategy_schema.broker_id), async_httpx_client
     )
 
     instrument = await pya3_obj.get_instrument_for_fno_from_redis(
@@ -593,79 +595,103 @@ async def buy_alice_blue_trades(
 
 
 async def place_close_order(
-    pya3_obj: Pya3Aliceblue, symbol, expiry: datetime.date, nfo_type, strike, quantity
+    pya3_obj: Pya3Aliceblue,
+    async_redis_client: Redis,
+    strategy_schema: StrategySchema,
+    strike: float,
+    quantity: int,
+    expiry: datetime.date,
+    option_type: OptionType,
 ):
-    option_type = "ce" if quantity > 0 else "pe"
     instrument = await pya3_obj.get_instrument_for_fno_from_redis(
-        symbol=symbol,
+        async_redis_client=async_redis_client,
+        symbol=strategy_schema.symbol,
         expiry_date=expiry,
-        is_fut=nfo_type != "option",
+        is_fut=strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX,
         strike=strike,
-        is_CE=option_type == "ce",
+        is_CE=option_type == OptionType.CE,
     )
 
-    place_order_response = pya3_obj.place_order(
+    place_order_response = await pya3_obj.place_order(
         transaction_type=TransactionType.Sell,
         instrument=instrument,
-        quantity=quantity if quantity > 0 else (-1 * quantity),
+        quantity=quantity,
         order_type=OrderType.Market,
         product_type=ProductType.Delivery,
     )
+
     # TODO: handle any error like what if we dont have NOrdNo in response
     return {strike: place_order_response["NOrdNo"]}
 
 
-# async def close_alice_blue_trades(
-#     expiry: datetime.date,
-#     nfo_type,
-#     redis_trades,
-#     data,
-# ):
-#     """
-#     assumptions
-#      all trades to be executed should belong to same:
-#       symbol [ for ex: either BANKNIFTY, NIFTY ]
-#       expiry
-#       call type [ for ex: either CE, PE ]
-#       nfo type [ for ex: either future or option]
-#     """
-#
-#     strike_quantity_dict = get_aggregated_trades(redis_trades)
-#     symbol = data["symbol"]
-#     pya3_obj = await get_pya3_obj()
-#
-#     if isinstance(expiry, str):
-#         expiry = datetime.datetime.strptime(expiry, "%d %b %Y").date()
-#
-#     with concurrent.futures.ThreadPoolExecutor() as executor:
-#         place_order_futures = [
-#             executor.submit(
-#                 place_close_order,
-#                 pya3_obj,
-#                 symbol,
-#                 expiry,
-#                 nfo_type,
-#                 strike,
-#                 quantity,
-#             )
-#             for strike, quantity in strike_quantity_dict.items()
-#         ]
-#
-#         place_order_future_results = [
-#             place_order_future.result() for place_order_future in place_order_futures
-#         ]
-#
-#         strike_exitprice_dict = {}
-#         for place_order_future_result in place_order_future_results:
-#             for (
-#                 strike,
-#                 order_id,
-#             ) in place_order_future_result.items():
-#                 order_history = pya3_obj.get_order_history(order_id)
-#                 for _ in range(20):
-#                     if order_history["Status"] == Status.COMPLETE:
-#                         strike_exitprice_dict[strike] = order_history["Avgprc"]
-#                         return "success", strike_exitprice_dict
-#                     time.sleep(0.2)
-#
-#         return "failure", strike_exitprice_dict
+def get_exiting_trades_insights(redis_trade_schema_list: list[RedisTradeSchema]):
+    strike_quantity_dict = defaultdict(int)
+
+    for redis_trade_schema in redis_trade_schema_list:
+        strike_quantity_dict[redis_trade_schema.strike] += redis_trade_schema.quantity
+
+    if len(strike_quantity_dict):
+        # even though loop is over, we still have the access to the last element
+        return strike_quantity_dict, redis_trade_schema.expiry, redis_trade_schema.option_type
+
+
+async def close_alice_blue_trades(
+    redis_trade_schema_list: list[RedisTradeSchema],
+    strategy_schema: StrategySchema,
+    async_redis_client: Redis,
+    async_httpx_client: AsyncClient,
+):
+    """
+    assumptions
+     all trades to be executed should belong to same:
+      symbol [ for ex: either BANKNIFTY, NIFTY ]
+      expiry
+      call type [ for ex: either CE, PE ]
+      nfo type [ for ex: either future or option]
+    """
+
+    strike_quantity_dict, expiry, option_type = get_exiting_trades_insights(
+        redis_trade_schema_list
+    )
+
+    pya3_obj = await get_pya3_obj(
+        async_redis_client, strategy_schema.broker_id, async_httpx_client
+    )
+
+    tasks = []
+    for strike, quantity in strike_quantity_dict.items():
+        tasks.append(
+            asyncio.create_task(
+                place_close_order(
+                    pya3_obj,
+                    async_redis_client,
+                    strategy_schema,
+                    strike,
+                    quantity,
+                    expiry,
+                    option_type,
+                )
+            )
+        )
+
+    if tasks:
+        place_order_future_response = await asyncio.gather(*tasks)
+
+        place_order_future_results = [
+            place_order_future.result() for place_order_future in place_order_future_response
+        ]
+
+        strike_exitprice_dict = {}
+        for place_order_future_result in place_order_future_results:
+            for (
+                strike,
+                order_id,
+            ) in place_order_future_result.items():
+                order_history = await pya3_obj.get_order_history(order_id)
+                for _ in range(20):
+                    if order_history["Status"] == Status.COMPLETE:
+                        strike_exitprice_dict[strike] = order_history["Avgprc"]
+                        return "success", strike_exitprice_dict
+                    await asyncio.sleep(0.2)
+
+        return "failure", strike_exitprice_dict

@@ -3,6 +3,7 @@ from datetime import datetime
 
 from aioredis import Redis
 from fastapi_sa.database import db
+from httpx import AsyncClient
 from sqlalchemy import bindparam
 from sqlalchemy import select
 from sqlalchemy import update
@@ -49,7 +50,7 @@ def init_db(config_file):
 
 
 async def task_entry_trade(
-    signal_payload_schema, async_redis_client, strategy_schema, async_client
+    signal_payload_schema, async_redis_client, strategy_schema, async_httpx_client
 ):
     option_chain = await get_option_chain(
         async_redis_client,
@@ -74,7 +75,7 @@ async def task_entry_trade(
 
     if strategy_schema.broker_id:
         status, entry_price = await buy_alice_blue_trades(
-            signal_payload_schema, strategy_schema, async_redis_client, async_client
+            signal_payload_schema, strategy_schema, async_redis_client, async_httpx_client
         )
 
         if status != Status.COMPLETE:
@@ -115,9 +116,14 @@ async def task_exit_trade(
     redis_trade_schema_list: list[RedisTradeSchema],
     async_redis_client: Redis,
     strategy_schema: StrategySchema,
+    async_httpx_client: AsyncClient,
 ):
     strike_exit_price_dict = await get_strike_and_exit_price_dict(
-        async_redis_client, signal_payload_schema, redis_trade_schema_list, strategy_schema
+        async_redis_client,
+        signal_payload_schema,
+        redis_trade_schema_list,
+        strategy_schema,
+        async_httpx_client,
     )
 
     future_exit_price = await get_future_price(async_redis_client, signal_payload_schema.symbol)

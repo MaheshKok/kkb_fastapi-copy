@@ -10,7 +10,7 @@ from pydantic import parse_obj_as
 from tasks.execution import task_entry_trade
 from tasks.execution import task_exit_trade
 
-from app.api.dependency import get_async_client
+from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_strategy_schema
 from app.api.utils import get_current_and_next_expiry
@@ -45,7 +45,7 @@ async def post_nfo(
     signal_payload_schema: SignalPayloadSchema,
     strategy_schema: StrategySchema = Depends(get_strategy_schema),
     async_redis_client: Redis = Depends(get_async_redis_client),
-    async_client: AsyncClient = Depends(get_async_client),
+    async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
 ):
     todays_date = datetime.now().date()
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
@@ -74,11 +74,12 @@ async def post_nfo(
                 redis_trade_schema_list,
                 async_redis_client,
                 strategy_schema,
+                async_httpx_client,
             )
     except Exception as e:
         logging.error(f"Exception while exiting trade: {e}")
 
     # initiate celery buy_trade
     return await task_entry_trade(
-        signal_payload_schema, async_redis_client, strategy_schema, async_client
+        signal_payload_schema, async_redis_client, strategy_schema, async_httpx_client
     )

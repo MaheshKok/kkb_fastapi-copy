@@ -1,7 +1,13 @@
 from datetime import datetime
 
+from aioredis import Redis
+from httpx import AsyncClient
+
 from app.api.utils import get_expiry_list
+from app.schemas.strategy import StrategySchema
+from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
+from app.services.broker.pya3_alice_blue import close_alice_blue_trades
 from app.utils.option_chain import get_option_chain
 
 
@@ -56,21 +62,20 @@ async def get_future_price(async_redis_client, symbol):
 
 
 async def get_strike_and_exit_price_dict(
-    async_redis_client,
+    async_redis_client: Redis,
     signal_payload_schema: SignalPayloadSchema,
-    redis_trade_schema_list,
-    strategy_schema,
+    redis_trade_schema_list: list[RedisTradeSchema],
+    strategy_schema: StrategySchema,
+    async_httpx_client: AsyncClient,
 ) -> dict:
     # Reason being trade_payload is an entry trade and we want to close all ongoing trades of opposite option_type
     ongoing_trades_option_type = "PE" if signal_payload_schema.option_type == "CE" else "CE"
 
-    # TODO: Uncomment if i cant send dict as an argument via celery task
-    # redis_ongoing_trades_key = f"{trade_payload['strategy_id']} {expiry_date} {'pe' if trade_payload['option_type'] == 'ce' else 'ce'}"
-
     if strategy_schema.broker_id:
-        print("broker_id", strategy_schema.broker_id)
         # TODO: close trades in broker and get exit price
-        strike_exit_price_dict = {}
+        strike_exit_price_dict = await close_alice_blue_trades(
+            redis_trade_schema_list, strategy_schema, async_redis_client, async_httpx_client
+        )
     else:
         # get exit price from option chain
         strike_exit_price_dict = await get_exit_price_from_option_chain(
