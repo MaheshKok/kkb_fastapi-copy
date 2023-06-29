@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 
 from fastapi_sa.database import db
+from line_profiler_pycharm import profile
 from sqlalchemy import bindparam
 from sqlalchemy import select
 from sqlalchemy import update
@@ -20,6 +21,8 @@ from app.schemas.enums import PositionEnum
 from app.schemas.trade import ExitTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import TradeSchema
+from app.services.broker.pya3_alice_blue import buy_alice_blue_trades
+from app.utils.constants import Status
 from app.utils.option_chain import get_option_chain
 
 
@@ -44,7 +47,10 @@ def init_db(config_file):
     db.init(async_db_url, engine_kw=engine_kw)
 
 
-async def execute_celery_buy_trade_task(signal_payload_schema, async_redis):
+@profile
+async def execute_celery_buy_trade_task(
+    signal_payload_schema, async_redis, strategy_schema, async_client
+):
     option_chain = await get_option_chain(
         async_redis,
         signal_payload_schema.symbol,
@@ -59,44 +65,31 @@ async def execute_celery_buy_trade_task(signal_payload_schema, async_redis):
         future_price=signal_payload_schema.future_entry_price_received,
     )
 
-    future_entry_price = await get_future_price(
-        async_redis, signal_payload_schema.symbol, signal_payload_schema.expiry
-    )
+    # this is very important to set strike to signal_payload_schema as it would be used hereafter
+    signal_payload_schema.strike = strike
 
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
     if not strike:
         return None
 
-    if broker_id := signal_payload_schema.broker_id:
-        print("broker_id", broker_id)
-        # TODO: fix this for alice blue
-        # status, entry_price = buy_alice_blue_trades(
-        #     data,
-        #     expiry,
-        #     NFO_TYPE.OPTION,
-        # )
+    if strategy_schema.broker_id:
+        status, entry_price = await buy_alice_blue_trades(
+            signal_payload_schema, strategy_schema, async_redis, async_client
+        )
 
-        # if status == STATUS.COMPLETE:
-        #     data["entry_price"] = entry_price
-        # else:
-        #     # Order not successful so dont place it in db
-        #     return None
+        if status != Status.COMPLETE:
+            # Order not successful so dont make its entry in db
+            return None
 
-    # if we already have a strike in the payload then remove it
-    # as we have successfully fetched the available strike from option_chain
-
-    del signal_payload_schema.strike
-    del signal_payload_schema.premium
-    del signal_payload_schema.broker_id
+    future_entry_price = await get_future_price(async_redis, signal_payload_schema.symbol)
 
     async with db():
         # Use the AsyncSession to perform database operations
         # Example: Create a new entry in the database
         trade_schema = TradeSchema(
-            strike=strike,
             entry_price=entry_price,
             future_entry_price=future_entry_price,
-            **signal_payload_schema.dict(),
+            **signal_payload_schema.dict(exclude={"premium"}),
         )
 
         trade_model = TradeModel(
@@ -118,17 +111,15 @@ async def execute_celery_buy_trade_task(signal_payload_schema, async_redis):
 
 
 async def execute_celery_exit_trade_task(
-    signal_payload_schema, redis_ongoing_key, exiting_trades_json, async_redis
+    signal_payload_schema, redis_ongoing_key, exiting_trades_json, async_redis, strategy_schema
 ):
     exiting_trades = [json.loads(trade) for trade in json.loads(exiting_trades_json)]
 
     strike_exit_price_dict = await get_strike_and_exit_price_dict(
-        async_redis, signal_payload_schema, exiting_trades
+        async_redis, signal_payload_schema, exiting_trades, strategy_schema
     )
 
-    future_exit_price = await get_future_price(
-        async_redis, signal_payload_schema.symbol, signal_payload_schema.expiry
-    )
+    future_exit_price = await get_future_price(async_redis, signal_payload_schema.symbol)
 
     updated_values = []
     total_profit = 0

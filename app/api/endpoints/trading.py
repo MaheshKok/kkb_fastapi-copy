@@ -5,11 +5,13 @@ from datetime import datetime
 from aioredis import Redis
 from fastapi import APIRouter
 from fastapi import Depends
+from httpx import AsyncClient
 from tasks.execution import execute_celery_buy_trade_task
 from tasks.execution import execute_celery_exit_trade_task
 
+from app.api.dependency import get_async_client
 from app.api.dependency import get_async_redis
-from app.api.dependency import is_valid_strategy
+from app.api.dependency import get_strategy_schema
 from app.api.utils import get_current_and_next_expiry
 from app.schemas.trade import SignalPayloadSchema
 
@@ -38,8 +40,9 @@ futures_router = APIRouter(
 @options_router.post("/options", status_code=200)
 async def post_nfo(
     signal_payload_schema: SignalPayloadSchema,
-    _: bool = Depends(is_valid_strategy),
+    strategy_schema: bool = Depends(get_strategy_schema),
     async_redis: Redis = Depends(get_async_redis),
+    async_client: AsyncClient = Depends(get_async_client),
 ):
     todays_date = datetime.now().date()
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
@@ -65,12 +68,12 @@ async def post_nfo(
                 exiting_trades_key,
                 exiting_trades_json,
                 async_redis,
+                strategy_schema,
             )
     except Exception as e:
-        logging.info(f"Exception: {e}")
+        logging.info(f"Exception while exiting trade: {e}")
 
     # initiate celery buy_trade
     return await execute_celery_buy_trade_task(
-        signal_payload_schema,
-        async_redis,
+        signal_payload_schema, async_redis, strategy_schema, async_client
     )

@@ -37,4 +37,6 @@ async def get_option_chain(
             )
         else:
             return option_chain
-    raise Exception(f"No option data: [{symbol} {expiry} {future_or_option_type}] found in redis")
+    raise Exception(
+        f"no option chain data for: [{symbol} {expiry} {future_or_option_type}] found in redis"
+    )

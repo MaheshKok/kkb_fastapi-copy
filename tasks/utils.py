@@ -1,3 +1,6 @@
+from datetime import datetime
+
+from app.api.utils import get_expiry_list
 from app.schemas.trade import SignalPayloadSchema
 from app.utils.option_chain import get_option_chain
 
@@ -11,16 +14,41 @@ async def get_exit_price_from_option_chain(
     return {strike: option_chain[strike] for strike in strikes}
 
 
-async def get_future_price(async_redis, symbol, expiry_date):
-    # get future price from redis
-    # TODO: compute future price from argument expiry_data
+async def get_future_price(async_redis, symbol):
+    """
+    if expiry_list = ["06 Jul 2023", "13 Jul 2023", "20 Jul 2023", "27 Jul 2023", "03 Aug 2023", "31 Aug 2023", "28 Sep 2023", "28 Dec 2023", "31 Dec 2026", "24 Jun 2027", "30 Dec 2027"]
+    and today is 27th June then we have to find july months expiry
 
-    future_option_chain = await get_option_chain(async_redis, symbol, expiry_date, is_future=True)
+    logic:
+        start iterating over expiry list till second last expiry_date
+        now check if the current item expiry date month is less then next expiry_date in list
+
+    if today is june then current month will be set to july month and thats why logic will work
+
+    """
+    expiry_dates = await get_expiry_list(async_redis)
+    monthly_expiry_date = None
+
+    current_month = datetime.now().date().month
+    if current_month < expiry_dates[0].month:
+        current_month = current_month + 1
+
+    for index, expiry_date in enumerate(expiry_dates[:-1]):
+        if current_month < expiry_dates[index + 1].month:
+            monthly_expiry_date = expiry_date
+            break
+
+    if not monthly_expiry_date:
+        return None
+
+    future_option_chain = await get_option_chain(
+        async_redis, symbol, monthly_expiry_date, is_future=True
+    )
     return float(future_option_chain["FUT"])
 
 
 async def get_strike_and_exit_price_dict(
-    async_redis, signal_payload_schema: SignalPayloadSchema, redis_ongoing_trades
+    async_redis, signal_payload_schema: SignalPayloadSchema, redis_ongoing_trades, strategy_schema
 ) -> dict:
     # Reason being trade_payload is an entry trade and we want to close all ongoing trades of opposite option_type
     ongoing_trades_option_type = "PE" if signal_payload_schema.option_type == "CE" else "CE"
@@ -28,8 +56,8 @@ async def get_strike_and_exit_price_dict(
     # TODO: Uncomment if i cant send dict as an argument via celery task
     # redis_ongoing_trades_key = f"{trade_payload['strategy_id']} {expiry_date} {'pe' if trade_payload['option_type'] == 'ce' else 'ce'}"
 
-    if signal_payload_schema.broker_id:
-        print("broker_id", signal_payload_schema.broker_id)
+    if strategy_schema.broker_id:
+        print("broker_id", strategy_schema.broker_id)
         # TODO: close trades in broker and get exit price
         strike_exit_price_dict = {}
     else:

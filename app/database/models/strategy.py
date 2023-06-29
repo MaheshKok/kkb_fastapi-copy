@@ -39,7 +39,7 @@ class StrategyModel(Base):
     name = Column(String, nullable=False, default="Renko Strategy Every Candle")
 
     broker_id = Column(UUID(as_uuid=True), ForeignKey("broker.id"), nullable=True, index=True)
-    broker = relationship("Broker", backref="strategies")
+    broker = relationship("BrokerModel", backref="strategies")
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id"), nullable=False, index=True)
     user = relationship("User", backref="strategy_list")

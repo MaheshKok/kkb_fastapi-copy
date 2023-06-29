@@ -14,6 +14,14 @@ class OptionType:
     PE = "PE"
 
 
+class Status:
+    SUCCESS = "success"
+    ERROR = "error"
+    COMPLETE = "complete"
+    REJECTED = "rejected"
+    VALIDATION_PENDING = "validation pending"
+
+
 # strategy_id = UUID
 # expiry = datetime.date object
 # option_type = OptionType.CE or OptionType.PE
@@ -24,3 +32,5 @@ ONGOING_TRADES_REDIS_KEY = "strategy_id expiry option_type"
 EDELWEISS_DATE_FORMAT = "%d %b %Y"
 REDIS_DATE_FORMAT = "%Y-%m-%d"
 SQLALCHEMY_DATE_FORMAT = "%Y-%m-%d"
+ALICE_BLUE_DATE_FORMAT = "%d%b%y"
+FUT = "FUT"

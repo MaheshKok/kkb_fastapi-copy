@@ -9,7 +9,7 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 
-class Broker(Base):
+class BrokerModel(Base):
     __tablename__ = "broker"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

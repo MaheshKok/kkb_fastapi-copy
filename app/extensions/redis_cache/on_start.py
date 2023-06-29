@@ -38,11 +38,9 @@ async def cache_ongoing_trades(async_redis):
         redis_key_trade_models_dict = {}
         for ongoing_trade_model in ongoing_trades_model:
             redis_key = f"{ongoing_trade_model.strategy_id} {ongoing_trade_model.expiry} {ongoing_trade_model.option_type}"
-
-            redis_key_trade_models_dict[redis_key] = redis_key_trade_models_dict.get(
-                redis_key, []
-            ) + [ongoing_trade_model]
-
+            if redis_key not in redis_key_trade_models_dict:
+                redis_key_trade_models_dict[redis_key] = []
+            redis_key_trade_models_dict[redis_key].append(ongoing_trade_model)
             # counter_key is used to store the counter trade for the ongoing trade
             # if the ongoing trade is CE then the counter trade is PE and vice versa
             counter_key = f"{ongoing_trade_model.strategy_id} {ongoing_trade_model.expiry} {OptionType.CE if ongoing_trade_model.option_type == OptionType.PE else OptionType.PE}"
@@ -69,7 +67,7 @@ async def cache_ongoing_trades(async_redis):
                     await async_redis.rpush(key, json.dumps(redis_trades_schema_json_list))
                 elif trades_in_redis and len(trades_in_redis) != len(trade_models):
                     await async_redis.delete(key)
-                    await async_redis.lpush(key, *redis_trades_schema_json_list)
+                    await async_redis.rpush(key, *redis_trades_schema_json_list)
 
         await pipe.execute()
         logging.info("Ongoing trades cached in redis")

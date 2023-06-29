@@ -1,9 +1,14 @@
+import json
+
 from aioredis import Redis
 from fastapi import Depends
 from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi import Request
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.schemas.strategy import StrategySchema
 from app.schemas.trade import SignalPayloadSchema
 
 
@@ -20,13 +25,20 @@ async def get_async_redis(app: FastAPI = Depends(get_app)) -> Redis:
     yield app.state.async_redis
 
 
-async def is_valid_strategy(
+async def get_strategy_schema(
     signal_payload_schema: SignalPayloadSchema, async_redis: Redis = Depends(get_async_redis)
-):
-    # TODO: check redis cache if strategy_id exists
-    # its working, 1 sec 10 trades, now change celery redis to memtera or something else
-    # as upstash is cancelling or some other reason
-    # strategy_list = await async_redis.lrange("strategy_list", 0, -1)
-    # if trade_post_schema.strategy_id not in strategy_list:
-    #     raise HTTPException(status_code=400, detail="Invalid strategy_id")
-    return True
+) -> StrategySchema:
+    redis_strategy = await async_redis.get(str(signal_payload_schema.strategy_id))
+    if not redis_strategy:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Strategy: {signal_payload_schema.strategy_id} not found in redis",
+        )
+
+    # i am bit confused as why i didnt receive the result in dict format and rather string
+    return StrategySchema(**json.loads(redis_strategy))
+
+
+async def get_async_client() -> AsyncClient:
+    async with AsyncClient() as client:
+        yield client
