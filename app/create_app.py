@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi_sa.database import db
-from fastapi_sa.middleware import DBSessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.base import RequestResponseEndpoint
 
@@ -53,7 +52,7 @@ def get_app(config_file) -> FastAPI:
     )  # change debug based on environment
     app.state.config = config
     # Add middleware, event handlers, etc. here
-    app.add_middleware(DBSessionMiddleware)
+    # app.add_middleware(DBSessionMiddleware)
     # Include routers
     register_routers(app)
 

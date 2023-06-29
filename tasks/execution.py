@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+from aioredis import Redis
 from fastapi_sa.database import db
 from sqlalchemy import bindparam
 from sqlalchemy import select
@@ -16,8 +17,10 @@ from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
+from app.schemas.strategy import StrategySchema
 from app.schemas.trade import ExitTradeSchema
 from app.schemas.trade import RedisTradeSchema
+from app.schemas.trade import SignalPayloadSchema
 from app.schemas.trade import TradeSchema
 from app.services.broker.pya3_alice_blue import buy_alice_blue_trades
 from app.utils.constants import Status
@@ -95,27 +98,26 @@ async def task_entry_trade(
         db.session.add(trade_model)
         await db.session.flush()
         await db.session.refresh(trade_model)
-        logging.info(f"{trade_model.id} added to db")
         # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
         # it works i confirmed this with python_console with dummy data,
         # interesting part is to get such trades i have to call lrange with 0, -1
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
         redis_trade_json = RedisTradeSchema.from_orm(trade_model).json(exclude={"received_at"})
         await async_redis_client.rpush(trade_key, redis_trade_json)
-        logging.info(f"{trade_model.id} added to redis")
+        logging.info(f"{trade_model.id} added to db and redis")
 
     return "successfully added trade to db"
 
 
 async def task_exit_trade(
-    signal_payload_schema,
-    redis_ongoing_key,
-    exiting_trades_dict,
-    async_redis_client,
-    strategy_schema,
+    signal_payload_schema: SignalPayloadSchema,
+    redis_ongoing_key: str,
+    redis_trade_schema_list: list[RedisTradeSchema],
+    async_redis_client: Redis,
+    strategy_schema: StrategySchema,
 ):
     strike_exit_price_dict = await get_strike_and_exit_price_dict(
-        async_redis_client, signal_payload_schema, exiting_trades_dict, strategy_schema
+        async_redis_client, signal_payload_schema, redis_trade_schema_list, strategy_schema
     )
 
     future_exit_price = await get_future_price(async_redis_client, signal_payload_schema.symbol)
@@ -124,24 +126,24 @@ async def task_exit_trade(
     total_profit = 0
     total_future_profit = 0
 
-    for trade in exiting_trades_dict:
-        entry_price = trade["entry_price"]
-        quantity = trade["quantity"]
-        position = trade["position"]
-        exit_price = strike_exit_price_dict[trade["strike"]]
+    for trade in redis_trade_schema_list:
+        entry_price = trade.entry_price
+        quantity = trade.quantity
+        position = trade.position
+        exit_price = strike_exit_price_dict[trade.strike]
         profit = get_profit(entry_price, exit_price, quantity, position)
 
-        future_entry_price = trade["future_entry_price"]
+        future_entry_price = trade.future_entry_price
         # if option_type is PE then position is SHORT and for CE its LONG
         future_position = (
-            PositionEnum.SHORT if trade["option_type"] == OptionTypeEnum.PE else PositionEnum.LONG
+            PositionEnum.SHORT if trade.option_type == OptionTypeEnum.PE else PositionEnum.LONG
         )
         future_profit = get_profit(
             future_entry_price, future_exit_price, quantity, future_position
         )
 
         mapping = {
-            "id": trade["id"],
+            "id": trade.id,
             "exit_price": exit_price,
             "profit": profit,
             "future_exit_price": future_exit_price,
@@ -155,22 +157,22 @@ async def task_exit_trade(
 
     async with db():
         fetch_take_away_profit_query_ = await db.session.execute(
-            select(TakeAwayProfit).filter_by(strategy_id=trade["strategy_id"])
+            select(TakeAwayProfit).filter_by(strategy_id=strategy_schema.id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
 
         if take_away_profit_model:
             take_away_profit_model.profit += total_profit
             take_away_profit_model.future_profit += total_future_profit
-            take_away_profit_model.total_trades += len(exiting_trades_dict)
+            take_away_profit_model.total_trades += len(redis_trade_schema_list)
             take_away_profit_model.updated_at = datetime.now()
             await db.session.flush()
         else:
             take_away_profit_model = TakeAwayProfit(
                 profit=total_profit,
                 future_profit=total_future_profit,
-                strategy_id=trade["strategy_id"],
-                total_trades=len(exiting_trades_dict),
+                strategy_id=strategy_schema.id,
+                total_trades=len(redis_trade_schema_list),
             )
             db.session.add(take_away_profit_model)
             await db.session.flush()
@@ -209,6 +211,6 @@ async def task_exit_trade(
         await db.session.flush()
         await async_redis_client.delete(redis_ongoing_key)
     logging.info(
-        "successfully closed trades and updated the take_away_profit table with the profit and deleted the redis key"
+        f"{redis_ongoing_key} closed trades, updated the take_away_profit with the profit and deleted the redis key"
     )
-    return "successfully closed trades and updated the take_away_profit table with the profit and deleted the redis key"
+    return f"{redis_ongoing_key} closed trades, updated the take_away_profit with the profit and deleted the redis key"

@@ -6,10 +6,10 @@ from app.utils.option_chain import get_option_chain
 
 
 async def get_exit_price_from_option_chain(
-    async_redis_client, redis_ongoing_trades, symbol, expiry_date, option_type
+    async_redis_client, redis_trade_schema_list, symbol, expiry_date, option_type
 ):
     # reason for using set comprehension, we want the exit_price for all distinct strikes
-    strikes = {trade["strike"] for trade in redis_ongoing_trades}
+    strikes = {trade.strike for trade in redis_trade_schema_list}
     option_chain = await get_option_chain(async_redis_client, symbol, expiry_date, option_type)
     return {strike: option_chain[strike] for strike in strikes}
 
@@ -58,7 +58,7 @@ async def get_future_price(async_redis_client, symbol):
 async def get_strike_and_exit_price_dict(
     async_redis_client,
     signal_payload_schema: SignalPayloadSchema,
-    redis_ongoing_trades,
+    redis_trade_schema_list,
     strategy_schema,
 ) -> dict:
     # Reason being trade_payload is an entry trade and we want to close all ongoing trades of opposite option_type
@@ -75,7 +75,7 @@ async def get_strike_and_exit_price_dict(
         # get exit price from option chain
         strike_exit_price_dict = await get_exit_price_from_option_chain(
             async_redis_client,
-            redis_ongoing_trades,
+            redis_trade_schema_list,
             signal_payload_schema.symbol,
             signal_payload_schema.expiry,
             ongoing_trades_option_type,

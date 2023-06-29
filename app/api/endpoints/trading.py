@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime
 
@@ -5,6 +6,7 @@ from aioredis import Redis
 from fastapi import APIRouter
 from fastapi import Depends
 from httpx import AsyncClient
+from pydantic import parse_obj_as
 from tasks.execution import task_entry_trade
 from tasks.execution import task_exit_trade
 
@@ -12,6 +14,8 @@ from app.api.dependency import get_async_client
 from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_strategy_schema
 from app.api.utils import get_current_and_next_expiry
+from app.schemas.strategy import StrategySchema
+from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 
 
@@ -39,7 +43,7 @@ futures_router = APIRouter(
 @options_router.post("/options", status_code=200)
 async def post_nfo(
     signal_payload_schema: SignalPayloadSchema,
-    strategy_schema: bool = Depends(get_strategy_schema),
+    strategy_schema: StrategySchema = Depends(get_strategy_schema),
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_client: AsyncClient = Depends(get_async_client),
 ):
@@ -58,18 +62,21 @@ async def post_nfo(
 
     signal_payload_schema.expiry = current_expiry_date
     try:
-        if exiting_trades_dict := await async_redis_client.lrange(exiting_trades_key, 0, -1):
+        if exiting_trades_list_json := await async_redis_client.lrange(exiting_trades_key, 0, -1):
             # initiate celery close_trade
-            logging.info(f"Total: {len(exiting_trades_dict)} trades to be closed")
+            logging.info(f"Total: {len(exiting_trades_list_json)} trades to be closed")
+            redis_trade_schema_list = parse_obj_as(
+                list[RedisTradeSchema], [json.loads(trade) for trade in exiting_trades_list_json]
+            )
             await task_exit_trade(
                 signal_payload_schema,
                 exiting_trades_key,
-                exiting_trades_dict,
+                redis_trade_schema_list,
                 async_redis_client,
                 strategy_schema,
             )
     except Exception as e:
-        logging.info(f"Exception while exiting trade: {e}")
+        logging.error(f"Exception while exiting trade: {e}")
 
     # initiate celery buy_trade
     return await task_entry_trade(

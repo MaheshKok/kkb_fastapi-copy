@@ -554,7 +554,9 @@ async def buy_alice_blue_trades(
             nfo type [ for ex: either future or option]
     """
 
-    pya3_obj = await get_pya3_obj(async_redis_client, strategy_schema.broker_id, async_client)
+    pya3_obj = await get_pya3_obj(
+        async_redis_client, str(strategy_schema.broker_id), async_client
+    )
 
     instrument = await pya3_obj.get_instrument_for_fno_from_redis(
         async_redis_client=async_redis_client,
