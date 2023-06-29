@@ -3,7 +3,6 @@ import logging
 from datetime import datetime
 
 from fastapi_sa.database import db
-from line_profiler_pycharm import profile
 from sqlalchemy import bindparam
 from sqlalchemy import select
 from sqlalchemy import update
@@ -47,7 +46,6 @@ def init_db(config_file):
     db.init(async_db_url, engine_kw=engine_kw)
 
 
-@profile
 async def execute_celery_buy_trade_task(
     signal_payload_schema, async_redis, strategy_schema, async_client
 ):

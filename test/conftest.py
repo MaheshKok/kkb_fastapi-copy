@@ -159,6 +159,7 @@ async def test_async_engine(test_config):
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def db_cleanup(test_async_engine):
     async with test_async_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
     yield

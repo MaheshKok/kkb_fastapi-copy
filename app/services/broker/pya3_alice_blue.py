@@ -8,7 +8,6 @@ from aioredis import Redis
 from fastapi import HTTPException
 from fastapi_sa.database import db
 from httpx import AsyncClient
-from line_profiler_pycharm import profile
 from pya3 import Aliceblue
 from pya3 import Instrument
 from pya3 import OrderType
@@ -52,7 +51,6 @@ class Pya3Aliceblue(Aliceblue):
         """Post method declaration"""
         return await self._request(url, "POST", data=data)
 
-    @profile
     async def _request(self, method, req_type, data=None):
         """
         Headers with authorization. For some requests authorization
@@ -503,7 +501,6 @@ class Pya3Aliceblue(Aliceblue):
     #         return inst, token_full_name_dict
 
 
-@profile
 async def get_pya3_obj(async_redis, broker_id, async_client) -> Pya3Aliceblue:
     broker_json = await async_redis.get(broker_id)
 
@@ -536,7 +533,6 @@ async def get_pya3_obj(async_redis, broker_id, async_client) -> Pya3Aliceblue:
     return pya3_obj
 
 
-@profile
 async def buy_alice_blue_trades(
     signal_payload_schema: SignalPayloadSchema,
     strategy_schema: StrategySchema,
