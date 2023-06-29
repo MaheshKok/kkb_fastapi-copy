@@ -46,11 +46,11 @@ def init_db(config_file):
     db.init(async_db_url, engine_kw=engine_kw)
 
 
-async def execute_celery_buy_trade_task(
-    signal_payload_schema, async_redis, strategy_schema, async_client
+async def task_entry_trade(
+    signal_payload_schema, async_redis_client, strategy_schema, async_client
 ):
     option_chain = await get_option_chain(
-        async_redis,
+        async_redis_client,
         signal_payload_schema.symbol,
         expiry=signal_payload_schema.expiry,
         option_type=signal_payload_schema.option_type,
@@ -72,14 +72,14 @@ async def execute_celery_buy_trade_task(
 
     if strategy_schema.broker_id:
         status, entry_price = await buy_alice_blue_trades(
-            signal_payload_schema, strategy_schema, async_redis, async_client
+            signal_payload_schema, strategy_schema, async_redis_client, async_client
         )
 
         if status != Status.COMPLETE:
             # Order not successful so dont make its entry in db
             return None
 
-    future_entry_price = await get_future_price(async_redis, signal_payload_schema.symbol)
+    future_entry_price = await get_future_price(async_redis_client, signal_payload_schema.symbol)
 
     async with db():
         # Use the AsyncSession to perform database operations
@@ -102,22 +102,26 @@ async def execute_celery_buy_trade_task(
         # interesting part is to get such trades i have to call lrange with 0, -1
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
         redis_trade_schema = RedisTradeSchema.from_orm(trade_model).json(exclude={"received_at"})
-        await async_redis.rpush(trade_key, redis_trade_schema)
+        await async_redis_client.rpush(trade_key, redis_trade_schema)
         logging.info(f"{trade_model.id} added to redis")
 
     return "successfully added trade to db"
 
 
-async def execute_celery_exit_trade_task(
-    signal_payload_schema, redis_ongoing_key, exiting_trades_json, async_redis, strategy_schema
+async def task_exit_trade(
+    signal_payload_schema,
+    redis_ongoing_key,
+    exiting_trades_json,
+    async_redis_client,
+    strategy_schema,
 ):
     exiting_trades = [json.loads(trade) for trade in json.loads(exiting_trades_json)]
 
     strike_exit_price_dict = await get_strike_and_exit_price_dict(
-        async_redis, signal_payload_schema, exiting_trades, strategy_schema
+        async_redis_client, signal_payload_schema, exiting_trades, strategy_schema
     )
 
-    future_exit_price = await get_future_price(async_redis, signal_payload_schema.symbol)
+    future_exit_price = await get_future_price(async_redis_client, signal_payload_schema.symbol)
 
     updated_values = []
     total_profit = 0
@@ -206,7 +210,7 @@ async def execute_celery_exit_trade_task(
             )
 
         await db.session.flush()
-        await async_redis.delete(redis_ongoing_key)
+        await async_redis_client.delete(redis_ongoing_key)
     logging.info(
         "successfully closed trades and updated the take_away_profit table with the profit and deleted the redis key"
     )

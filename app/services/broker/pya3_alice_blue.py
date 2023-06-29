@@ -402,7 +402,12 @@ class Pya3Aliceblue(Aliceblue):
 
     @staticmethod
     async def get_instrument_for_fno_from_redis(
-        async_redis, symbol, expiry_date: datetime.date, is_fut=True, strike=None, is_CE=False
+        async_redis_client,
+        symbol,
+        expiry_date: datetime.date,
+        is_fut=True,
+        strike=None,
+        is_CE=False,
     ):
         """
         instrument_ins_name: full name of the instrument
@@ -417,7 +422,7 @@ class Pya3Aliceblue(Aliceblue):
             # TODO: remove conversion of strik to float when in redis we start storing strike as float
             key = f"{symbol} {expiry_date.strftime(ALICE_BLUE_DATE_FORMAT).upper()} {int(strike)} {OptionType.CE if is_CE else OptionType.PE}"
 
-        instrument_json = await async_redis.get(key)
+        instrument_json = await async_redis_client.get(key)
         result = json.loads(instrument_json or "{}")
         if result:
             return Instrument(
@@ -501,8 +506,8 @@ class Pya3Aliceblue(Aliceblue):
     #         return inst, token_full_name_dict
 
 
-async def get_pya3_obj(async_redis, broker_id, async_client) -> Pya3Aliceblue:
-    broker_json = await async_redis.get(broker_id)
+async def get_pya3_obj(async_redis_client, broker_id, async_client) -> Pya3Aliceblue:
+    broker_json = await async_redis_client.get(broker_id)
 
     if broker_json:
         broker_schema = BrokerSchema(**json.loads(broker_json))
@@ -536,7 +541,7 @@ async def get_pya3_obj(async_redis, broker_id, async_client) -> Pya3Aliceblue:
 async def buy_alice_blue_trades(
     signal_payload_schema: SignalPayloadSchema,
     strategy_schema: StrategySchema,
-    async_redis: Redis,
+    async_redis_client: Redis,
     async_client: AsyncClient,
 ):
     """
@@ -549,10 +554,10 @@ async def buy_alice_blue_trades(
             nfo type [ for ex: either future or option]
     """
 
-    pya3_obj = await get_pya3_obj(async_redis, strategy_schema.broker_id, async_client)
+    pya3_obj = await get_pya3_obj(async_redis_client, strategy_schema.broker_id, async_client)
 
     instrument = await pya3_obj.get_instrument_for_fno_from_redis(
-        async_redis=async_redis,
+        async_redis_client=async_redis_client,
         symbol=signal_payload_schema.symbol,
         expiry_date=signal_payload_schema.expiry,
         is_fut=strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX,

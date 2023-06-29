@@ -27,7 +27,7 @@ from app.utils.constants import ConfigFile
 # @pytest.fixture(scope="session", autouse=True)
 # async def setup_redis():
 #     test_config = get_config(ConfigFile.TEST)
-#     _test_async_redis = await aioredis.StrictRedis.from_url(
+#     _test_async_redis_client = await aioredis.StrictRedis.from_url(
 #         test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
 #     )
 #     # update redis with necessary data i.e expiry list, option chain etc
@@ -35,11 +35,11 @@ from app.utils.constants import ConfigFile
 #
 #     logging.info(f"Updated redis with expiry list: {datetime.now()}")
 #     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-#         _test_async_redis, datetime.now().date()
+#         _test_async_redis_client, datetime.now().date()
 #     )
 #
 #     prod_config = get_config()
-#     prod_async_redis = await aioredis.StrictRedis.from_url(
+#     prod_async_redis_client = await aioredis.StrictRedis.from_url(
 #         prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
 #     )
 #     # add keys for future price as well
@@ -56,7 +56,7 @@ from app.utils.constants import ConfigFile
 #
 #     monthly_expiry = None
 #     current_month_number = datetime.now().date().month
-#     expiry_list = await get_expiry_list(_test_async_redis)
+#     expiry_list = await get_expiry_list(_test_async_redis_client)
 #     for _, expiry_date in enumerate(expiry_list):
 #         if expiry_date.month > current_month_number:
 #             break
@@ -69,18 +69,18 @@ from app.utils.constants import ConfigFile
 #     start_time = datetime.now()
 #     logging.info(f"start updating redis with option_chain: {start_time}")
 #     all_option_chain = {}
-#     async with prod_async_redis.pipeline() as pipe:
+#     async with prod_async_redis_client.pipeline() as pipe:
 #         for key in keys:
-#             option_chain = await prod_async_redis.hgetall(key)
+#             option_chain = await prod_async_redis_client.hgetall(key)
 #             if option_chain:
 #                 all_option_chain[key] = option_chain
 #     await pipe.execute()
 #     logging.info(f"pulled option chain from prod redis: {datetime.now()}")
 #
-#     async with _test_async_redis.pipeline() as pipe:
+#     async with _test_async_redis_client.pipeline() as pipe:
 #         for key, option_chain in all_option_chain.items():
 #             for strike, premium in option_chain.items():
-#                 await _test_async_redis.hset(key, strike, premium)
+#                 await _test_async_redis_client.hset(key, strike, premium)
 #     await pipe.execute()
 #
 #     logging.info(f"Time taken to update redis: {datetime.now() - start_time}")
@@ -118,12 +118,12 @@ def event_loop(request):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_async_redis():
+async def test_async_redis_client():
     test_config = get_config(ConfigFile.TEST)
-    _test_async_redis = await aioredis.StrictRedis.from_url(
+    _test_async_redis_client = await aioredis.StrictRedis.from_url(
         test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
     )
-    yield _test_async_redis
+    yield _test_async_redis_client
 
 
 @pytest.fixture(scope="session")
@@ -187,18 +187,18 @@ async def test_async_session(db_session_ctx):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_app(test_async_redis):
+async def test_app(test_async_redis_client):
     app = get_app(ConfigFile.TEST)  # pragma: no cover
-    app.state.async_redis = test_async_redis  # pragma: no cover
+    app.state.async_redis_client = test_async_redis_client  # pragma: no cover
     yield app
 
     # cleanup redis after test
     # remove all stored trades and leave option chain and expiry list for other unit tests
-    async with test_async_redis.pipeline() as pipe:
-        for key in await test_async_redis.keys():
+    async with test_async_redis_client.pipeline() as pipe:
+        for key in await test_async_redis_client.keys():
             if "BANKNIFTY" in key or "NIFTY" in key or "expiry_list" in key:
                 continue
-            await test_async_redis.delete(key)
+            await test_async_redis_client.delete(key)
     await pipe.execute()
 
 
@@ -224,8 +224,8 @@ async def test_async_client(test_app):
 #
 #     mock_redis = MagicMock()
 #     mock_redis.hgetall = AsyncMock(side_effect=mock_hgetall)
-#     test_app.state.async_redis = mock_redis
-#     # monkeypatch.setattr("app.utils.option_chain.async_redis", mock_redis)
+#     test_app.state.async_redis_client = mock_redis
+#     # monkeypatch.setattr("app.utils.option_chain.async_redis_client", mock_redis)
 #     return mock_redis
 #
 #
@@ -233,8 +233,8 @@ async def test_async_client(test_app):
 # async def patch_redis_expiry_list(test_app, monkeypatch):
 #     mock_redis = MagicMock()
 #     mock_redis.get = AsyncMock(return_value='["10 JUN 2023", "15 JUN 2023"]')
-#     test_app.state.async_redis = mock_redis
-#     # monkeypatch.setattr("app.api.utils.async_redis", mock_redis)
+#     test_app.state.async_redis_client = mock_redis
+#     # monkeypatch.setattr("app.api.utils.async_redis_client", mock_redis)
 #     return mock_redis
 
 
@@ -242,7 +242,7 @@ async def test_async_client(test_app):
 # async def patch_redis_delete_ongoing_trades(monkeypatch):
 #     mock_redis = MagicMock()
 #     mock_redis.delete = AsyncMock(return_value=True)
-#     monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
+#     monkeypatch.setattr("tasks.tasks.async_redis_client", mock_redis)
 #     return mock_redis
 #
 #
@@ -251,7 +251,7 @@ async def test_async_client(test_app):
 #     mock_redis = MagicMock()
 #     mock_redis.exists = AsyncMock(return_value=False)
 #     mock_redis.lpush = AsyncMock(return_value=True)
-#     monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
+#     monkeypatch.setattr("tasks.tasks.async_redis_client", mock_redis)
 #     return mock_redis
 #
 #
@@ -269,5 +269,5 @@ async def test_async_client(test_app):
 #     )
 #     mock_redis.delete = AsyncMock(return_value=True)
 #     mock_redis.lpush = AsyncMock(return_value=True)
-#     monkeypatch.setattr("tasks.tasks.async_redis", mock_redis)
+#     monkeypatch.setattr("tasks.tasks.async_redis_client", mock_redis)
 #     return mock_redis

@@ -3,7 +3,7 @@ import json
 import pytest
 from fastapi_sa.database import db
 from sqlalchemy import select
-from tasks.execution import execute_celery_buy_trade_task
+from tasks.execution import task_entry_trade
 
 from app.database.models import TradeModel
 from app.database.models.strategy import StrategyModel
@@ -13,13 +13,13 @@ from app.schemas.trade import SignalPayloadSchema
 @pytest.mark.asyncio
 @pytest.mark.parametrize("option_type", ["CE", "PE"], ids=["CE Options", "PE Options"])
 async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
-    option_type, celery_buy_task_payload_dict, test_async_redis
+    option_type, celery_buy_task_payload_dict, test_async_redis_client
 ):
     if option_type == "PE":
         celery_buy_task_payload_dict["option_type"] = "PE"
 
-    await execute_celery_buy_trade_task(
-        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis
+    await task_entry_trade(
+        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis_client
     )
 
     async with db():
@@ -35,7 +35,7 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
         assert trade_model.strategy.id == strategy_model.id
         assert trade_model.entry_price <= celery_buy_task_payload_dict["premium"]
         key = f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}"
-        redis_in_trades_list = await test_async_redis.lrange(key, 0, -1)
+        redis_in_trades_list = await test_async_redis_client.lrange(key, 0, -1)
         assert len(redis_in_trades_list) == 1
         assert json.loads(redis_in_trades_list[0])["id"] == str(trade_model.id)
 
@@ -43,7 +43,7 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
 @pytest.mark.asyncio
 @pytest.mark.parametrize("option_type", ["CE", "PE"], ids=["CE Options", "PE Options"])
 async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
-    test_async_redis, option_type, celery_buy_task_payload_dict
+    test_async_redis_client, option_type, celery_buy_task_payload_dict
 ):
     if option_type == "PE":
         celery_buy_task_payload_dict["option_type"] = "PE"
@@ -51,8 +51,8 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
     # We dont need to create closed trades here explicitly
     # because get_test_celery_buy_task_payload_dict already takes care of it
 
-    await execute_celery_buy_trade_task(
-        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis
+    await task_entry_trade(
+        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis_client
     )
 
     # query database for strategy
@@ -72,7 +72,7 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
 
         # trades are being added to redis
         key = f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}"
-        redis_in_trades_list = await test_async_redis.lrange(key, 0, -1)
+        redis_in_trades_list = await test_async_redis_client.lrange(key, 0, -1)
         assert len(redis_in_trades_list) == 1
         assert json.loads(redis_in_trades_list[0])["id"] == str(trade_model.id)
 
@@ -82,7 +82,7 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
 )
 @pytest.mark.asyncio
 async def test_buy_trade_for_strike(
-    payload_strike, test_async_redis, celery_buy_task_payload_dict
+    payload_strike, test_async_redis_client, celery_buy_task_payload_dict
 ):
     del celery_buy_task_payload_dict["premium"]
     celery_buy_task_payload_dict["strike"] = payload_strike
@@ -90,8 +90,8 @@ async def test_buy_trade_for_strike(
     # We dont need to create closed trades here explicitly
     # because get_test_celery_buy_task_payload_dict already takes care of it
 
-    await execute_celery_buy_trade_task(
-        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis
+    await task_entry_trade(
+        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis_client
     )
 
     async with db():
@@ -110,6 +110,6 @@ async def test_buy_trade_for_strike(
         assert trade_model.strike <= float(payload_strike)
 
         key = f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}"
-        redis_in_trades_list = await test_async_redis.lrange(key, 0, -1)
+        redis_in_trades_list = await test_async_redis_client.lrange(key, 0, -1)
         assert len(redis_in_trades_list) == 1
         assert json.loads(redis_in_trades_list[0])["id"] == str(trade_model.id)

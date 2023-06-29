@@ -1,7 +1,7 @@
 import pytest
 from fastapi_sa.database import db
 from sqlalchemy import select
-from tasks.execution import execute_celery_exit_trade_task
+from tasks.execution import task_exit_trade
 
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
@@ -21,7 +21,7 @@ from test.unit_tests.test_celery.conftest import celery_sell_task_args
     ],
 )
 async def test_celery_sell_trade_without_take_away_profit(
-    test_async_redis, take_away_profit, ce_trade
+    test_async_redis_client, take_away_profit, ce_trade
 ):
     async with db():
         (
@@ -30,7 +30,7 @@ async def test_celery_sell_trade_without_take_away_profit(
             redis_ongoing_key,
             redis_trades_json,
         ) = await celery_sell_task_args(
-            test_async_redis, take_away_profit=take_away_profit, ce_trade=ce_trade
+            test_async_redis_client, take_away_profit=take_away_profit, ce_trade=ce_trade
         )
 
         # assert we dont have takeawayprofit model before closing trades
@@ -40,10 +40,10 @@ async def test_celery_sell_trade_without_take_away_profit(
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
         assert take_away_profit_model is None
 
-        assert await test_async_redis.exists(redis_ongoing_key)
+        assert await test_async_redis_client.exists(redis_ongoing_key)
 
-        await execute_celery_exit_trade_task(
-            signal_payload_schema, redis_ongoing_key, redis_trades_json, test_async_redis
+        await task_exit_trade(
+            signal_payload_schema, redis_ongoing_key, redis_trades_json, test_async_redis_client
         )
 
         fetch_trades_query_ = await db.session.execute(select(TradeModel))
@@ -65,7 +65,7 @@ async def test_celery_sell_trade_without_take_away_profit(
         assert take_away_profit_model.profit == profit_to_be_added
 
         # key has been removed from redis
-        assert not await test_async_redis.exists(redis_ongoing_key)
+        assert not await test_async_redis_client.exists(redis_ongoing_key)
 
 
 @pytest.mark.asyncio
@@ -81,7 +81,7 @@ async def test_celery_sell_trade_without_take_away_profit(
     ],
 )
 async def test_celery_sell_trade_updating_takeaway_profit(
-    test_async_redis, take_away_profit, ce_trade
+    test_async_redis_client, take_away_profit, ce_trade
 ):
     async with db():
         (
@@ -89,7 +89,9 @@ async def test_celery_sell_trade_updating_takeaway_profit(
             signal_payload_schema,
             redis_ongoing_key,
             redis_trades_json,
-        ) = await celery_sell_task_args(test_async_redis, take_away_profit=True, ce_trade=False)
+        ) = await celery_sell_task_args(
+            test_async_redis_client, take_away_profit=True, ce_trade=False
+        )
 
         # assert we dont have takeawayprofit model before closing trades
         fetch_take_away_profit_query_ = await db.session.execute(
@@ -99,10 +101,10 @@ async def test_celery_sell_trade_updating_takeaway_profit(
         assert take_away_profit_model is not None
         earlier_take_away_profit = take_away_profit_model.profit
 
-        assert await test_async_redis.exists(redis_ongoing_key)
+        assert await test_async_redis_client.exists(redis_ongoing_key)
 
-        await execute_celery_exit_trade_task(
-            signal_payload_schema, redis_ongoing_key, redis_trades_json, test_async_redis
+        await task_exit_trade(
+            signal_payload_schema, redis_ongoing_key, redis_trades_json, test_async_redis_client
         )
 
         fetch_trades_query_ = await db.session.execute(select(TradeModel))
@@ -124,7 +126,7 @@ async def test_celery_sell_trade_updating_takeaway_profit(
         assert take_away_profit_model.profit == earlier_take_away_profit + profit_to_be_added
 
         # key has been removed from redis
-        assert not await test_async_redis.exists(redis_ongoing_key)
+        assert not await test_async_redis_client.exists(redis_ongoing_key)
 
 
 # TODO: assert exit_at, profit, future_profit, exit_received_at < exit_at ,

@@ -21,14 +21,15 @@ async def get_async_session(app: FastAPI = Depends(get_app)) -> AsyncSession:
     yield async_session
 
 
-async def get_async_redis(app: FastAPI = Depends(get_app)) -> Redis:
-    yield app.state.async_redis
+async def get_async_redis_client(app: FastAPI = Depends(get_app)) -> Redis:
+    yield app.state.async_redis_client
 
 
 async def get_strategy_schema(
-    signal_payload_schema: SignalPayloadSchema, async_redis: Redis = Depends(get_async_redis)
+    signal_payload_schema: SignalPayloadSchema,
+    async_redis_client: Redis = Depends(get_async_redis_client),
 ) -> StrategySchema:
-    redis_strategy = await async_redis.get(str(signal_payload_schema.strategy_id))
+    redis_strategy = await async_redis_client.get(str(signal_payload_schema.strategy_id))
     if not redis_strategy:
         raise HTTPException(
             status_code=404,

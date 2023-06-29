@@ -3,8 +3,8 @@ import ssl
 
 from celery import Celery
 from celery.signals import worker_process_init
-from tasks.execution import execute_celery_buy_trade_task
-from tasks.execution import execute_celery_exit_trade_task
+from tasks.execution import task_entry_trade
+from tasks.execution import task_exit_trade
 
 from app.core.config import get_config
 
@@ -41,9 +41,7 @@ def task_exiting_trades(payload_json, redis_ongoing_key, exiting_trades_json, co
 
     # Use the event loop to run the asynchronous function
     result = loop.run_until_complete(
-        execute_celery_exit_trade_task(
-            payload_json, redis_ongoing_key, exiting_trades_json, config_file
-        )
+        task_exit_trade(payload_json, redis_ongoing_key, exiting_trades_json, config_file)
     )
 
     # Return the result
@@ -59,7 +57,7 @@ def task_buying_trade(payload_json, config_file):
     asyncio.set_event_loop(loop)
 
     # Use the event loop to run the asynchronous function
-    result = loop.run_until_complete(execute_celery_buy_trade_task(payload_json, config_file))
+    result = loop.run_until_complete(task_entry_trade(payload_json, config_file))
 
     # Return the result
     return result

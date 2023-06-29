@@ -16,7 +16,7 @@ from test.utils import create_open_trades
 
 
 @pytest_asyncio.fixture(scope="function")
-async def celery_buy_task_payload_dict(test_async_redis):
+async def celery_buy_task_payload_dict(test_async_redis_client):
     post_trade_payload = get_test_post_trade_payload()
 
     await create_closed_trades(users=1, strategies=1, trades=10)
@@ -30,7 +30,7 @@ async def celery_buy_task_payload_dict(test_async_redis):
             current_expiry_date,
             next_expiry_date,
             is_today_expiry,
-        ) = await get_current_and_next_expiry(test_async_redis, datetime.now().date())
+        ) = await get_current_and_next_expiry(test_async_redis_client, datetime.now().date())
 
         post_trade_payload["strategy_id"] = strategy_model.id
         post_trade_payload["symbol"] = strategy_model.symbol
@@ -39,7 +39,7 @@ async def celery_buy_task_payload_dict(test_async_redis):
         return post_trade_payload
 
 
-async def celery_sell_task_args(test_async_redis, take_away_profit=False, ce_trade=False):
+async def celery_sell_task_args(test_async_redis_client, take_away_profit=False, ce_trade=False):
     await create_open_trades(
         users=1,
         strategies=1,
@@ -61,7 +61,7 @@ async def celery_sell_task_args(test_async_redis, take_away_profit=False, ce_tra
             current_expiry_date,
             next_expiry_date,
             is_today_expiry,
-        ) = await get_current_and_next_expiry(test_async_redis, datetime.now().date())
+        ) = await get_current_and_next_expiry(test_async_redis_client, datetime.now().date())
 
         post_trade_payload["strategy_id"] = strategy_model.id
         post_trade_payload["symbol"] = strategy_model.symbol
@@ -71,7 +71,7 @@ async def celery_sell_task_args(test_async_redis, take_away_profit=False, ce_tra
         redis_key = f"{strategy_model.id} {trade_models[0].expiry} {trade_models[0].option_type}"
         redis_trades = [RedisTradeSchema.from_orm(trade).json() for trade in trade_models]
 
-        await test_async_redis.lpush(redis_key, *redis_trades)
+        await test_async_redis_client.lpush(redis_key, *redis_trades)
         return (
             strategy_model.id,
             SignalPayloadSchema(**post_trade_payload),

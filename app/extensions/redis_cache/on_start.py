@@ -9,7 +9,7 @@ from app.schemas.trade import RedisTradeSchema
 from app.utils.constants import OptionType
 
 
-async def cache_ongoing_trades(async_redis):
+async def cache_ongoing_trades(async_redis_client):
     """
     fetch all ongoing trades using filter exited_at=None from db using sqlalchemy
     create an empty dict redis_key_trade_models_dict ={}
@@ -47,27 +47,27 @@ async def cache_ongoing_trades(async_redis):
             redis_key_trade_models_dict[counter_key] = []
 
         # pipeline ensures theres one round trip to redis
-        async with async_redis.pipeline() as pipe:
+        async with async_redis_client.pipeline() as pipe:
             # store ongoing trades in redis for faster access
             for key, trade_models in redis_key_trade_models_dict.items():
                 # this will make sure that if theres any discrepancy in db and redis, then redis will be updated
                 if not trade_models:
-                    await async_redis.delete(key)
+                    await async_redis_client.delete(key)
                     continue
 
                 redis_trades_schema_json_list = [
                     RedisTradeSchema.from_orm(trade_model).json() for trade_model in trade_models
                 ]
 
-                trades_in_redis = await async_redis.lrange(key, 0, -1)
+                trades_in_redis = await async_redis_client.lrange(key, 0, -1)
                 # if ongoing trades are not present in redis or
                 # if the length of ongoing trades in redis is not equal to the length of ongoing trades in db
                 # then update the ongoing trades in redis
                 if not trades_in_redis:
-                    await async_redis.rpush(key, json.dumps(redis_trades_schema_json_list))
+                    await async_redis_client.rpush(key, json.dumps(redis_trades_schema_json_list))
                 elif trades_in_redis and len(trades_in_redis) != len(trade_models):
-                    await async_redis.delete(key)
-                    await async_redis.rpush(key, *redis_trades_schema_json_list)
+                    await async_redis_client.delete(key)
+                    await async_redis_client.rpush(key, *redis_trades_schema_json_list)
 
         await pipe.execute()
         logging.info("Ongoing trades cached in redis")

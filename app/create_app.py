@@ -68,12 +68,12 @@ async def lifespan(app):
 
     db.init(async_db_url, engine_kw=engine_kw)
     logging.info("Initialized database")
-    async_redis = get_redis_client(app.state.config)
+    async_redis_client = get_redis_client(app.state.config)
     logging.info("Initialized redis")
-    app.state.async_redis = async_redis
+    app.state.async_redis_client = async_redis_client
 
     # create a task to cache ongoing trades in Redis
-    asyncio.create_task(cache_ongoing_trades(async_redis))
+    asyncio.create_task(cache_ongoing_trades(async_redis_client))
 
     try:
         yield
@@ -81,5 +81,5 @@ async def lifespan(app):
         logging.info("Application shutdown")
         # Close the connection when the application shuts down
         await db.close()
-        await app.state.async_redis.close()
+        await app.state.async_redis_client.close()
         await app.state.async_session_maker.kw["bind"].dispose()
