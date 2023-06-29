@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime
 
@@ -101,8 +100,8 @@ async def task_entry_trade(
         # it works i confirmed this with python_console with dummy data,
         # interesting part is to get such trades i have to call lrange with 0, -1
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
-        redis_trade_schema = RedisTradeSchema.from_orm(trade_model).json(exclude={"received_at"})
-        await async_redis_client.rpush(trade_key, redis_trade_schema)
+        redis_trade_json = RedisTradeSchema.from_orm(trade_model).json(exclude={"received_at"})
+        await async_redis_client.rpush(trade_key, redis_trade_json)
         logging.info(f"{trade_model.id} added to redis")
 
     return "successfully added trade to db"
@@ -111,14 +110,12 @@ async def task_entry_trade(
 async def task_exit_trade(
     signal_payload_schema,
     redis_ongoing_key,
-    exiting_trades_json,
+    exiting_trades_dict,
     async_redis_client,
     strategy_schema,
 ):
-    exiting_trades = [json.loads(trade) for trade in json.loads(exiting_trades_json)]
-
     strike_exit_price_dict = await get_strike_and_exit_price_dict(
-        async_redis_client, signal_payload_schema, exiting_trades, strategy_schema
+        async_redis_client, signal_payload_schema, exiting_trades_dict, strategy_schema
     )
 
     future_exit_price = await get_future_price(async_redis_client, signal_payload_schema.symbol)
@@ -127,7 +124,7 @@ async def task_exit_trade(
     total_profit = 0
     total_future_profit = 0
 
-    for trade in exiting_trades:
+    for trade in exiting_trades_dict:
         entry_price = trade["entry_price"]
         quantity = trade["quantity"]
         position = trade["position"]
@@ -165,7 +162,7 @@ async def task_exit_trade(
         if take_away_profit_model:
             take_away_profit_model.profit += total_profit
             take_away_profit_model.future_profit += total_future_profit
-            take_away_profit_model.total_trades += len(exiting_trades)
+            take_away_profit_model.total_trades += len(exiting_trades_dict)
             take_away_profit_model.updated_at = datetime.now()
             await db.session.flush()
         else:
@@ -173,7 +170,7 @@ async def task_exit_trade(
                 profit=total_profit,
                 future_profit=total_future_profit,
                 strategy_id=trade["strategy_id"],
-                total_trades=len(exiting_trades),
+                total_trades=len(exiting_trades_dict),
             )
             db.session.add(take_away_profit_model)
             await db.session.flush()

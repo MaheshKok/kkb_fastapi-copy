@@ -1,4 +1,3 @@
-import json
 import logging
 from datetime import datetime
 
@@ -59,14 +58,13 @@ async def post_nfo(
 
     signal_payload_schema.expiry = current_expiry_date
     try:
-        if exiting_trades := await async_redis_client.lrange(exiting_trades_key, 0, -1):
-            exiting_trades_json = json.dumps(exiting_trades)
+        if exiting_trades_dict := await async_redis_client.lrange(exiting_trades_key, 0, -1):
             # initiate celery close_trade
-            logging.info(f"Total: {len(exiting_trades)} trades to be closed")
+            logging.info(f"Total: {len(exiting_trades_dict)} trades to be closed")
             await task_exit_trade(
                 signal_payload_schema,
                 exiting_trades_key,
-                exiting_trades_json,
+                exiting_trades_dict,
                 async_redis_client,
                 strategy_schema,
             )
