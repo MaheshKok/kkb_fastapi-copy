@@ -1,5 +1,6 @@
 import json
 
+import httpx
 import pytest
 from fastapi_sa.database import db
 from sqlalchemy import select
@@ -7,7 +8,11 @@ from tasks.execution import task_entry_trade
 
 from app.database.models import TradeModel
 from app.database.models.strategy import StrategyModel
+from app.schemas.strategy import StrategySchema
 from app.schemas.trade import SignalPayloadSchema
+
+
+# I just fixed them , but didnt assert so many things
 
 
 @pytest.mark.asyncio
@@ -18,11 +23,17 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
     if option_type == "PE":
         celery_buy_task_payload_dict["option_type"] = "PE"
 
-    await task_entry_trade(
-        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis_client
-    )
-
     async with db():
+        strategy_model = await db.session.get(
+            StrategyModel, celery_buy_task_payload_dict["strategy_id"]
+        )
+        strategy_schema = StrategySchema.from_orm(strategy_model)
+        await task_entry_trade(
+            signal_payload_schema=SignalPayloadSchema(**celery_buy_task_payload_dict),
+            async_redis_client=test_async_redis_client,
+            strategy_schema=strategy_schema,
+            async_httpx_client=httpx.AsyncClient(),
+        )
         fetch_trades_query_ = await db.session.execute(
             select(TradeModel).order_by(TradeModel.entry_at.desc())
         )
@@ -51,12 +62,18 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
     # We dont need to create closed trades here explicitly
     # because get_test_celery_buy_task_payload_dict already takes care of it
 
-    await task_entry_trade(
-        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis_client
-    )
-
-    # query database for strategy
     async with db():
+        strategy_model = await db.session.get(
+            StrategyModel, celery_buy_task_payload_dict["strategy_id"]
+        )
+        strategy_schema = StrategySchema.from_orm(strategy_model)
+        await task_entry_trade(
+            signal_payload_schema=SignalPayloadSchema(**celery_buy_task_payload_dict),
+            async_redis_client=test_async_redis_client,
+            strategy_schema=strategy_schema,
+            async_httpx_client=httpx.AsyncClient(),
+        )
+
         # the top most trade is the one which is just created
         fetch_trades_query_ = await db.session.execute(
             select(TradeModel).order_by(TradeModel.entry_at.desc())
@@ -90,11 +107,18 @@ async def test_buy_trade_for_strike(
     # We dont need to create closed trades here explicitly
     # because get_test_celery_buy_task_payload_dict already takes care of it
 
-    await task_entry_trade(
-        SignalPayloadSchema(**celery_buy_task_payload_dict), test_async_redis_client
-    )
-
     async with db():
+        strategy_model = await db.session.get(
+            StrategyModel, celery_buy_task_payload_dict["strategy_id"]
+        )
+        strategy_schema = StrategySchema.from_orm(strategy_model)
+        await task_entry_trade(
+            signal_payload_schema=SignalPayloadSchema(**celery_buy_task_payload_dict),
+            async_redis_client=test_async_redis_client,
+            strategy_schema=strategy_schema,
+            async_httpx_client=httpx.AsyncClient(),
+        )
+
         # the top most trade is the one which is just created
         fetch_trades_query_ = await db.session.execute(
             select(TradeModel).order_by(TradeModel.entry_at.desc())

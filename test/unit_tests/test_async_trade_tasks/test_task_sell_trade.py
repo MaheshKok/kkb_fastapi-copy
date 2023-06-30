@@ -1,11 +1,17 @@
+import httpx
 import pytest
 from fastapi_sa.database import db
 from sqlalchemy import select
 from tasks.execution import task_exit_trade
 
+from app.database.models import StrategyModel
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
-from test.unit_tests.test_tasks.conftest import celery_sell_task_args
+from app.schemas.strategy import StrategySchema
+from test.unit_tests.test_async_trade_tasks.conftest import celery_sell_task_args
+
+
+# I just fixed them , but didnt assert so many things which are mentioned at the bottom
 
 
 @pytest.mark.asyncio
@@ -23,16 +29,16 @@ from test.unit_tests.test_tasks.conftest import celery_sell_task_args
 async def test_celery_sell_trade_without_take_away_profit(
     test_async_redis_client, take_away_profit, ce_trade
 ):
-    async with db():
-        (
-            strategy_model_id,
-            signal_payload_schema,
-            redis_ongoing_key,
-            redis_trades_json,
-        ) = await celery_sell_task_args(
-            test_async_redis_client, take_away_profit=take_away_profit, ce_trade=ce_trade
-        )
+    (
+        strategy_model_id,
+        signal_payload_schema,
+        redis_ongoing_key,
+        redis_trade_schema_list,
+    ) = await celery_sell_task_args(
+        test_async_redis_client, take_away_profit=take_away_profit, ce_trade=ce_trade
+    )
 
+    async with db():
         # assert we dont have takeawayprofit model before closing trades
         fetch_take_away_profit_query_ = await db.session.execute(
             select(TakeAwayProfit).filter_by(strategy_id=strategy_model_id)
@@ -41,9 +47,16 @@ async def test_celery_sell_trade_without_take_away_profit(
         assert take_away_profit_model is None
 
         assert await test_async_redis_client.exists(redis_ongoing_key)
+        strategy_model = await db.session.get(StrategyModel, strategy_model_id)
+        strategy_schema = StrategySchema.from_orm(strategy_model)
 
         await task_exit_trade(
-            signal_payload_schema, redis_ongoing_key, redis_trades_json, test_async_redis_client
+            signal_payload_schema=signal_payload_schema,
+            redis_ongoing_key=redis_ongoing_key,
+            redis_trade_schema_list=redis_trade_schema_list,
+            async_redis_client=test_async_redis_client,
+            strategy_schema=strategy_schema,
+            async_httpx_client=httpx.AsyncClient(),
         )
 
         fetch_trades_query_ = await db.session.execute(select(TradeModel))
@@ -83,16 +96,16 @@ async def test_celery_sell_trade_without_take_away_profit(
 async def test_celery_sell_trade_updating_takeaway_profit(
     test_async_redis_client, take_away_profit, ce_trade
 ):
-    async with db():
-        (
-            strategy_model_id,
-            signal_payload_schema,
-            redis_ongoing_key,
-            redis_trades_json,
-        ) = await celery_sell_task_args(
-            test_async_redis_client, take_away_profit=True, ce_trade=False
-        )
+    (
+        strategy_model_id,
+        signal_payload_schema,
+        redis_ongoing_key,
+        redis_trade_schema_list,
+    ) = await celery_sell_task_args(
+        test_async_redis_client, take_away_profit=True, ce_trade=False
+    )
 
+    async with db():
         # assert we dont have takeawayprofit model before closing trades
         fetch_take_away_profit_query_ = await db.session.execute(
             select(TakeAwayProfit).filter_by(strategy_id=strategy_model_id)
@@ -103,8 +116,16 @@ async def test_celery_sell_trade_updating_takeaway_profit(
 
         assert await test_async_redis_client.exists(redis_ongoing_key)
 
+        strategy_model = await db.session.get(StrategyModel, strategy_model_id)
+        strategy_schema = StrategySchema.from_orm(strategy_model)
+
         await task_exit_trade(
-            signal_payload_schema, redis_ongoing_key, redis_trades_json, test_async_redis_client
+            signal_payload_schema=signal_payload_schema,
+            redis_ongoing_key=redis_ongoing_key,
+            redis_trade_schema_list=redis_trade_schema_list,
+            async_redis_client=test_async_redis_client,
+            strategy_schema=strategy_schema,
+            async_httpx_client=httpx.AsyncClient(),
         )
 
         fetch_trades_query_ = await db.session.execute(select(TradeModel))

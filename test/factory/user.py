@@ -16,7 +16,7 @@ class UserFactory(AsyncSQLAlchemyFactory):
         sqlalchemy_session_persistence = "commit"
         sqlalchemy_session = sc_session
 
-    id = factory.LazyFunction(uuid.uuid4)
+    id = Sequence(lambda n: uuid.uuid4())
     email = Sequence(lambda n: f"email{uuid.uuid4()}@example.com")
     access_token = Sequence(lambda n: f"access_token_{n}")
     refresh_token = Sequence(lambda n: f"refresh_token_{n}")
