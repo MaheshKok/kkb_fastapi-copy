@@ -1,5 +1,3 @@
-import json
-
 from aioredis import Redis
 from fastapi import Depends
 from fastapi import FastAPI
@@ -29,15 +27,13 @@ async def get_strategy_schema(
     signal_payload_schema: SignalPayloadSchema,
     async_redis_client: Redis = Depends(get_async_redis_client),
 ) -> StrategySchema:
-    redis_strategy = await async_redis_client.get(str(signal_payload_schema.strategy_id))
-    if not redis_strategy:
+    redis_strategy_json = await async_redis_client.get(str(signal_payload_schema.strategy_id))
+    if not redis_strategy_json:
         raise HTTPException(
             status_code=404,
             detail=f"Strategy: {signal_payload_schema.strategy_id} not found in redis",
         )
-
-    # i am bit confused as why i didnt receive the result in dict format and rather string
-    return StrategySchema(**json.loads(redis_strategy))
+    return StrategySchema.parse_raw(redis_strategy_json)
 
 
 async def get_async_httpx_client() -> AsyncClient:

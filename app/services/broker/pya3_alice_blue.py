@@ -512,7 +512,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya
     broker_json = await async_redis_client.get(broker_id)
 
     if broker_json:
-        broker_schema = BrokerSchema(**json.loads(broker_json))
+        broker_schema = BrokerSchema.parse_raw(broker_json)
     else:
         async with db():
             # We have a cron that update session token every 1 hour,
@@ -655,7 +655,7 @@ async def close_alice_blue_trades(
     )
 
     pya3_obj = await get_pya3_obj(
-        async_redis_client, strategy_schema.broker_id, async_httpx_client
+        async_redis_client, str(strategy_schema.broker_id), async_httpx_client
     )
 
     tasks = []

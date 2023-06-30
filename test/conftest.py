@@ -19,6 +19,7 @@ from app.database.base import get_db_url
 from app.utils.constants import ConfigFile
 
 
+# uncomment this only once a day as its very heavy computation which consumes almost 40 seconds to complete
 # import logging
 # from datetime import datetime
 # from app.api.utils import get_current_and_next_expiry
