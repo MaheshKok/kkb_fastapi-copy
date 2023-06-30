@@ -82,4 +82,3 @@ websockets==11.0.3
 wsproto==1.2.0
 
 pya3~=1.0.29
-fastapi-orm-manager==0.0.15

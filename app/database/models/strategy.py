@@ -1,7 +1,6 @@
 import uuid
 from datetime import datetime
 
-from fastapi_manager import Manager
 from sqlalchemy import Boolean
 from sqlalchemy import Column
 from sqlalchemy import ForeignKey
@@ -47,7 +46,3 @@ class StrategyModel(Base):
 
     daily_profits = relationship("DailyProfit", back_populates="strategy")
     take_away_profit = relationship("TakeAwayProfit", back_populates="strategy")
-
-
-class StrategyManager(Manager[StrategyModel]):
-    pass
