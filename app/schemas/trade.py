@@ -86,7 +86,7 @@ class ExitTradeSchema(BaseModel):
         description="Exited At", default=datetime.utcnow(), example="2023-05-22 06:25:03.117358"
     )
     exit_received_at: datetime = Field(
-        description="Received Exit At", example="2023-05-22 06:25:03.117358", alias="received_at"
+        description="Received Exit At", example="2023-05-22 06:25:03.117358"
     )
 
 

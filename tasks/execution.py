@@ -36,9 +36,9 @@ logging.basicConfig(
 
 def get_profit(entry_price, exit_price, quantity, position):
     if position == PositionEnum.LONG:
-        profit = (exit_price - entry_price) * quantity
+        profit = (exit_price - entry_price) * quantity - 60
     else:
-        profit = (entry_price - exit_price) * quantity
+        profit = (entry_price - exit_price) * quantity - 60
 
     return profit
 
@@ -167,7 +167,7 @@ async def task_exit_trade(
             "profit": profit,
             "future_exit_price": future_exit_price,
             "future_profit": future_profit,
-            "received_at": signal_payload_schema.received_at,
+            "exit_received_at": signal_payload_schema.received_at,
         }
         exit_trade_schema = ExitTradeSchema(**mapping)
         updated_values.append(exit_trade_schema)
