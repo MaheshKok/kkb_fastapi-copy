@@ -24,6 +24,9 @@ from app.utils.constants import ConfigFile
 # from app.api.utils import get_current_and_next_expiry
 # from app.api.utils import get_expiry_list
 # from app.cron.update_fno_expiry import update_expiry_list
+# from tasks.utils import get_monthly_expiry_date
+#
+#
 # @pytest.fixture(scope="session", autouse=True)
 # async def setup_redis():
 #     test_config = get_config(ConfigFile.TEST)
@@ -54,14 +57,7 @@ from app.utils.constants import ConfigFile
 #         f"NIFTY {next_expiry_date} PE",
 #     ]
 #
-#     monthly_expiry = None
-#     current_month_number = datetime.now().date().month
-#     expiry_list = await get_expiry_list(_test_async_redis_client)
-#     for _, expiry_date in enumerate(expiry_list):
-#         if expiry_date.month > current_month_number:
-#             break
-#         monthly_expiry = expiry_date
-#
+#     monthly_expiry = await get_monthly_expiry_date(_test_async_redis_client)
 #     if monthly_expiry:
 #         keys.append(f"BANKNIFTY {monthly_expiry} FUT")
 #         keys.append(f"NIFTY {monthly_expiry} FUT")
@@ -79,8 +75,12 @@ from app.utils.constants import ConfigFile
 #
 #     async with _test_async_redis_client.pipeline() as pipe:
 #         for key, option_chain in all_option_chain.items():
-#             for strike, premium in option_chain.items():
-#                 await _test_async_redis_client.hset(key, strike, premium)
+#             if "FUT" in key:
+#                 # For future option chain first and second argument are same
+#                 await _test_async_redis_client.hset(key, key, option_chain["FUT"])
+#             else:
+#                 for strike, premium in option_chain.items():
+#                     await _test_async_redis_client.hset(key, strike, premium)
 #     await pipe.execute()
 #
 #     logging.info(f"Time taken to update redis: {datetime.now() - start_time}")

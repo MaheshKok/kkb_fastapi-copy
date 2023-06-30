@@ -11,15 +11,15 @@ from app.database.models import TradeModel
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from test.unit_tests.test_data import get_test_post_trade_payload
-from test.utils import create_closed_trades
 from test.utils import create_open_trades
+from test.utils import create_pre_db_data
 
 
 @pytest_asyncio.fixture(scope="function")
 async def celery_buy_task_payload_dict(test_async_redis_client):
     post_trade_payload = get_test_post_trade_payload()
 
-    await create_closed_trades(users=1, strategies=1, trades=10)
+    await create_pre_db_data(users=1, strategies=1, trades=10)
     # query database for stragey
 
     async with db():

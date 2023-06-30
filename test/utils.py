@@ -41,7 +41,7 @@ async def create_open_trades(
                 )
 
 
-async def create_closed_trades(
+async def create_pre_db_data(
     users=1, strategies=1, trades=0, take_away_profit=False, daily_profit=0
 ):
     for _ in range(users):

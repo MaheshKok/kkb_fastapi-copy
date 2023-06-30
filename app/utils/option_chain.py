@@ -1,12 +1,16 @@
+import logging
 from datetime import datetime
 
 from app.api.utils import get_expiry_list
+from app.schemas.enums import InstrumentTypeEnum
+from app.schemas.strategy import StrategySchema
 
 
 async def get_option_chain(
     async_redis_client,
     symbol,
     expiry,
+    strategy_schema: StrategySchema,
     option_type=None,
     is_future=False,
 ):
@@ -37,6 +41,12 @@ async def get_option_chain(
             )
         else:
             return option_chain
-    raise Exception(
-        f"no option chain data for: [{symbol} {expiry} {future_or_option_type}] found in redis"
-    )
+
+    if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
+        raise Exception(
+            f"Option chain data for: [{symbol} {expiry} {future_or_option_type}] NOT found in redis"
+        )
+    else:
+        logging.error(
+            f"Option chain data for: [{symbol} {expiry} {future_or_option_type}] NOT found in redis"
+        )
