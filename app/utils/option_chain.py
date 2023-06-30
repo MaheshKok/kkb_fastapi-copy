@@ -4,6 +4,7 @@ from datetime import datetime
 from app.api.utils import get_expiry_list
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import StrategySchema
+from app.utils.constants import OptionType
 
 
 async def get_option_chain(
@@ -29,11 +30,11 @@ async def get_option_chain(
     future_or_option_type = "FUT" if is_future else option_type
     option_chain = await async_redis_client.hgetall(f"{symbol} {expiry} {future_or_option_type}")
     if option_chain:
-        if option_type == "CE":
+        if option_type == OptionType.CE:
             return dict(
                 sorted([(float(key), float(value)) for key, value in option_chain.items()])
             )
-        elif option_type == "PE":
+        elif option_type == OptionType.PE:
             return dict(
                 sorted(
                     [(float(key), float(value)) for key, value in option_chain.items()],

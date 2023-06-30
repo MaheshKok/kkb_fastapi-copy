@@ -14,7 +14,9 @@ from test.utils import create_pre_db_data
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("option_type", ["CE", "PE"], ids=["CE Options", "PE Options"])
+@pytest.mark.parametrize(
+    "option_type", [OptionType.CE, OptionType.PE], ids=["CE Options", "PE Options"]
+)
 async def test_trading_nfo_options_with_no_existing_trades(
     option_type, test_async_client, test_async_redis_client
 ):
@@ -25,8 +27,8 @@ async def test_trading_nfo_options_with_no_existing_trades(
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
 
-        if option_type == "PE":
-            payload["option_type"] = "PE"
+        if option_type == OptionType.PE:
+            payload["option_type"] = OptionType.PE
 
         # set strategy in redis
         await test_async_redis_client.set(
@@ -52,19 +54,23 @@ async def test_trading_nfo_options_with_no_existing_trades(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("option_type", ["CE", "PE"], ids=["CE Options", "PE Options"])
+@pytest.mark.parametrize(
+    "option_type", [OptionType.CE, OptionType.PE], ids=["CE Options", "PE Options"]
+)
 async def test_trading_nfo_options_with_existing_trade_of_same_type(
     option_type, test_async_client, test_async_redis_client
 ):
-    await create_open_trades(users=1, strategies=1, trades=10, ce_trade=option_type == "CE")
+    await create_open_trades(
+        users=1, strategies=1, trades=10, ce_trade=option_type == OptionType.CE
+    )
 
     async with db():
         strategy_model = await db.session.scalar(select(StrategyModel))
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
 
-        if option_type == "PE":
-            payload["option_type"] = "PE"
+        if option_type == OptionType.PE:
+            payload["option_type"] = OptionType.PE
 
         # set strategy in redis
         await test_async_redis_client.set(
@@ -108,19 +114,23 @@ async def test_trading_nfo_options_with_existing_trade_of_same_type(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("option_type", ["CE", "PE"], ids=["CE Options", "PE Options"])
+@pytest.mark.parametrize(
+    "option_type", [OptionType.CE, OptionType.PE], ids=["CE Options", "PE Options"]
+)
 async def test_trading_nfo_options_with_existing_trade_of_opposite_type(
     option_type, test_async_client, test_async_redis_client
 ):
-    await create_open_trades(users=1, strategies=1, trades=10, ce_trade=option_type != "CE")
+    await create_open_trades(
+        users=1, strategies=1, trades=10, ce_trade=option_type != OptionType.CE
+    )
 
     async with db():
         strategy_model = await db.session.scalar(select(StrategyModel))
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
 
-        if option_type == "PE":
-            payload["option_type"] = "PE"
+        if option_type == OptionType.PE:
+            payload["option_type"] = OptionType.PE
 
         # set strategy in redis
         await test_async_redis_client.set(
@@ -148,7 +158,7 @@ async def test_trading_nfo_options_with_existing_trade_of_opposite_type(
         fetch_trade_models_query = await db.session.execute(
             select(TradeModel).filter_by(
                 strategy_id=strategy_model.id,
-                option_type=OptionType.CE if option_type == "PE" else OptionType.PE,
+                option_type=OptionType.CE if option_type == OptionType.PE else OptionType.PE,
             )
         )
         exited_trade_models = fetch_trade_models_query.scalars().all()

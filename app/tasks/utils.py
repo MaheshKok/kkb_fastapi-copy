@@ -8,6 +8,7 @@ from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from app.services.broker.pya3_alice_blue import close_alice_blue_trades
+from app.utils.constants import OptionType
 from app.utils.option_chain import get_option_chain
 
 
@@ -89,7 +90,9 @@ async def get_strike_and_exit_price_dict(
     async_httpx_client: AsyncClient,
 ) -> dict:
     # Reason being trade_payload is an entry trade and we want to close all ongoing trades of opposite option_type
-    ongoing_trades_option_type = "PE" if signal_payload_schema.option_type == "CE" else "CE"
+    ongoing_trades_option_type = (
+        OptionType.PE if signal_payload_schema.option_type == OptionType.CE else OptionType.CE
+    )
 
     if strategy_schema.broker_id:
         # TODO: close trades in broker and get exit price
