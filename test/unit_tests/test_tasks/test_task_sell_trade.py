@@ -5,7 +5,7 @@ from tasks.execution import task_exit_trade
 
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
-from test.unit_tests.test_celery.conftest import celery_sell_task_args
+from test.unit_tests.test_tasks.conftest import celery_sell_task_args
 
 
 @pytest.mark.asyncio
