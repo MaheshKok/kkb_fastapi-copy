@@ -204,7 +204,7 @@ async def test_async_client(test_app):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def celery_buy_task_payload_dict(test_async_redis_client):
+async def buy_task_payload_dict(test_async_redis_client):
     post_trade_payload = get_test_post_trade_payload()
 
     await create_pre_db_data(users=1, strategies=1, trades=10)
@@ -221,7 +221,6 @@ async def celery_buy_task_payload_dict(test_async_redis_client):
         ) = await get_current_and_next_expiry(test_async_redis_client, datetime.now().date())
 
         post_trade_payload["strategy_id"] = strategy_model.id
-        post_trade_payload["symbol"] = strategy_model.symbol
         post_trade_payload["expiry"] = current_expiry_date
 
         return post_trade_payload

@@ -7,9 +7,6 @@ from httpx import AsyncClient
 from sqlalchemy import bindparam
 from sqlalchemy import select
 from sqlalchemy import update
-from tasks.utils import get_future_price
-from tasks.utils import get_strike_and_entry_price
-from tasks.utils import get_strike_and_exit_price_dict
 
 from app.core.config import get_config
 from app.database.base import engine_kw
@@ -24,6 +21,9 @@ from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from app.schemas.trade import TradeSchema
 from app.services.broker.pya3_alice_blue import buy_alice_blue_trades
+from app.tasks.utils import get_future_price
+from app.tasks.utils import get_strike_and_entry_price
+from app.tasks.utils import get_strike_and_exit_price_dict
 from app.utils.constants import Status
 from app.utils.option_chain import get_option_chain
 

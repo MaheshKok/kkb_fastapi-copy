@@ -8,8 +8,6 @@ from fastapi import APIRouter
 from fastapi import Depends
 from httpx import AsyncClient
 from pydantic import parse_obj_as
-from tasks.execution import task_entry_trade
-from tasks.execution import task_exit_trade
 
 from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
@@ -18,6 +16,8 @@ from app.api.utils import get_current_and_next_expiry
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
+from app.tasks.tasks import task_entry_trade
+from app.tasks.tasks import task_exit_trade
 
 
 logging.basicConfig(level=logging.INFO)
@@ -71,7 +71,7 @@ async def post_nfo(
     }
     try:
         if exiting_trades_list_json := await async_redis_client.lrange(exiting_trades_key, 0, -1):
-            # initiate celery close_trade
+            # initiate exit_trade
             logging.info(f"Total: {len(exiting_trades_list_json)} trades to be closed")
             redis_trade_schema_list = parse_obj_as(
                 list[RedisTradeSchema], [json.loads(trade) for trade in exiting_trades_list_json]
@@ -85,7 +85,7 @@ async def post_nfo(
         logging.error(f"Exception while exiting trade: {e}")
         traceback.print_exc()
 
-    # initiate celery buy_trade
+    # initiate buy_trade
     return await task_entry_trade(
         **kwargs,
     )

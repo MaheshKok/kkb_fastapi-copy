@@ -2,13 +2,13 @@ import httpx
 import pytest
 from fastapi_sa.database import db
 from sqlalchemy import select
-from tasks.execution import task_exit_trade
 
 from app.database.models import StrategyModel
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
 from app.schemas.strategy import StrategySchema
-from test.unit_tests.test_async_trade_tasks.conftest import celery_sell_task_args
+from app.tasks.tasks import task_exit_trade
+from test.unit_tests.test_async_trade_tasks.conftest import sell_task_args
 
 
 # I just fixed them , but didnt assert so many things which are mentioned at the bottom
@@ -26,7 +26,7 @@ from test.unit_tests.test_async_trade_tasks.conftest import celery_sell_task_arg
         "sell_pe_trade_without_take_away_profit",
     ],
 )
-async def test_celery_sell_trade_without_take_away_profit(
+async def test_sell_trade_without_take_away_profit(
     test_async_redis_client, take_away_profit, ce_trade
 ):
     (
@@ -34,7 +34,7 @@ async def test_celery_sell_trade_without_take_away_profit(
         signal_payload_schema,
         redis_ongoing_key,
         redis_trade_schema_list,
-    ) = await celery_sell_task_args(
+    ) = await sell_task_args(
         test_async_redis_client, take_away_profit=take_away_profit, ce_trade=ce_trade
     )
 
@@ -93,7 +93,7 @@ async def test_celery_sell_trade_without_take_away_profit(
         "sell_pe_trade_updating_take_away_profit",
     ],
 )
-async def test_celery_sell_trade_updating_takeaway_profit(
+async def test_sell_trade_updating_takeaway_profit(
     test_async_redis_client, take_away_profit, ce_trade
 ):
     (
@@ -101,9 +101,7 @@ async def test_celery_sell_trade_updating_takeaway_profit(
         signal_payload_schema,
         redis_ongoing_key,
         redis_trade_schema_list,
-    ) = await celery_sell_task_args(
-        test_async_redis_client, take_away_profit=True, ce_trade=False
-    )
+    ) = await sell_task_args(test_async_redis_client, take_away_profit=True, ce_trade=False)
 
     async with db():
         # assert we dont have takeawayprofit model before closing trades

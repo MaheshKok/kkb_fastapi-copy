@@ -12,7 +12,7 @@ from test.unit_tests.test_data import get_test_post_trade_payload
 from test.utils import create_open_trades
 
 
-async def celery_sell_task_args(test_async_redis_client, take_away_profit=False, ce_trade=False):
+async def sell_task_args(test_async_redis_client, take_away_profit=False, ce_trade=False):
     await create_open_trades(
         users=1,
         strategies=1,
