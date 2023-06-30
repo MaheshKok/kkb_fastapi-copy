@@ -69,5 +69,5 @@ async def cache_ongoing_trades(async_redis_client):
                     await async_redis_client.delete(key)
                     await async_redis_client.rpush(key, *redis_trades_schema_json_list)
 
-        await pipe.execute()
-        logging.info("Ongoing trades cached in redis")
+            await pipe.execute()
+            logging.info("Ongoing trades cached in redis")

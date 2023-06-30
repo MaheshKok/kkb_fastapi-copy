@@ -581,6 +581,9 @@ async def buy_alice_blue_trades(
     )
 
     if place_order_response["stat"] == "Not_ok":
+        # TODO: try to refresh access token
+        # TODO: update db with new access token
+        # TODO: update redis with new access token
         raise HTTPException(status_code=403, detail=place_order_response["emsg"])
 
     order_id = place_order_response["NOrdNo"]
