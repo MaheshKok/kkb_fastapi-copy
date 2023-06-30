@@ -596,6 +596,17 @@ async def buy_alice_blue_trades(
     return None, None
 
 
+def get_exiting_trades_insights(redis_trade_schema_list: list[RedisTradeSchema]):
+    strike_quantity_dict = defaultdict(int)
+
+    for redis_trade_schema in redis_trade_schema_list:
+        strike_quantity_dict[redis_trade_schema.strike] += redis_trade_schema.quantity
+
+    if len(strike_quantity_dict):
+        # even though loop is over, we still have the access to the last element
+        return strike_quantity_dict, redis_trade_schema.expiry, redis_trade_schema.option_type
+
+
 async def place_close_order(
     pya3_obj: Pya3Aliceblue,
     async_redis_client: Redis,
@@ -624,17 +635,6 @@ async def place_close_order(
 
     # TODO: handle any error like what if we dont have NOrdNo in response
     return {strike: place_order_response["NOrdNo"]}
-
-
-def get_exiting_trades_insights(redis_trade_schema_list: list[RedisTradeSchema]):
-    strike_quantity_dict = defaultdict(int)
-
-    for redis_trade_schema in redis_trade_schema_list:
-        strike_quantity_dict[redis_trade_schema.strike] += redis_trade_schema.quantity
-
-    if len(strike_quantity_dict):
-        # even though loop is over, we still have the access to the last element
-        return strike_quantity_dict, redis_trade_schema.expiry, redis_trade_schema.option_type
 
 
 async def close_alice_blue_trades(
@@ -677,23 +677,20 @@ async def close_alice_blue_trades(
         )
 
     if tasks:
-        place_order_future_response = await asyncio.gather(*tasks)
-
-        place_order_future_results = [
-            place_order_future.result() for place_order_future in place_order_future_response
-        ]
-
+        place_order_results = await asyncio.gather(*tasks)
         strike_exitprice_dict = {}
-        for place_order_future_result in place_order_future_results:
+        for place_order_result in place_order_results:
             for (
                 strike,
                 order_id,
-            ) in place_order_future_result.items():
+            ) in place_order_result.items():
                 order_history = await pya3_obj.get_order_history(order_id)
                 for _ in range(20):
                     if order_history["Status"] == Status.COMPLETE:
                         strike_exitprice_dict[strike] = order_history["Avgprc"]
-                        return "success", strike_exitprice_dict
+                        break
                     await asyncio.sleep(0.2)
+                else:
+                    log.error(f"Unable to close strike: {strike}, order_history: {order_history}")
 
-        return "failure", strike_exitprice_dict
+        return strike_exitprice_dict
