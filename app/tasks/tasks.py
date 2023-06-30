@@ -20,11 +20,9 @@ from app.schemas.trade import ExitTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from app.schemas.trade import TradeSchema
-from app.services.broker.pya3_alice_blue import buy_alice_blue_trades
 from app.tasks.utils import get_future_price
 from app.tasks.utils import get_strike_and_entry_price
 from app.tasks.utils import get_strike_and_exit_price_dict
-from app.utils.constants import Status
 from app.utils.option_chain import get_option_chain
 
 
@@ -60,11 +58,12 @@ async def task_entry_trade(
         strategy_schema=strategy_schema,
     )
 
-    strike, entry_price = get_strike_and_entry_price(
-        option_chain,
-        strike=signal_payload_schema.strike,
-        premium=signal_payload_schema.premium,
-        future_price=signal_payload_schema.future_entry_price_received,
+    strike, entry_price = await get_strike_and_entry_price(
+        option_chain=option_chain,
+        signal_payload_schema=signal_payload_schema,
+        strategy_schema=strategy_schema,
+        async_redis_client=async_redis_client,
+        async_httpx_client=async_httpx_client,
     )
 
     # this is very important to set strike to signal_payload_schema as it would be used hereafter
@@ -73,18 +72,6 @@ async def task_entry_trade(
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
     if not strike:
         return None
-
-    if strategy_schema.broker_id:
-        status, entry_price = await buy_alice_blue_trades(
-            signal_payload_schema=signal_payload_schema,
-            strategy_schema=strategy_schema,
-            async_redis_client=async_redis_client,
-            async_httpx_client=async_httpx_client,
-        )
-
-        if status != Status.COMPLETE:
-            # Order not successful so dont make its entry in db
-            return None
 
     future_entry_price = await get_future_price(
         async_redis_client=async_redis_client,

@@ -1,12 +1,16 @@
+import logging
+import traceback
 from datetime import datetime
 
 from aioredis import Redis
+from fastapi import HTTPException
 from httpx import AsyncClient
 
 from app.api.utils import get_expiry_list
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
+from app.services.broker.pya3_alice_blue import buy_alice_blue_trades
 from app.services.broker.pya3_alice_blue import close_alice_blue_trades
 from app.utils.constants import OptionType
 from app.utils.option_chain import get_option_chain
@@ -113,7 +117,13 @@ async def get_strike_and_exit_price_dict(
     return strike_exit_price_dict
 
 
-def get_strike_and_entry_price(option_chain, strike=None, premium=None, future_price=None):
+async def get_strike_and_entry_price_from_option_chain(
+    option_chain, signal_payload_schema: SignalPayloadSchema
+):
+    strike = signal_payload_schema.strike
+    premium = signal_payload_schema.premium
+    future_price = signal_payload_schema.future_entry_price_received
+
     # use bisect to find the strike and its price from option chain
     if strike:
         if premium := option_chain.get(strike):
@@ -134,5 +144,35 @@ def get_strike_and_entry_price(option_chain, strike=None, premium=None, future_p
     elif future_price:
         # TODO: to fetch the strike based on volume and open interest, add more data to option chain
         pass
+    else:
+        raise Exception("Either premium or strike or future_price should be provided")
 
-    raise Exception("Either premium or strike or future_price should be provided")
+
+async def get_strike_and_entry_price(
+    *,
+    option_chain,
+    strategy_schema: StrategySchema,
+    signal_payload_schema: SignalPayloadSchema,
+    async_redis_client: Redis,
+    async_httpx_client: AsyncClient,
+):
+    strike, premium = await get_strike_and_entry_price_from_option_chain(
+        option_chain=option_chain, signal_payload_schema=signal_payload_schema
+    )
+
+    if strategy_schema.broker_id:
+        try:
+            entry_price = await buy_alice_blue_trades(
+                strike=strike,
+                signal_payload_schema=signal_payload_schema,
+                strategy_schema=strategy_schema,
+                async_redis_client=async_redis_client,
+                async_httpx_client=async_httpx_client,
+            )
+            return strike, entry_price
+        except BaseException as e:
+            logging.error(f"error while buying trade {e}")
+            traceback.print_exc()
+            raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+    return strike, premium

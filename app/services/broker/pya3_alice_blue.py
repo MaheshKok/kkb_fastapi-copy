@@ -543,6 +543,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya
 
 async def buy_alice_blue_trades(
     *,
+    strike: float,
     signal_payload_schema: SignalPayloadSchema,
     strategy_schema: StrategySchema,
     async_redis_client: Redis,
@@ -567,7 +568,7 @@ async def buy_alice_blue_trades(
         symbol=signal_payload_schema.symbol,
         expiry_date=signal_payload_schema.expiry,
         is_fut=strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX,
-        strike=signal_payload_schema.strike,
+        strike=strike,
         is_CE=signal_payload_schema.option_type == OptionType.CE,
     )
 
@@ -579,11 +580,14 @@ async def buy_alice_blue_trades(
         product_type=ProductType.Delivery,
     )
 
+    if place_order_response["stat"] == "Not_ok":
+        raise HTTPException(status_code=403, detail=place_order_response["emsg"])
+
     order_id = place_order_response["NOrdNo"]
     for _ in range(40):
         latest_order_status = await pya3_obj.get_order_history(order_id)
         if latest_order_status["Status"] == Status.COMPLETE:
-            return Status.COMPLETE, latest_order_status["Avgprc"]
+            return latest_order_status["Avgprc"]
         elif latest_order_status["Status"] == Status.REJECTED:
             # TODO: send whatsapp message using Twilio API instead of Telegram
             # Rejection Reason: latest_order_status["RejReason"]
@@ -592,8 +596,6 @@ async def buy_alice_blue_trades(
         else:
             log.warning(f"order_history: {latest_order_status}")
             await asyncio.sleep(0.5)
-
-    return None, None
 
 
 def get_exiting_trades_insights(redis_trade_schema_list: list[RedisTradeSchema]):

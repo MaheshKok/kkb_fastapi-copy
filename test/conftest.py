@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime
 
 import aioredis
@@ -18,15 +19,31 @@ from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.models import StrategyModel
 from app.utils.constants import ConfigFile
+from test.unit_tests.test_data import get_test_post_trade_payload
+from test.utils import create_pre_db_data
 
-# uncomment this only once a day as its very heavy computation which consumes almost 40 seconds to complete
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+
+
+# # uncomment this only once a day as its very heavy computation which consumes almost 40 seconds to complete
+# import io
+# import json
+# import httpx
+# import pandas as pd
 # import logging
 # from datetime import datetime
 # from app.api.utils import get_current_and_next_expiry
 # from app.api.utils import get_expiry_list
 # from app.cron.update_fno_expiry import update_expiry_list
-# from tasks.utils import get_monthly_expiry_date
+# from app.tasks.utils import get_monthly_expiry_date
 #
+# from test.unit_tests.test_data import get_test_post_trade_payload
+# from test.utils import create_pre_db_data
+
 #
 # @pytest.fixture(scope="session", autouse=True)
 # async def setup_redis():
@@ -34,66 +51,100 @@ from app.utils.constants import ConfigFile
 #     _test_async_redis_client = await aioredis.StrictRedis.from_url(
 #         test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
 #     )
-#     # update redis with necessary data i.e expiry list, option chain etc
-#     await update_expiry_list(test_config, "INDX OPT")
+# # update redis with necessary data i.e expiry list, option chain etc
+# await update_expiry_list(test_config, "INDX OPT")
 #
-#     logging.info(f"Updated redis with expiry list: {datetime.now()}")
-#     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-#         _test_async_redis_client, datetime.now().date()
-#     )
+# logging.info(f"Updated redis with expiry list: {datetime.now()}")
+# current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
+#     _test_async_redis_client, datetime.now().date()
+# )
 #
-#     prod_config = get_config()
-#     prod_async_redis_client = await aioredis.StrictRedis.from_url(
-#         prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
-#     )
-#     # add keys for future price as well
-#     keys = [
-#         f"BANKNIFTY {current_expiry_date} CE",
-#         f"BANKNIFTY {current_expiry_date} PE",
-#         f"BANKNIFTY {next_expiry_date} CE",
-#         f"BANKNIFTY {next_expiry_date} PE",
-#         f"NIFTY {current_expiry_date} CE",
-#         f"NIFTY {current_expiry_date} PE",
-#         f"NIFTY {next_expiry_date} CE",
-#         f"NIFTY {next_expiry_date} PE",
-#     ]
+# prod_config = get_config()
+# prod_async_redis_client = await aioredis.StrictRedis.from_url(
+#     prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+# )
+# # add keys for future price as well
+# keys = [
+#     f"BANKNIFTY {current_expiry_date} CE",
+#     f"BANKNIFTY {current_expiry_date} PE",
+#     f"BANKNIFTY {next_expiry_date} CE",
+#     f"BANKNIFTY {next_expiry_date} PE",
+#     f"NIFTY {current_expiry_date} CE",
+#     f"NIFTY {current_expiry_date} PE",
+#     f"NIFTY {next_expiry_date} CE",
+#     f"NIFTY {next_expiry_date} PE",
+# ]
 #
-#     monthly_expiry = await get_monthly_expiry_date(_test_async_redis_client)
-#     if monthly_expiry:
-#         keys.append(f"BANKNIFTY {monthly_expiry} FUT")
-#         keys.append(f"NIFTY {monthly_expiry} FUT")
+# monthly_expiry = await get_monthly_expiry_date(_test_async_redis_client)
+# if monthly_expiry:
+#     keys.append(f"BANKNIFTY {monthly_expiry} FUT")
+#     keys.append(f"NIFTY {monthly_expiry} FUT")
 #
-#     start_time = datetime.now()
-#     logging.info(f"start updating redis with option_chain: {start_time}")
-#     all_option_chain = {}
-#     async with prod_async_redis_client.pipeline() as pipe:
-#         for key in keys:
-#             option_chain = await prod_async_redis_client.hgetall(key)
-#             if option_chain:
-#                 all_option_chain[key] = option_chain
-#     await pipe.execute()
-#     logging.info(f"pulled option chain from prod redis: {datetime.now()}")
+# start_time = datetime.now()
+# logging.info(f"start updating redis with option_chain: {start_time}")
+# all_option_chain = {}
+# async with prod_async_redis_client.pipeline() as pipe:
+#     for key in keys:
+#         option_chain = await prod_async_redis_client.hgetall(key)
+#         if option_chain:
+#             all_option_chain[key] = option_chain
+# await pipe.execute()
+# logging.info(f"pulled option chain from prod redis: {datetime.now()}")
 #
-#     async with _test_async_redis_client.pipeline() as pipe:
-#         for key, option_chain in all_option_chain.items():
-#             if "FUT" in key:
-#                 # For future option chain first and second argument are same
-#                 await _test_async_redis_client.hset(key, key, option_chain["FUT"])
-#             else:
-#                 for strike, premium in option_chain.items():
-#                     await _test_async_redis_client.hset(key, strike, premium)
-#     await pipe.execute()
+# async with _test_async_redis_client.pipeline() as pipe:
+#     for key, option_chain in all_option_chain.items():
+#         if "FUT" in key:
+#             # For future option chain first and second argument are same
+#             await _test_async_redis_client.hset(key, key, option_chain["FUT"])
+#         else:
+#             for strike, premium in option_chain.items():
+#                 await _test_async_redis_client.hset(key, strike, premium)
+# await pipe.execute()
 #
-#     logging.info(f"Time taken to update redis: {datetime.now() - start_time}")
-from test.unit_tests.test_data import get_test_post_trade_payload
-from test.utils import create_pre_db_data
+# logging.info(f"Time taken to update redis: {datetime.now() - start_time}")
+
+# Choose the column to be used as the key
+# key_column = "Formatted Ins Name"
+#
+# url = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
+# response = await httpx.AsyncClient().get(url)
+# data_stream = io.StringIO(response.text)
+# try:
+#     df = pd.read_csv(data_stream)
+# except Exception as e:
+#     logging.error(f"Error while reading csv: {e}")
+# full_name_row_dict = {
+#     key: json.dumps(value) for key, value in df.set_index(key_column).T.to_dict().items()
+# }
+#
+# logging.info("Setting master contract in Redis")
+# start_time = datetime.now()
+#
+# # Split the dictionary into smaller chunks
+# chunk_size = 10000
+# dict_chunks = [
+#     dict(list(full_name_row_dict.items())[i : i + chunk_size])
+#     for i in range(0, len(full_name_row_dict), chunk_size)
+# ]
+#
+# # Use a pipeline to set each chunk of key-value pairs in Redis
+#
+# async with _test_async_redis_client.pipeline() as pipe:
+#     for chunk in dict_chunks:
+#         for key, value in chunk.items():
+#             pipe.set(key, value)
+# await pipe.execute()
+#
+# logging.info(f"Time taken to set master contract in redis: {datetime.now() - start_time}")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def event_loop(request):
     """Create an instance of the default event loop for each test case."""
     loop = asyncio.get_event_loop_policy().new_event_loop()
+    logging.info("loop created")
     yield loop
+    logging.info("loop closed")
     loop.close()
 
 
@@ -109,19 +160,21 @@ def event_loop(request):
 #             await session.rollback()
 
 
+@pytest.fixture(scope="session")
+def test_config():
+    config = get_config(ConfigFile.TEST)
+    return config
+
+
 @pytest_asyncio.fixture(scope="function")
 async def test_async_redis_client():
     test_config = get_config(ConfigFile.TEST)
     _test_async_redis_client = await aioredis.StrictRedis.from_url(
         test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
     )
+    logging.info("test redis client created")
     yield _test_async_redis_client
-
-
-@pytest.fixture(scope="session")
-def test_config():
-    config = get_config(ConfigFile.TEST)
-    return config
+    logging.info("test redis client created")
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -139,13 +192,19 @@ async def test_async_engine(test_config):
     async with engine.connect() as conn:
         trans = await conn.begin()
         try:
+            logging.info("test db engine created")
             yield engine
+            logging.info("test db engine closed")
         except Exception as e:  # pragma: no cover
             await trans.rollback()
             raise e
-        else:
+        finally:
+            logging.info("commiting transaction")
             await trans.commit()
+            logging.info("committed transaction")
+
     await engine.dispose()
+    logging.info("test db engine disposed")
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
@@ -154,10 +213,13 @@ async def db_cleanup(test_async_engine):
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
+    logging.info("tables created")
     yield
 
     async with test_async_engine.begin() as conn:
+        logging.info("tables dropping")
         await conn.run_sync(Base.metadata.drop_all)
+        logging.info("tables created")
 
 
 @pytest.fixture()
@@ -167,22 +229,28 @@ def db_session_ctx(test_config):
 
     """db session context"""
     token = db.set_session_ctx()
+    logging.info("db session context created")
     yield
     db.reset_session_ctx(token)
+    logging.info("db session context closed")
 
 
 @pytest.fixture(autouse=True)
 async def test_async_session(db_session_ctx):
     """session fixture"""
     async with db.session.begin():
+        logging.info("test db session created")
         yield db.session
+        logging.info("test db session closed")
 
 
 @pytest_asyncio.fixture(scope="function")
 async def test_app(test_async_redis_client):
     app = get_app(ConfigFile.TEST)  # pragma: no cover
     app.state.async_redis_client = test_async_redis_client  # pragma: no cover
+    logging.info("test app created")
     yield app
+    logging.info("test app closed")
 
     # cleanup redis after test
     # remove all stored trades and leave option chain and expiry list for other unit tests
@@ -192,6 +260,7 @@ async def test_app(test_async_redis_client):
                 continue
             await test_async_redis_client.delete(key)
     await pipe.execute()
+    logging.info("redis cleaned up")
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -200,7 +269,9 @@ async def test_async_client(test_app):
     async with AsyncClient(
         app=test_app, base_url="http://localhost:8080/"
     ) as ac:  # pragma: no cover
+        logging.info("test httpx async client created")
         yield ac
+        logging.info("test httpx async client closed")
 
 
 @pytest_asyncio.fixture(scope="function")
