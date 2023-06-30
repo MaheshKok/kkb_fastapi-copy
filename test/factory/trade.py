@@ -8,7 +8,7 @@ from async_factory_boy.factory.sqlalchemy import AsyncSQLAlchemyFactory
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
-from test.conftest import sc_session
+from test.factory.base_factory import sc_session
 from test.factory.strategy import StrategyFactory
 
 

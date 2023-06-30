@@ -7,7 +7,7 @@ from async_factory_boy.factory.sqlalchemy import AsyncSQLAlchemyFactory
 from factory import Sequence
 
 from app.database.models import User
-from test.conftest import sc_session
+from test.factory.base_factory import sc_session
 
 
 class UserFactory(AsyncSQLAlchemyFactory):

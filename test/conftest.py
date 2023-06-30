@@ -5,10 +5,7 @@ import pytest as pytest
 import pytest_asyncio
 from fastapi_sa.database import db
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import scoped_session
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 
 from app.core.config import get_config
@@ -85,17 +82,6 @@ from app.utils.constants import ConfigFile
 #     await pipe.execute()
 #
 #     logging.info(f"Time taken to update redis: {datetime.now() - start_time}")
-
-
-engine = create_async_engine(get_db_url(get_config(ConfigFile.TEST)))
-async_session = sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
-sc_session = scoped_session(async_session)
 
 
 @pytest.fixture(scope="session")
