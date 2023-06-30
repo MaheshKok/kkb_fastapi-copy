@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import BaseModel
 from pydantic import Field
 
@@ -7,7 +9,7 @@ class BrokerSchema(BaseModel):
     class Config:
         orm_mode = True
 
-    id: str = Field(description="Broker ID", example="ff80cf6b-3c4a-4d28-82b0-631eafb4cdd1")
+    id: UUID = Field(description="Broker ID", example="ff80cf6b-3c4a-4d28-82b0-631eafb4cdd1")
     access_token: str = Field(
         description="access token",
         example="u5tIkfvy1OgSPx1tvQ3e1XSHeml82qMQRuLszzVSBEsFevFElu87ZNP2A20zB4nu8Wfo8JSlYR2hgOUNzQAtppkABzlt7Um1Tke8znrt413hveAz9b4BFNDU2ob6KoK4RcXz3rRSkhPMr3QnO2Trxv3dBgldQT54FSnNq0UlWN3vNX7tKsBQ7Vxs1CZmFHrnx5SmdnA37gc8dbgbuRXGbbiFGn5c4kOHrQrIWtU0PTcJhX0riMdyvPYtk1e5A5AF",

@@ -529,6 +529,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya
             if not broker_model:
                 raise HTTPException(status_code=404, detail=f"Broker: {broker_id} not found")
             broker_schema = BrokerSchema.from_orm(broker_model)
+            await async_redis_client.set(broker_id, broker_schema.json())
 
     # TODO: update cron updating alice blue access token to update redis as well with the latest access token
     pya3_obj = Pya3Aliceblue(
