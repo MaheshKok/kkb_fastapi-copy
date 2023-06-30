@@ -60,6 +60,13 @@ async def post_nfo(
     # To be decided in future, the name of actions
 
     signal_payload_schema.expiry = current_expiry_date
+
+    kwargs = {
+        "signal_payload_schema": signal_payload_schema,
+        "async_redis_client": async_redis_client,
+        "strategy_schema": strategy_schema,
+        "async_httpx_client": async_httpx_client,
+    }
     try:
         if exiting_trades_list_json := await async_redis_client.lrange(exiting_trades_key, 0, -1):
             # initiate celery close_trade
@@ -68,17 +75,14 @@ async def post_nfo(
                 list[RedisTradeSchema], exiting_trades_list_json
             )
             await task_exit_trade(
-                signal_payload_schema,
-                exiting_trades_key,
-                redis_trade_schema_list,
-                async_redis_client,
-                strategy_schema,
-                async_httpx_client,
+                **kwargs,
+                redis_ongoing_key=exiting_trades_key,
+                redis_trade_schema_list=redis_trade_schema_list,
             )
     except Exception as e:
         logging.error(f"Exception while exiting trade: {e}")
 
     # initiate celery buy_trade
     return await task_entry_trade(
-        signal_payload_schema, async_redis_client, strategy_schema, async_httpx_client
+        **kwargs,
     )

@@ -81,6 +81,7 @@ async def get_future_price(async_redis_client, symbol, strategy_schema):
 
 
 async def get_strike_and_exit_price_dict(
+    *,
     async_redis_client: Redis,
     signal_payload_schema: SignalPayloadSchema,
     redis_trade_schema_list: list[RedisTradeSchema],

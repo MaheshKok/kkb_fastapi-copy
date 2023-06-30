@@ -541,6 +541,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya
 
 
 async def buy_alice_blue_trades(
+    *,
     signal_payload_schema: SignalPayloadSchema,
     strategy_schema: StrategySchema,
     async_redis_client: Redis,

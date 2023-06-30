@@ -7,6 +7,7 @@ from app.schemas.strategy import StrategySchema
 
 
 async def get_option_chain(
+    *,
     async_redis_client,
     symbol,
     expiry,
