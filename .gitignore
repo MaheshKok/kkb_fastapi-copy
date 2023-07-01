@@ -37,3 +37,6 @@ dist/
 
 # Miscellaneous
 .DS_Store
+
+*.pclprof
+*.coverage
