@@ -563,30 +563,17 @@ async def buy_alice_blue_trades(
         async_redis_client, str(strategy_schema.broker_id), async_httpx_client
     )
 
-    instrument = await pya3_obj.get_instrument_for_fno_from_redis(
+    strike, order_id = await place_ablue_order(
+        pya3_obj=pya3_obj,
+        strategy_schema=strategy_schema,
         async_redis_client=async_redis_client,
-        symbol=signal_payload_schema.symbol,
-        expiry_date=signal_payload_schema.expiry,
-        is_fut=strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX,
         strike=strike,
-        is_CE=signal_payload_schema.option_type == OptionType.CE,
-    )
-
-    place_order_response = await pya3_obj.place_order(
-        transaction_type=TransactionType.Buy,
-        instrument=instrument,
         quantity=signal_payload_schema.quantity,
-        order_type=OrderType.Market,
-        product_type=ProductType.Delivery,
+        expiry=signal_payload_schema.expiry,
+        is_CE=signal_payload_schema.option_type == OptionType.CE,
+        is_buy=True,
     )
 
-    if place_order_response["stat"] == "Not_ok":
-        # TODO: try to refresh access token
-        # TODO: update db with new access token
-        # TODO: update redis with new access token
-        raise HTTPException(status_code=403, detail=place_order_response["emsg"])
-
-    order_id = place_order_response["NOrdNo"]
     for _ in range(40):
         latest_order_status = await pya3_obj.get_order_history(order_id)
         if latest_order_status["Status"] == Status.COMPLETE:
@@ -612,14 +599,16 @@ def get_exiting_trades_insights(redis_trade_schema_list: list[RedisTradeSchema])
         return strike_quantity_dict, redis_trade_schema.expiry, redis_trade_schema.option_type
 
 
-async def place_close_order(
+async def place_ablue_order(
+    *,
     pya3_obj: Pya3Aliceblue,
-    async_redis_client: Redis,
     strategy_schema: StrategySchema,
+    async_redis_client: Redis,
     strike: float,
     quantity: int,
     expiry: datetime.date,
-    option_type: OptionType,
+    is_CE: bool,
+    is_buy: bool,
 ):
     instrument = await pya3_obj.get_instrument_for_fno_from_redis(
         async_redis_client=async_redis_client,
@@ -627,19 +616,25 @@ async def place_close_order(
         expiry_date=expiry,
         is_fut=strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX,
         strike=strike,
-        is_CE=option_type == OptionType.CE,
+        is_CE=is_CE,
     )
 
     place_order_response = await pya3_obj.place_order(
-        transaction_type=TransactionType.Sell,
+        transaction_type=TransactionType.Buy if is_buy else TransactionType.Sell,
         instrument=instrument,
         quantity=quantity,
         order_type=OrderType.Market,
         product_type=ProductType.Delivery,
     )
 
+    if place_order_response["stat"] == "Not_ok":
+        # TODO: try to refresh access token
+        # TODO: update db with new access token
+        # TODO: update redis with new access token
+        raise HTTPException(status_code=403, detail=place_order_response["emsg"])
+
     # TODO: handle any error like what if we dont have NOrdNo in response
-    return {strike: place_order_response["NOrdNo"]}
+    return strike, place_order_response["NOrdNo"]
 
 
 async def close_alice_blue_trades(
@@ -669,14 +664,15 @@ async def close_alice_blue_trades(
     for strike, quantity in strike_quantity_dict.items():
         tasks.append(
             asyncio.create_task(
-                place_close_order(
-                    pya3_obj,
-                    async_redis_client,
-                    strategy_schema,
-                    strike,
-                    quantity,
-                    expiry,
-                    option_type,
+                place_ablue_order(
+                    pya3_obj=pya3_obj,
+                    async_redis_client=async_redis_client,
+                    strategy_schema=strategy_schema,
+                    strike=strike,
+                    quantity=quantity,
+                    expiry=expiry,
+                    is_CE=option_type == OptionType.CE,
+                    is_buy=False,
                 )
             )
         )
@@ -684,18 +680,14 @@ async def close_alice_blue_trades(
     if tasks:
         place_order_results = await asyncio.gather(*tasks)
         strike_exitprice_dict = {}
-        for place_order_result in place_order_results:
-            for (
-                strike,
-                order_id,
-            ) in place_order_result.items():
-                order_history = await pya3_obj.get_order_history(order_id)
-                for _ in range(20):
-                    if order_history["Status"] == Status.COMPLETE:
-                        strike_exitprice_dict[strike] = order_history["Avgprc"]
-                        break
-                    await asyncio.sleep(0.2)
-                else:
-                    log.error(f"Unable to close strike: {strike}, order_history: {order_history}")
+        for strike, order_id in place_order_results:
+            order_history = await pya3_obj.get_order_history(order_id)
+            for _ in range(20):
+                if order_history["Status"] == Status.COMPLETE:
+                    strike_exitprice_dict[strike] = order_history["Avgprc"]
+                    break
+                await asyncio.sleep(0.2)
+            else:
+                log.error(f"Unable to close strike: {strike}, order_history: {order_history}")
 
         return strike_exitprice_dict

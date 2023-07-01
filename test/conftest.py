@@ -111,11 +111,12 @@ async def setup_redis():
     data_stream = io.StringIO(response.text)
     try:
         df = pd.read_csv(data_stream)
+        full_name_row_dict = {}
+        for key, value in df.set_index(key_column).T.to_dict().items():
+            if "BANKNIFTY" in key or "NIFTY" in key:
+                full_name_row_dict[key] = json.dumps(value)
     except Exception as e:
         logging.error(f"Error while reading csv: {e}")
-    full_name_row_dict = {
-        key: json.dumps(value) for key, value in df.set_index(key_column).T.to_dict().items()
-    }
 
     logging.info("Start setting master contract in Redis")
     start_time = datetime.now()
@@ -128,12 +129,10 @@ async def setup_redis():
     ]
 
     # Use a pipeline to set each chunk of key-value pairs in Redis
-
     async with _test_async_redis_client.pipeline() as pipe:
         for chunk in dict_chunks:
             for key, value in chunk.items():
-                if "BANKNIFTY" in key or "NIFTY" in key:
-                    pipe.set(key, value)
+                pipe.set(key, value)
         await pipe.execute()
 
     logging.info(f"Time taken to set master contract in redis: [ {datetime.now() - start_time} ]")
