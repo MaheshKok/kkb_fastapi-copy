@@ -22,3 +22,4 @@ class BrokerFactory(AsyncSQLAlchemyFactory):
     api_key = factory.Sequence(lambda n: secrets.token_hex(50))
     app_id = factory.Sequence(lambda n: secrets.token_hex(8))
     totp = factory.Sequence(lambda n: secrets.token_hex(16))
+    twoFA = factory.Sequence(lambda n: int(f"199{n}"))

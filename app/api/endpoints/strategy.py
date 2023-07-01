@@ -17,7 +17,7 @@ strategy_router = APIRouter(
 )
 
 
-@strategy_router.post("")
+@strategy_router.post("", response_model=StrategySchema)
 async def post_strategy(
     strategy_schema: StrategyCreateSchema,
     async_redis_client: Redis = Depends(get_async_redis_client),

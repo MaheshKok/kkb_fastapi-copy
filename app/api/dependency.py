@@ -3,9 +3,12 @@ from fastapi import Depends
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
+from fastapi_sa.database import db
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.models import StrategyModel
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import SignalPayloadSchema
 
@@ -29,10 +32,23 @@ async def get_strategy_schema(
 ) -> StrategySchema:
     redis_strategy_json = await async_redis_client.get(str(signal_payload_schema.strategy_id))
     if not redis_strategy_json:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Strategy: {signal_payload_schema.strategy_id} not found in redis",
-        )
+        async with db():
+            fetch_strategy_query = await db.session.execute(
+                select(StrategyModel).where(StrategyModel.id == signal_payload_schema.strategy_id)
+            )
+            strategy_model = fetch_strategy_query.scalar()
+            if not strategy_model:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Strategy: {signal_payload_schema.strategy_id} not found in redis or database",
+                )
+            redis_set_result = await async_redis_client.set(
+                str(strategy_model.id), StrategySchema.from_orm(strategy_model).json()
+            )
+            if not redis_set_result:
+                raise Exception(f"Redis set strategy: {strategy_model.id} failed")
+
+            return StrategySchema.from_orm(strategy_model)
     return StrategySchema.parse_raw(redis_strategy_json)
 
 

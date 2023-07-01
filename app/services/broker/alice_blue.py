@@ -1,43 +1,179 @@
 import asyncio
+import base64
 import datetime
+import hashlib
 import json
 import logging
-from collections import defaultdict
+import os
 
 import httpx
-from aioredis import Redis
-from fastapi import HTTPException
-from fastapi_sa.database import db
-from httpx import AsyncClient
+import pyotp
+from cryptography.hazmat.primitives.ciphers import Cipher
+from cryptography.hazmat.primitives.ciphers import algorithms
+from cryptography.hazmat.primitives.ciphers import modes
 from pya3 import Aliceblue
 from pya3 import Instrument
 from pya3 import OrderType
 from pya3 import ProductType
-from pya3 import TransactionType
 from pya3 import encrypt_string
-from sqlalchemy import select
 
-from app.database.models import BrokerModel
-from app.schemas.broker import BrokerSchema
-from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.strategy import StrategySchema
-from app.schemas.trade import RedisTradeSchema
-from app.schemas.trade import SignalPayloadSchema
 from app.utils.constants import ALICE_BLUE_DATE_FORMAT
 from app.utils.constants import FUT
 from app.utils.constants import OptionType
-from app.utils.constants import Status
 
 
-log = logging.getLogger(__name__)
+logging = logging.getLogger(__name__)
+
+
+class CryptoJsAES:
+    @staticmethod
+    def __pad(data):
+        BLOCK_SIZE = 16
+        length = BLOCK_SIZE - (len(data) % BLOCK_SIZE)
+        return data + (chr(length) * length).encode()
+
+    @staticmethod
+    def __unpad(data):
+        return data[: -(data[-1] if type(data[-1]) == int else ord(data[-1]))]
+
+    @staticmethod
+    def __bytes_to_key(data, salt, output=48):
+        assert len(salt) == 8, len(salt)
+        data += salt
+        key = hashlib.md5(data).digest()
+        final_key = key
+        while len(final_key) < output:
+            key = hashlib.md5(key + data).digest()
+            final_key += key
+        return final_key[:output]
+
+    @staticmethod
+    def encrypt(message, passphrase):
+        salt = os.urandom(8)
+        key_iv = CryptoJsAES.__bytes_to_key(passphrase, salt, 32 + 16)
+        key = key_iv[:32]
+        iv = key_iv[32:]
+        aes = Cipher(algorithms.AES(key), modes.CBC(iv))
+        return base64.b64encode(
+            b"Salted__"
+            + salt
+            + aes.encryptor().update(CryptoJsAES.__pad(message))
+            + aes.encryptor().finalize()
+        )
+
+    @staticmethod
+    def decrypt(encrypted, passphrase):
+        encrypted = base64.b64decode(encrypted)
+        assert encrypted[0:8] == b"Salted__"
+        salt = encrypted[8:16]
+        key_iv = CryptoJsAES.__bytes_to_key(passphrase, salt, 32 + 16)
+        key = key_iv[:32]
+        iv = key_iv[32:]
+        aes = Cipher(algorithms.AES(key), modes.CBC(iv))
+        return CryptoJsAES.__unpad(
+            aes.decryptor.update(encrypted[16:]) + aes.decryptor().finalize()
+        )
 
 
 class Pya3Aliceblue(Aliceblue):
+    Aliceblue._sub_urls["webLogin"] = "customer/webLogin"
+    Aliceblue._sub_urls["twoFA"] = "sso/validAnswer"
+    Aliceblue._sub_urls["verifyTotp"] = "sso/verifyTotp"
+    Aliceblue._sub_urls["getApiKey"] = "api/getApiKey"
+    Aliceblue._sub_urls["apiGetEncKey"] = "api/customer/getAPIEncpkey"
+    Aliceblue._sub_urls["sessionID"] = "api/customer/getUserSID"
+
     def __init__(
-        self, user_id, api_key, async_httpx_client, base=None, session_id=None, disable_ssl=False
+        self,
+        user_id,
+        password,
+        api_key,
+        async_httpx_client: httpx.AsyncClient,
+        totp,
+        twoFA,
+        app_id,
+        base=None,
+        session_id=None,
+        disable_ssl=False,
     ):
         super().__init__(user_id, api_key, base, session_id, disable_ssl)
         self.async_httpx_client = async_httpx_client
+        self.password = password
+        self.totp = totp
+        self.twoFA = twoFA
+        self.app_id = app_id
+
+    async def login_and_get_session_id(self):
+        """Login and get Session ID"""
+        header = {"Content-Type": "application/json"}
+        # Get Encryption Key
+        data = {"userId": self.user_id}
+        r = await self._post("encryption_key", data=data)
+
+        if r.get("stat") == "Not_Ok":
+            logging.info(f"Error while retrieving Encryption Key: {r}")
+        encKey = r["encKey"]
+
+        # Web Login
+        checksum = CryptoJsAES.encrypt(self.password.encode(), encKey.encode())
+        checksum = checksum.decode("utf-8")
+        data = {"userId": self.user_id, "userData": checksum}
+        r = await self.async_httpx_client.post(self.base + self._sub_urls["webLogin"], data=data)
+        logging.info(f"Web Login response {r}")
+
+        # Web Login 2FA
+        data = {
+            "answer1": self.twoFA,
+            "sCount": "1",
+            "sIndex": "1",
+            "userId": self.user_id,
+            "vendor": self.app_id,
+        }
+        r = await self._post("twoFA", data=data)
+        logging.info(f"Web Login 2FA response {r}")
+        auth_us = r["us"]
+
+        # Web Login Totp
+        totp = str(pyotp.TOTP(self.totp).now())
+        data = {"userId": self.user_id, "tOtp": totp}
+        header["Authorization"] = f"Bearer {self.user_id} {auth_us}"
+        r = await self.async_httpx_client.post(
+            self.base + self._sub_urls["verifyTotp"], data=data, headers=header
+        )
+        logging.info(f"Totp Login response {r}")
+
+        # Web Login Api Key
+        userSessionID = r["userSessionID"]
+        header["Authorization"] = f"Bearer {self.user_id} {userSessionID}"
+        r = await self.async_httpx_client.post(
+            self.base + self._sub_urls["getApiKey"], headers=header
+        )
+        logging.info(f"Api Key response {r.text}")
+        api_key = r.json()["api_key"]
+
+        # Get API Encryption Key
+        data = {"userId": self.user_id}
+        r = await self.async_httpx_client.post(
+            self.base + self._sub_urls["apiGetEncKey"],
+            headers=header,
+            data=data,
+        )
+        logging.info(f"Get API Encryption Key response {r.text}")
+        encKey = r.json()["encKey"]
+
+        # Get User Details/Session ID
+        checksum = hashlib.sha256(f"{self.user_id}{api_key}{encKey}".encode()).hexdigest()
+        data = {"userId": self.user_id, "userData": checksum}
+        r = await self.async_httpx_client.post(
+            self.base + self._sub_urls["sessionID"],
+            headers=header,
+            data=data,
+        )
+        logging.info(f"Session ID response {r.text}")
+        session_id = r.json()["sessionID"]
+        logging.info(f"Session ID is {session_id}")
+
+        return session_id
 
     async def _get(self, sub_url, data=None):
         """Get method declaration"""
@@ -202,7 +338,7 @@ class Pya3Aliceblue(Aliceblue):
         else:
             data = encrypt_string(self.user_id.upper() + self.api_key + response["encKey"])
         data = {"userId": self.user_id.upper(), "userData": data}
-        res = self._post("getsessiondata", data)
+        res = await self._post("getsessiondata", data)
 
         if res["stat"] == "Ok":
             self.session_id = res["sessionID"]
@@ -506,188 +642,3 @@ class Pya3Aliceblue(Aliceblue):
     #                 )
     #
     #         return inst, token_full_name_dict
-
-
-async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya3Aliceblue:
-    broker_json = await async_redis_client.get(broker_id)
-
-    if broker_json:
-        broker_schema = BrokerSchema.parse_raw(broker_json)
-    else:
-        async with db():
-            # We have a cron that update session token every 1 hour,
-            # but frequency can be brought down to 1 day, but we dont know when it expires
-            # but due to some reason it doesnt work then get session token updated using get_alice_blue_obj
-            # and then create pya3_obj again and we would need to do it in place_order
-
-            # TODO: fetch it from redis
-            fetch_broker_query = await db.session.execute(
-                select(BrokerModel).filter_by(id=str(broker_id))
-            )
-            broker_model = fetch_broker_query.scalars().one_or_none()
-
-            if not broker_model:
-                raise HTTPException(status_code=404, detail=f"Broker: {broker_id} not found")
-            broker_schema = BrokerSchema.from_orm(broker_model)
-            await async_redis_client.set(broker_id, broker_schema.json())
-
-    # TODO: update cron updating alice blue access token to update redis as well with the latest access token
-    pya3_obj = Pya3Aliceblue(
-        user_id=broker_schema.username,
-        api_key=broker_schema.api_key,
-        session_id=broker_schema.access_token,
-        async_httpx_client=async_httpx_client,
-    )
-    return pya3_obj
-
-
-async def buy_alice_blue_trades(
-    *,
-    strike: float,
-    signal_payload_schema: SignalPayloadSchema,
-    strategy_schema: StrategySchema,
-    async_redis_client: Redis,
-    async_httpx_client: AsyncClient,
-):
-    """
-    assumptions
-        all trades to be executed should follow the below constraint:
-            they all should hve SAME paramters as below:
-            symbol [ for ex: either BANKNIFTY, NIFTY ]
-            expiry
-            call type [ for ex: either CE, PE ]
-            nfo type [ for ex: either future or option]
-    """
-
-    pya3_obj = await get_pya3_obj(
-        async_redis_client, str(strategy_schema.broker_id), async_httpx_client
-    )
-
-    strike, order_id = await place_ablue_order(
-        pya3_obj=pya3_obj,
-        strategy_schema=strategy_schema,
-        async_redis_client=async_redis_client,
-        strike=strike,
-        quantity=signal_payload_schema.quantity,
-        expiry=signal_payload_schema.expiry,
-        is_CE=signal_payload_schema.option_type == OptionType.CE,
-        is_buy=True,
-    )
-
-    for _ in range(40):
-        latest_order_status = await pya3_obj.get_order_history(order_id)
-        if latest_order_status["Status"] == Status.COMPLETE:
-            return latest_order_status["Avgprc"]
-        elif latest_order_status["Status"] == Status.REJECTED:
-            # TODO: send whatsapp message using Twilio API instead of Telegram
-            # Rejection Reason: latest_order_status["RejReason"]
-            log.error(f"order_status: {latest_order_status}")
-            raise HTTPException(status_code=403, detail=latest_order_status["RejReason"])
-        else:
-            log.warning(f"order_history: {latest_order_status}")
-            await asyncio.sleep(0.5)
-
-
-def get_exiting_trades_insights(redis_trade_schema_list: list[RedisTradeSchema]):
-    strike_quantity_dict = defaultdict(int)
-
-    for redis_trade_schema in redis_trade_schema_list:
-        strike_quantity_dict[redis_trade_schema.strike] += redis_trade_schema.quantity
-
-    if len(strike_quantity_dict):
-        # even though loop is over, we still have the access to the last element
-        return strike_quantity_dict, redis_trade_schema.expiry, redis_trade_schema.option_type
-
-
-async def place_ablue_order(
-    *,
-    pya3_obj: Pya3Aliceblue,
-    strategy_schema: StrategySchema,
-    async_redis_client: Redis,
-    strike: float,
-    quantity: int,
-    expiry: datetime.date,
-    is_CE: bool,
-    is_buy: bool,
-):
-    instrument = await pya3_obj.get_instrument_for_fno_from_redis(
-        async_redis_client=async_redis_client,
-        symbol=strategy_schema.symbol,
-        expiry_date=expiry,
-        is_fut=strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX,
-        strike=strike,
-        is_CE=is_CE,
-    )
-
-    place_order_response = await pya3_obj.place_order(
-        transaction_type=TransactionType.Buy if is_buy else TransactionType.Sell,
-        instrument=instrument,
-        quantity=quantity,
-        order_type=OrderType.Market,
-        product_type=ProductType.Delivery,
-    )
-
-    if place_order_response["stat"] == "Not_ok":
-        # TODO: try to refresh access token
-        # TODO: update db with new access token
-        # TODO: update redis with new access token
-        raise HTTPException(status_code=403, detail=place_order_response["emsg"])
-
-    # TODO: handle any error like what if we dont have NOrdNo in response
-    return strike, place_order_response["NOrdNo"]
-
-
-async def close_alice_blue_trades(
-    redis_trade_schema_list: list[RedisTradeSchema],
-    strategy_schema: StrategySchema,
-    async_redis_client: Redis,
-    async_httpx_client: AsyncClient,
-):
-    """
-    assumptions
-     all trades to be executed should belong to same:
-      symbol [ for ex: either BANKNIFTY, NIFTY ]
-      expiry
-      call type [ for ex: either CE, PE ]
-      nfo type [ for ex: either future or option]
-    """
-
-    strike_quantity_dict, expiry, option_type = get_exiting_trades_insights(
-        redis_trade_schema_list
-    )
-
-    pya3_obj = await get_pya3_obj(
-        async_redis_client, str(strategy_schema.broker_id), async_httpx_client
-    )
-
-    tasks = []
-    for strike, quantity in strike_quantity_dict.items():
-        tasks.append(
-            asyncio.create_task(
-                place_ablue_order(
-                    pya3_obj=pya3_obj,
-                    async_redis_client=async_redis_client,
-                    strategy_schema=strategy_schema,
-                    strike=strike,
-                    quantity=quantity,
-                    expiry=expiry,
-                    is_CE=option_type == OptionType.CE,
-                    is_buy=False,
-                )
-            )
-        )
-
-    if tasks:
-        place_order_results = await asyncio.gather(*tasks)
-        strike_exitprice_dict = {}
-        for strike, order_id in place_order_results:
-            order_history = await pya3_obj.get_order_history(order_id)
-            for _ in range(20):
-                if order_history["Status"] == Status.COMPLETE:
-                    strike_exitprice_dict[strike] = order_history["Avgprc"]
-                    break
-                await asyncio.sleep(0.2)
-            else:
-                log.error(f"Unable to close strike: {strike}, order_history: {order_history}")
-
-        return strike_exitprice_dict

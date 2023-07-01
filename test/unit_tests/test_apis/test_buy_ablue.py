@@ -9,7 +9,7 @@ from app.database.models import TradeModel
 from app.database.models import User
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
-from app.services.broker.pya3_alice_blue import Pya3Aliceblue
+from app.services.broker.alice_blue import Pya3Aliceblue
 from app.utils.constants import OptionType
 from app.utils.constants import Status
 from test.factory.broker import BrokerFactory

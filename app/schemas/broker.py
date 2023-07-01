@@ -23,3 +23,4 @@ class BrokerSchema(BaseModel):
     )
     app_id: str = Field(description="App Id", example="4EhBOEKf6ry5UXO")
     totp: str = Field(description="one time otp", example="OQJXYQYHSUVWXGAHUCENZPEGIFXUZFXA")
+    twoFA: int = Field(description="birth year for alice blue", example=1994)

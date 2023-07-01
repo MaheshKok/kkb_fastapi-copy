@@ -8,9 +8,6 @@ from sqlalchemy import bindparam
 from sqlalchemy import select
 from sqlalchemy import update
 
-from app.core.config import get_config
-from app.database.base import engine_kw
-from app.database.base import get_db_url
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
@@ -38,13 +35,7 @@ def get_profit(entry_price, exit_price, quantity, position):
     else:
         profit = (entry_price - exit_price) * quantity - 60
 
-    return profit
-
-
-def init_db(config_file):
-    config = get_config(config_file)
-    async_db_url = get_db_url(config)
-    db.init(async_db_url, engine_kw=engine_kw)
+    return round(profit, 2)
 
 
 async def task_entry_trade(

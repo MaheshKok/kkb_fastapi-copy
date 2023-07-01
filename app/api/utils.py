@@ -1,5 +1,13 @@
+import logging
 from datetime import datetime
 
+from aioredis import Redis
+from fastapi_sa.database import db
+from sqlalchemy import select
+
+from app.database.models import BrokerModel
+from app.schemas.broker import BrokerSchema
+from app.services.broker.alice_blue import Pya3Aliceblue
 from app.utils.constants import EDELWEISS_DATE_FORMAT
 from app.utils.in_memory_cache import current_and_next_expiry_cache
 
@@ -36,3 +44,22 @@ async def get_current_and_next_expiry(async_redis_client, todays_date):
     )
 
     return current_expiry_date, next_expiry_date, is_today_expiry
+
+
+async def refresh_and_get_session_id(pya3_obj: Pya3Aliceblue, async_redis_client: Redis):
+    session_id = await pya3_obj.login_and_get_session_id()
+    async with db():
+        # get broker model from db filtered by username
+        fetch_broker_query = await db.session.execute(
+            select(BrokerModel).where(BrokerModel.username == pya3_obj.user_id)
+        )
+        broker_model = fetch_broker_query.scalars().one_or_none()
+        broker_model.session_id = session_id
+        await db.session.flush()
+
+        # update redis cache with new session_id
+        redis_set_result = await async_redis_client.set(
+            str(broker_model.id), BrokerSchema.from_orm(broker_model).json()
+        )
+        logging.info(f"Redis set result: {redis_set_result}")
+        logging.info(f"session updated for user: {pya3_obj.user_id} in db and redis")
