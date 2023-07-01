@@ -171,7 +171,7 @@ async def get_strike_and_entry_price(
             )
             return strike, entry_price
         except BaseException as e:
-            logging.error(f"error while buying trade {e}")
+            logging.error(f"error while buying trade {e.detail}")
             traceback.print_exc()
             raise HTTPException(status_code=e.status_code, detail=e.detail)
 

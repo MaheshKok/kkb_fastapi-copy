@@ -11,6 +11,7 @@ import pyotp
 from cryptography.hazmat.primitives.ciphers import Cipher
 from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.ciphers import modes
+from fastapi import HTTPException
 from pya3 import Aliceblue
 from pya3 import Instrument
 from pya3 import OrderType
@@ -76,12 +77,41 @@ class CryptoJsAES:
 
 
 class Pya3Aliceblue(Aliceblue):
-    Aliceblue._sub_urls["webLogin"] = "customer/webLogin"
-    Aliceblue._sub_urls["twoFA"] = "sso/validAnswer"
-    Aliceblue._sub_urls["verifyTotp"] = "sso/verifyTotp"
-    Aliceblue._sub_urls["getApiKey"] = "api/getApiKey"
-    Aliceblue._sub_urls["apiGetEncKey"] = "api/customer/getAPIEncpkey"
-    Aliceblue._sub_urls["sessionID"] = "api/customer/getUserSID"
+    host = "https://ant.aliceblueonline.com/rest/AliceBlueAPIService"
+
+    _sub_urls = {
+        "webLogin": f"{host}/customer/webLogin",
+        "twoFA": f"{host}/sso/2fa",
+        "sessionID": f"{host}/api/customer/getUserSID",
+        "getEncKey": f"{host}/customer/getEncryptionKey",
+        "verifyTotp": f"{host}/sso/verifyTotp",
+        "getApiKey": f"{host}/api/getApiKey",
+        "authorizeVendor": f"{host}/sso/authorizeVendor",
+        "apiGetEncKey": f"{host}/api/customer/getAPIEncpkey",
+        "profile": f"{host}/api/customer/accountDetails",
+        "placeOrder": f"{host}/api/placeOrder/executePlaceOrder",
+        "logout": f"{host}/api/customer/logout",
+        "logoutFromAllDevices": f"{host}/api/customer/logOutFromAllDevice",
+        "fetchMWList": f"{host}/api/marketWatch/fetchMWList",
+        "fetchMWScrips": f"{host}/api/marketWatch/fetchMWScrips",
+        "addScripToMW": f"{host}/api/marketWatch/addScripToMW",
+        "deleteMWScrip": f"{host}/api/marketWatch/deleteMWScrip",
+        "scripDetails": f"{host}/api/ScripDetails/getScripQuoteDetails",
+        "positions": f"{host}/api/positionAndHoldings/positionBook",
+        "holdings": f"{host}/api/positionAndHoldings/holdings",
+        "sqrOfPosition": f"{host}/api/positionAndHoldings/sqrOofPosition",
+        "fetchOrder": f"{host}/api/placeOrder/fetchOrderBook",
+        "fetchTrade": f"{host}/api/placeOrder/fetchTradeBook",
+        "exitBracketOrder": f"{host}/api/placeOrder/exitBracketOrder",
+        "modifyOrder": f"{host}/api/placeOrder/modifyOrder",
+        "cancelOrder": f"{host}/api/placeOrder/cancelOrder",
+        "orderHistory": f"{host}/api/placeOrder/orderHistory",
+        "getRmsLimits": f"{host}/api/limits/getRmsLimits",
+        "createWsSession": f"{host}/api/ws/createSocketSess",
+        "history": f"{host}/api/chart/history",
+        "master_contract": "https://v2api.aliceblueonline.com/restpy/contract_master?exch={exchange}",
+        "ws": "wss://ws1.aliceblueonline.com/NorenWS/",
+    }
 
     def __init__(
         self,
@@ -108,17 +138,25 @@ class Pya3Aliceblue(Aliceblue):
         header = {"Content-Type": "application/json"}
         # Get Encryption Key
         data = {"userId": self.user_id}
-        r = await self._post("encryption_key", data=data)
+        r = await self._post("getEncKey", data=data)
 
         if r.get("stat") == "Not_Ok":
             logging.info(f"Error while retrieving Encryption Key: {r}")
+            raise HTTPException(
+                status_code=400, detail=f"Error while retrieving Encryption Key: {r}"
+            )
         encKey = r["encKey"]
 
+        if not encKey:
+            logging.info(f"Error while retrieving Encryption Key: {r}")
+            raise HTTPException(
+                status_code=400, detail=f"Error while retrieving Encryption Key: {r['emsg']}"
+            )
         # Web Login
         checksum = CryptoJsAES.encrypt(self.password.encode(), encKey.encode())
         checksum = checksum.decode("utf-8")
         data = {"userId": self.user_id, "userData": checksum}
-        r = await self.async_httpx_client.post(self.base + self._sub_urls["webLogin"], data=data)
+        r = await self._post("webLogin", data=data)
         logging.info(f"Web Login response {r}")
 
         # Web Login 2FA
@@ -138,25 +176,23 @@ class Pya3Aliceblue(Aliceblue):
         data = {"userId": self.user_id, "tOtp": totp}
         header["Authorization"] = f"Bearer {self.user_id} {auth_us}"
         r = await self.async_httpx_client.post(
-            self.base + self._sub_urls["verifyTotp"], data=data, headers=header
+            self._sub_urls["verifyTotp"], data=json.dumps(data), headers=header
         )
         logging.info(f"Totp Login response {r}")
 
         # Web Login Api Key
-        userSessionID = r["userSessionID"]
+        userSessionID = r.json()["userSessionID"]
         header["Authorization"] = f"Bearer {self.user_id} {userSessionID}"
-        r = await self.async_httpx_client.post(
-            self.base + self._sub_urls["getApiKey"], headers=header
-        )
+        r = await self.async_httpx_client.post(self._sub_urls["getApiKey"], headers=header)
         logging.info(f"Api Key response {r.text}")
         api_key = r.json()["api_key"]
 
         # Get API Encryption Key
         data = {"userId": self.user_id}
         r = await self.async_httpx_client.post(
-            self.base + self._sub_urls["apiGetEncKey"],
+            self._sub_urls["apiGetEncKey"],
             headers=header,
-            data=data,
+            data=json.dumps(data),
         )
         logging.info(f"Get API Encryption Key response {r.text}")
         encKey = r.json()["encKey"]
@@ -165,9 +201,9 @@ class Pya3Aliceblue(Aliceblue):
         checksum = hashlib.sha256(f"{self.user_id}{api_key}{encKey}".encode()).hexdigest()
         data = {"userId": self.user_id, "userData": checksum}
         r = await self.async_httpx_client.post(
-            self.base + self._sub_urls["sessionID"],
+            self._sub_urls["sessionID"],
             headers=header,
-            data=data,
+            data=json.dumps(data),
         )
         logging.info(f"Session ID response {r.text}")
         session_id = r.json()["sessionID"]
@@ -177,12 +213,12 @@ class Pya3Aliceblue(Aliceblue):
 
     async def _get(self, sub_url, data=None):
         """Get method declaration"""
-        url = self.base + self._sub_urls[sub_url]
+        url = self._sub_urls[sub_url]
         return await self._request(url, "GET", data=data)
 
     async def _post(self, sub_url, data=None):
         """Post method declaration"""
-        url = self.base + self._sub_urls[sub_url]
+        url = self._sub_urls[sub_url]
         return await self._request(url, "POST", data=data)
 
     async def _dummypost(self, url, data=None):
@@ -303,7 +339,7 @@ class Pya3Aliceblue(Aliceblue):
             }
         ]
         # print(data)
-        placeorderresp = await self._post("placeorder", data)
+        placeorderresp = await self._post("placeOrder", data)
         if len(placeorderresp) == 1:
             return placeorderresp[0]
         else:
@@ -312,13 +348,13 @@ class Pya3Aliceblue(Aliceblue):
     """Method to get Funds Data"""
 
     async def get_balance(self):
-        fundsresp = await self._get("fundsrecord")
+        fundsresp = await self._get("getRmsLimits")
         return fundsresp
 
     async def get_order_history(self, nextorder):
-        orderresp = await self._get("orderbook")
+        orderresp = await self._get("fetchOrder")
         if nextorder == "":
-            # orderresp = self._get("orderbook")
+            # orderresp = self._get("fetchOrder")
             return orderresp
         else:
             # data = {'nestOrderNumber': nextorder}
@@ -332,13 +368,13 @@ class Pya3Aliceblue(Aliceblue):
 
     async def get_session_id(self, data=None):
         data = {"userId": self.user_id.upper()}
-        response = await self._post("encryption_key", data)
+        response = await self._post("getEncKey", data)
         if response["encKey"] is None:
             return response
         else:
             data = encrypt_string(self.user_id.upper() + self.api_key + response["encKey"])
         data = {"userId": self.user_id.upper(), "userData": data}
-        res = await self._post("getsessiondata", data)
+        res = await self._post("sessionID", data)
 
         if res["stat"] == "Ok":
             self.session_id = res["sessionID"]
@@ -347,13 +383,13 @@ class Pya3Aliceblue(Aliceblue):
     """GET Market watchlist"""
 
     async def getmarketwatch_list(self):
-        marketwatchrespdata = await self._get("getmarketwatch_list")
+        marketwatchrespdata = await self._get("fetchMWList")
         return marketwatchrespdata
 
     """GET Tradebook Records"""
 
     async def get_trade_book(self):
-        tradebookresp = await self._get("tradebook")
+        tradebookresp = await self._get("fetchTradeBook")
         return tradebookresp
 
     async def get_profile(self):
@@ -363,20 +399,20 @@ class Pya3Aliceblue(Aliceblue):
     """GET Holdings Records"""
 
     async def get_holding_positions(self):
-        holdingresp = await self._get("holding")
+        holdingresp = await self._get("holdings")
         return holdingresp
 
     """GET Orderbook Records"""
 
     async def order_data(self):
-        orderresp = await self._get("orderbook")
+        orderresp = await self._get("fetchOrder")
         return orderresp
 
     """Method to call Cancel Orders"""
 
     async def cancel_order(self, nestordernmbr):
         data = {"nestOrderNumber": nestordernmbr}
-        cancelresp = await self._post("cancelorder", data)
+        cancelresp = await self._post("cancelOrder", data)
         return cancelresp
 
     """Method to call Squareoff Positions"""
@@ -389,7 +425,7 @@ class Pya3Aliceblue(Aliceblue):
             "tockenNo": tokenno,
             "symbol": symbol,
         }
-        squareoffresp = await self._post("squareoffposition", data)
+        squareoffresp = await self._post("sqrOofPosition", data)
         return squareoffresp
 
     """Method to call Modify Order"""
@@ -439,7 +475,7 @@ class Pya3Aliceblue(Aliceblue):
             "pCode": product_type.value,
         }
         # print(data)
-        modifyorderresp = await self._post("modifyorder", data)
+        modifyorderresp = await self._post("modifyOrder", data)
         return modifyorderresp
 
     """Method to call Exitbook  Order"""
@@ -455,7 +491,7 @@ class Pya3Aliceblue(Aliceblue):
             "symbolOrderId": symbolOrderId,
             "status": status,
         }
-        exitboorderresp = await self._post("exitboorder", data)
+        exitboorderresp = await self._post("exitBracketOrder", data)
         return exitboorderresp
 
     """Method to get Position Book"""
@@ -467,19 +503,19 @@ class Pya3Aliceblue(Aliceblue):
         data = {
             "ret": ret,
         }
-        positionbookresp = await self._post("positiondata", data)
+        positionbookresp = await self._post("positions", data)
         return positionbookresp
 
     async def get_daywise_positions(self):
         data = {"ret": "DAY"}
-        positionbookresp = await self._post("positiondata", data)
+        positionbookresp = await self._post("positions", data)
         return positionbookresp
 
     async def get_netwise_positions(
         self,
     ):
         data = {"ret": "NET"}
-        positionbookresp = await self._post("positiondata", data)
+        positionbookresp = await self._post("positions", data)
         return positionbookresp
 
     async def place_basket_order(self, orders):
@@ -535,7 +571,7 @@ class Pya3Aliceblue(Aliceblue):
             }
             data.append(request_data)
         # print(data)
-        placeorderresp = await self._post("placeorder", data)
+        placeorderresp = await self._post("placeOrder", data)
         return placeorderresp
 
     @staticmethod

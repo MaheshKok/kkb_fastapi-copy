@@ -48,13 +48,14 @@ async def get_current_and_next_expiry(async_redis_client, todays_date):
 
 async def refresh_and_get_session_id(pya3_obj: Pya3Aliceblue, async_redis_client: Redis):
     session_id = await pya3_obj.login_and_get_session_id()
+
     async with db():
         # get broker model from db filtered by username
         fetch_broker_query = await db.session.execute(
             select(BrokerModel).where(BrokerModel.username == pya3_obj.user_id)
         )
         broker_model = fetch_broker_query.scalars().one_or_none()
-        broker_model.session_id = session_id
+        broker_model.access_token = session_id
         await db.session.flush()
 
         # update redis cache with new session_id
@@ -63,3 +64,4 @@ async def refresh_and_get_session_id(pya3_obj: Pya3Aliceblue, async_redis_client
         )
         logging.info(f"Redis set result: {redis_set_result}")
         logging.info(f"session updated for user: {pya3_obj.user_id} in db and redis")
+        return session_id

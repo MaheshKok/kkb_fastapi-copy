@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 
 import uvicorn
 
@@ -7,14 +8,21 @@ from app.create_app import get_app
 from app.utils.constants import ConfigFile
 
 
-app = get_app(ConfigFile.PRODUCTION)
-
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    logging.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+
+sys.excepthook = handle_exception
+
+
+app = get_app(ConfigFile.PRODUCTION)
 
 if __name__ == "__main__":
     try:
