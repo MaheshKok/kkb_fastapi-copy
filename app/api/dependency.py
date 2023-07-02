@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
 from httpx import AsyncClient
+from httpx import Limits
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,5 +54,9 @@ async def get_strategy_schema(
 
 
 async def get_async_httpx_client() -> AsyncClient:
-    async with AsyncClient() as client:
+    limits = Limits(max_connections=10, max_keepalive_connections=5)
+    client = AsyncClient(http2=True, limits=limits)
+    try:
         yield client
+    finally:
+        await client.aclose()

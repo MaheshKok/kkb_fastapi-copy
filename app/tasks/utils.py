@@ -1,3 +1,4 @@
+import json
 import logging
 import traceback
 from datetime import datetime
@@ -170,9 +171,13 @@ async def get_strike_and_entry_price(
                 async_httpx_client=async_httpx_client,
             )
             return strike, entry_price
-        except BaseException as e:
-            logging.error(f"error while buying trade {e.detail}")
+        except HTTPException as e:
+            logging.error(f"error while buying trade {e}")
             traceback.print_exc()
             raise HTTPException(status_code=e.status_code, detail=e.detail)
+        except BaseException as e:
+            logging.error(f"error while buying trade {e}")
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=json.dumps(e))
 
     return strike, premium

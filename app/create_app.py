@@ -1,11 +1,13 @@
 import asyncio
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
+from starlette.types import Send
 
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.strategy import strategy_router
@@ -25,23 +27,12 @@ def register_routers(app: FastAPI):
     app.include_router(strategy_router)
 
 
-def get_num_connections():
-    return Database.engine.pool.status()
-
-
-class ConnectionLoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
-        # Get the number of connections before the request
-        num_connections_before = get_num_connections()  # replace with actual method
-
+class TimingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next: Send) -> Response:
+        start_time = time.time()
         response = await call_next(request)
-
-        # Get the number of connections after the request
-        num_connections_after = get_num_connections()  # replace with actual method
-
-        logging.info(f"Connections before request: {num_connections_before}")
-        logging.info(f"Connections after request: {num_connections_after}")
-
+        process_time = time.time() - start_time
+        logging.info(f"Request processing time: {process_time} seconds")
         return response
 
 
@@ -55,6 +46,7 @@ def get_app(config_file) -> FastAPI:
     # app.add_middleware(DBSessionMiddleware)
     # Include routers
     register_routers(app)
+    app.add_middleware(TimingMiddleware)
 
     # TODO: register scout and new relic
 
