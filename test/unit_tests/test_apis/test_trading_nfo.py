@@ -1,9 +1,9 @@
 import pytest
-from fastapi_sa.database import db
 from sqlalchemy import select
 
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
+from app.database.sqlalchemy_client.client import Database
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.utils.constants import OptionType
@@ -22,8 +22,8 @@ async def test_trading_nfo_options_with_no_existing_trades(
 ):
     await create_pre_db_data(users=1, strategies=1)
 
-    async with db():
-        strategy_model = await db.session.scalar(select(StrategyModel))
+    async with Database():
+        strategy_model = await Database.session.scalar(select(StrategyModel))
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
 
@@ -41,8 +41,8 @@ async def test_trading_nfo_options_with_no_existing_trades(
         assert response.json() == "successfully added trade to db"
 
         # assert trade in db
-        trade_model = await db.session.scalar(select(TradeModel))
-        await db.session.refresh(strategy_model)
+        trade_model = await Database.session.scalar(select(TradeModel))
+        await Database.session.refresh(strategy_model)
         assert trade_model.strategy_id == strategy_model.id
 
         # assert trade in redis
@@ -64,8 +64,8 @@ async def test_trading_nfo_options_with_existing_trade_of_same_type(
         users=1, strategies=1, trades=10, ce_trade=option_type == OptionType.CE
     )
 
-    async with db():
-        strategy_model = await db.session.scalar(select(StrategyModel))
+    async with Database():
+        strategy_model = await Database.session.scalar(select(StrategyModel))
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
 
@@ -78,7 +78,7 @@ async def test_trading_nfo_options_with_existing_trade_of_same_type(
         )
 
         # set trades in redis
-        fetch_trade_models_query = await db.session.execute(
+        fetch_trade_models_query = await Database.session.execute(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         trade_models = fetch_trade_models_query.scalars().all()
@@ -94,8 +94,8 @@ async def test_trading_nfo_options_with_existing_trade_of_same_type(
         assert response.json() == "successfully added trade to db"
 
         # assert trade in db
-        await db.session.refresh(strategy_model)
-        fetch_trade_models_query = await db.session.execute(
+        await Database.session.refresh(strategy_model)
+        fetch_trade_models_query = await Database.session.execute(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         trade_models = fetch_trade_models_query.scalars().all()
@@ -124,8 +124,8 @@ async def test_trading_nfo_options_with_existing_trade_of_opposite_type(
         users=1, strategies=1, trades=10, ce_trade=option_type != OptionType.CE
     )
 
-    async with db():
-        strategy_model = await db.session.scalar(select(StrategyModel))
+    async with Database():
+        strategy_model = await Database.session.scalar(select(StrategyModel))
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
 
@@ -138,7 +138,7 @@ async def test_trading_nfo_options_with_existing_trade_of_opposite_type(
         )
 
         # set trades in redis
-        fetch_trade_models_query = await db.session.execute(
+        fetch_trade_models_query = await Database.session.execute(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         exited_trade_models = fetch_trade_models_query.scalars().all()
@@ -154,8 +154,8 @@ async def test_trading_nfo_options_with_existing_trade_of_opposite_type(
         assert response.json() == "successfully added trade to db"
 
         # fetch closed trades in db
-        await db.session.refresh(strategy_model)
-        fetch_trade_models_query = await db.session.execute(
+        await Database.session.refresh(strategy_model)
+        fetch_trade_models_query = await Database.session.execute(
             select(TradeModel).filter_by(
                 strategy_id=strategy_model.id,
                 option_type=OptionType.CE if option_type == OptionType.PE else OptionType.PE,

@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi import Request
-from fastapi_sa.database import db
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.base import RequestResponseEndpoint
 
@@ -15,6 +14,7 @@ from app.core.config import get_config
 from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
+from app.database.sqlalchemy_client.client import Database
 from app.extensions.redis_cache.on_start import cache_ongoing_trades
 
 
@@ -26,7 +26,7 @@ def register_routers(app: FastAPI):
 
 
 def get_num_connections():
-    return db.engine.pool.status()
+    return Database.engine.pool.status()
 
 
 class ConnectionLoggingMiddleware(BaseHTTPMiddleware):
@@ -67,7 +67,7 @@ async def lifespan(app):
     logging.info("Application startup")
     async_db_url = get_db_url(app.state.config)
 
-    db.init(async_db_url, engine_kw=engine_kw)
+    Database.init(async_db_url, engine_kw=engine_kw)
     logging.info("Initialized database")
     async_redis_client = get_redis_client(app.state.config)
     logging.info("Initialized redis")
@@ -81,6 +81,6 @@ async def lifespan(app):
     finally:
         logging.info("Application shutdown")
         # Close the connection when the application shuts down
-        await db.close()
+        await Database.close()
         await app.state.async_redis_client.close()
         await app.state.async_session_maker.kw["bind"].dispose()

@@ -1,10 +1,10 @@
 import json
 import logging
 
-from fastapi_sa.database import db
 from sqlalchemy import select
 
 from app.database.models import TradeModel
+from app.database.sqlalchemy_client.client import Database
 from app.schemas.trade import RedisTradeSchema
 from app.utils.constants import OptionType
 
@@ -27,13 +27,15 @@ async def cache_ongoing_trades(async_redis_client):
 
     """
 
-    async with db():
+    async with Database():
         # TODO: query the database for Trade table and filter by exited_at=None
         # if its possible to get the result in the same manner i.e
         # key should be combination of three columns strategy_id, expiry and option_type
         # then we can avoid the for loop and the redis_key_trade_models_dict
 
-        live_trades_query = await db.session.execute(select(TradeModel).filter_by(exit_at=None))
+        live_trades_query = await Database.session.execute(
+            select(TradeModel).filter_by(exit_at=None)
+        )
         ongoing_trades_model = live_trades_query.scalars().all()
         redis_key_trade_models_dict = {}
         for ongoing_trade_model in ongoing_trades_model:

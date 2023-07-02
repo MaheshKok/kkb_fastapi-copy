@@ -1,8 +1,8 @@
 import pytest
-from fastapi_sa.database import db
 from sqlalchemy import select
 
 from app.database.models import StrategyModel
+from app.database.sqlalchemy_client.client import Database
 from test.factory.strategy import StrategyFactory
 from test.factory.user import UserFactory
 
@@ -13,8 +13,8 @@ async def test_strategy_factory():
     for _ in range(10):
         await StrategyFactory(user=user)
 
-    async with db():
-        result = await db.session.scalars(select(StrategyModel))
+    async with Database():
+        result = await Database.session.scalars(select(StrategyModel))
         assert len(result.all()) == 10
 
 
@@ -23,6 +23,6 @@ async def test_strategy_factory_with_invalid_position():
     user = await UserFactory()
     await StrategyFactory(user=user, position="INVALID")
 
-    async with db():
-        result = await db.session.scalars(select(StrategyModel))
+    async with Database():
+        result = await Database.session.scalars(select(StrategyModel))
         assert len(result.all()) == 1

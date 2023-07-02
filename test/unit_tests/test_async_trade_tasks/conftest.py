@@ -1,11 +1,11 @@
 from datetime import datetime
 
-from fastapi_sa.database import db
 from sqlalchemy import select
 
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
+from app.database.sqlalchemy_client.client import Database
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from test.unit_tests.test_data import get_test_post_trade_payload
@@ -22,12 +22,12 @@ async def sell_task_args(test_async_redis_client, take_away_profit=False, ce_tra
     )
     post_trade_payload = get_test_post_trade_payload()
 
-    async with db():
+    async with Database():
         # query database for stragey
-        fetch_strategy_query_ = await db.session.execute(select(StrategyModel))
+        fetch_strategy_query_ = await Database.session.execute(select(StrategyModel))
         strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
-        fetch_trade_query_ = await db.session.execute(select(TradeModel))
+        fetch_trade_query_ = await Database.session.execute(select(TradeModel))
         trade_models = fetch_trade_query_.scalars().all()
 
         (
