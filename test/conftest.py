@@ -9,7 +9,6 @@ import httpx
 import pandas as pd
 import pytest as pytest
 import pytest_asyncio
-from fastapi_sa.database import db
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -23,6 +22,7 @@ from app.database import Base
 from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.models import StrategyModel
+from app.database.sqlalchemy_client.client import Database
 from app.tasks.utils import get_monthly_expiry_date
 from app.utils.constants import ConfigFile
 from test.unit_tests.test_data import get_test_post_trade_payload
@@ -225,22 +225,25 @@ async def db_cleanup(test_async_engine):
 @pytest.fixture()
 def db_session_ctx(test_config):
     async_db_url = get_db_url(test_config)
-    db.init(async_db_url, engine_kw=engine_kw)
+    Database.init(async_db_url, engine_kw=engine_kw)
 
     """db session context"""
-    token = db.set_session_ctx()
+    token = Database.set_session_ctx()
     logging.info("db session context created")
     yield
-    db.reset_session_ctx(token)
+    Database.reset_session_ctx(token)
     logging.info("db session context closed")
 
 
 @pytest.fixture(autouse=True)
-async def test_async_session(db_session_ctx):
+async def test_async_session(test_config):
+    async_db_url = get_db_url(test_config)
+    Database.init(async_db_url, engine_kw=engine_kw)
+
     """session fixture"""
-    async with db.session.begin():
+    async with Database() as session:
         logging.info("test db session created")
-        yield db.session
+        yield session
         logging.info("test db session closed")
 
 
@@ -282,8 +285,8 @@ async def buy_task_payload_dict(test_async_redis_client):
     await create_pre_db_data(users=1, strategies=1, trades=10)
     # query database for stragey
 
-    async with db():
-        fetch_strategy_query_ = await db.session.execute(select(StrategyModel))
+    async with Database():
+        fetch_strategy_query_ = await Database.session.execute(select(StrategyModel))
         strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
         (

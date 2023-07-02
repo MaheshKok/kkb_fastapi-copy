@@ -1,12 +1,12 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from fastapi_sa.database import db
 from sqlalchemy import select
 
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.models import User
+from app.database.sqlalchemy_client.client import Database
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.services.broker.alice_blue import Pya3Aliceblue
@@ -29,12 +29,12 @@ async def test_exit_alice_blue_trade(
         users=1, strategies=1, trades=10, ce_trade=option_type != OptionType.CE
     )
 
-    async with db():
-        user_model = await db.session.scalar(select(User))
+    async with Database():
+        user_model = await Database.session.scalar(select(User))
         broker_model = await BrokerFactory(user_id=user_model.id)
-        strategy_model = await db.session.scalar(select(StrategyModel))
+        strategy_model = await Database.session.scalar(select(StrategyModel))
         strategy_model.broker_id = broker_model.id
-        await db.session.flush()
+        await Database.session.flush()
 
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
@@ -48,7 +48,7 @@ async def test_exit_alice_blue_trade(
         )
 
         # set trades in redis
-        fetch_trade_models_query = await db.session.execute(
+        fetch_trade_models_query = await Database.session.execute(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         trade_models = fetch_trade_models_query.scalars().all()
@@ -58,7 +58,7 @@ async def test_exit_alice_blue_trade(
                 RedisTradeSchema.from_orm(trade_model).json(),
             )
 
-        await db.session.commit()
+        await Database.session.commit()
 
     # Mock the place_order method
     async def mock_place_order(*args, **kwargs):
@@ -78,10 +78,10 @@ async def test_exit_alice_blue_trade(
     assert response.status_code == 200
     assert response.json() == "successfully added trade to db"
 
-    async with db():
+    async with Database():
         # fetch closed trades in db
-        strategy_model = await db.session.scalar(select(StrategyModel))
-        fetch_trade_models_query = await db.session.execute(
+        strategy_model = await Database.session.scalar(select(StrategyModel))
+        fetch_trade_models_query = await Database.session.execute(
             select(TradeModel).filter_by(
                 strategy_id=strategy_model.id,
                 option_type=OptionType.CE if option_type == OptionType.PE else OptionType.PE,
@@ -123,12 +123,12 @@ async def test_exit_alice_blue_trade_raise_401(
         users=1, strategies=1, trades=10, ce_trade=option_type != OptionType.CE
     )
 
-    async with db():
-        user_model = await db.session.scalar(select(User))
+    async with Database():
+        user_model = await Database.session.scalar(select(User))
         broker_model = await BrokerFactory(user_id=user_model.id)
-        strategy_model = await db.session.scalar(select(StrategyModel))
+        strategy_model = await Database.session.scalar(select(StrategyModel))
         strategy_model.broker_id = broker_model.id
-        await db.session.flush()
+        await Database.session.flush()
 
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
@@ -142,7 +142,7 @@ async def test_exit_alice_blue_trade_raise_401(
         )
 
         # set trades in redis
-        fetch_trade_models_query = await db.session.execute(
+        fetch_trade_models_query = await Database.session.execute(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         trade_models = fetch_trade_models_query.scalars().all()
@@ -152,7 +152,7 @@ async def test_exit_alice_blue_trade_raise_401(
                 RedisTradeSchema.from_orm(trade_model).json(),
             )
 
-        await db.session.commit()
+        await Database.session.commit()
 
     # Mock the place_order method
     async def mock_place_order(*args, **kwargs):
@@ -166,10 +166,10 @@ async def test_exit_alice_blue_trade_raise_401(
     assert response.status_code == 403
     assert response.json() == {"detail": "401 - Unauthorized"}
 
-    async with db():
+    async with Database():
         # assert trade in db
-        strategy_model = await db.session.scalar(select(StrategyModel))
-        fetch_trade_models_query = await db.session.execute(
+        strategy_model = await Database.session.scalar(select(StrategyModel))
+        fetch_trade_models_query = await Database.session.execute(
             select(TradeModel).filter(
                 TradeModel.strategy_id == strategy_model.id, TradeModel.exit_at is None
             )

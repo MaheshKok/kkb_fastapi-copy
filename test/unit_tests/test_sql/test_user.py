@@ -1,9 +1,9 @@
 import pytest
-from fastapi_sa.database import db
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.database.models import User
+from app.database.sqlalchemy_client.client import Database
 from test.factory.user import UserFactory
 
 
@@ -12,8 +12,8 @@ async def test_user_factory():
     for _ in range(10):
         await UserFactory()
 
-    async with db():
-        result = await db.session.scalars(select(User))
+    async with Database():
+        result = await Database.session.scalars(select(User))
         assert len(result.all()) == 10
 
 

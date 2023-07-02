@@ -3,12 +3,12 @@ from fastapi import Depends
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
-from fastapi_sa.database import db
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import StrategyModel
+from app.database.sqlalchemy_client.client import Database
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import SignalPayloadSchema
 
@@ -32,8 +32,8 @@ async def get_strategy_schema(
 ) -> StrategySchema:
     redis_strategy_json = await async_redis_client.get(str(signal_payload_schema.strategy_id))
     if not redis_strategy_json:
-        async with db():
-            fetch_strategy_query = await db.session.execute(
+        async with Database():
+            fetch_strategy_query = await Database.session.execute(
                 select(StrategyModel).where(StrategyModel.id == signal_payload_schema.strategy_id)
             )
             strategy_model = fetch_strategy_query.scalar()

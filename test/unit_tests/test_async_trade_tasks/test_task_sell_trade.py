@@ -1,11 +1,11 @@
 import httpx
 import pytest
-from fastapi_sa.database import db
 from sqlalchemy import select
 
 from app.database.models import StrategyModel
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
+from app.database.sqlalchemy_client.client import Database
 from app.schemas.strategy import StrategySchema
 from app.tasks.tasks import task_exit_trade
 from test.unit_tests.test_async_trade_tasks.conftest import sell_task_args
@@ -38,16 +38,16 @@ async def test_sell_trade_without_take_away_profit(
         test_async_redis_client, take_away_profit=take_away_profit, ce_trade=ce_trade
     )
 
-    async with db():
+    async with Database():
         # assert we dont have takeawayprofit model before closing trades
-        fetch_take_away_profit_query_ = await db.session.execute(
+        fetch_take_away_profit_query_ = await Database.session.execute(
             select(TakeAwayProfit).filter_by(strategy_id=strategy_model_id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
         assert take_away_profit_model is None
 
         assert await test_async_redis_client.exists(redis_ongoing_key)
-        strategy_model = await db.session.get(StrategyModel, strategy_model_id)
+        strategy_model = await Database.session.get(StrategyModel, strategy_model_id)
         strategy_schema = StrategySchema.from_orm(strategy_model)
 
         await task_exit_trade(
@@ -59,22 +59,22 @@ async def test_sell_trade_without_take_away_profit(
             async_httpx_client=httpx.AsyncClient(),
         )
 
-        fetch_trades_query_ = await db.session.execute(select(TradeModel))
+        fetch_trades_query_ = await Database.session.execute(select(TradeModel))
         trades = fetch_trades_query_.scalars().all()
 
         # Refresh each trade individually
         for trade in trades:
-            await db.session.refresh(trade)
+            await Database.session.refresh(trade)
 
         assert len(trades) == 10
 
         profit_to_be_added = sum(trade.profit for trade in trades)
 
-        fetch_take_away_profit_query_ = await db.session.execute(
+        fetch_take_away_profit_query_ = await Database.session.execute(
             select(TakeAwayProfit).filter_by(strategy_id=strategy_model_id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
-        await db.session.refresh(take_away_profit_model)
+        await Database.session.refresh(take_away_profit_model)
         assert take_away_profit_model.profit == profit_to_be_added
 
         # key has been removed from redis
@@ -103,9 +103,9 @@ async def test_sell_trade_updating_takeaway_profit(
         redis_trade_schema_list,
     ) = await sell_task_args(test_async_redis_client, take_away_profit=True, ce_trade=False)
 
-    async with db():
+    async with Database():
         # assert we dont have takeawayprofit model before closing trades
-        fetch_take_away_profit_query_ = await db.session.execute(
+        fetch_take_away_profit_query_ = await Database.session.execute(
             select(TakeAwayProfit).filter_by(strategy_id=strategy_model_id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
@@ -114,7 +114,7 @@ async def test_sell_trade_updating_takeaway_profit(
 
         assert await test_async_redis_client.exists(redis_ongoing_key)
 
-        strategy_model = await db.session.get(StrategyModel, strategy_model_id)
+        strategy_model = await Database.session.get(StrategyModel, strategy_model_id)
         strategy_schema = StrategySchema.from_orm(strategy_model)
 
         await task_exit_trade(
@@ -126,22 +126,22 @@ async def test_sell_trade_updating_takeaway_profit(
             async_httpx_client=httpx.AsyncClient(),
         )
 
-        fetch_trades_query_ = await db.session.execute(select(TradeModel))
+        fetch_trades_query_ = await Database.session.execute(select(TradeModel))
         trades = fetch_trades_query_.scalars().all()
 
         # Refresh each trade individually
         for trade in trades:
-            await db.session.refresh(trade)
+            await Database.session.refresh(trade)
 
         assert len(trades) == 10
 
         profit_to_be_added = sum(trade.profit for trade in trades)
 
-        fetch_take_away_profit_query_ = await db.session.execute(
+        fetch_take_away_profit_query_ = await Database.session.execute(
             select(TakeAwayProfit).filter_by(strategy_id=strategy_model_id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
-        await db.session.refresh(take_away_profit_model)
+        await Database.session.refresh(take_away_profit_model)
         assert take_away_profit_model.profit == earlier_take_away_profit + profit_to_be_added
 
         # key has been removed from redis
