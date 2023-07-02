@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import StrategyModel
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import SignalPayloadSchema
 

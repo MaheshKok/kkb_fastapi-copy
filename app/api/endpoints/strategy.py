@@ -6,7 +6,7 @@ from fastapi import Depends
 
 from app.api.dependency import get_async_redis_client
 from app.database.models import StrategyModel
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategyCreateSchema
 from app.schemas.strategy import StrategySchema
 

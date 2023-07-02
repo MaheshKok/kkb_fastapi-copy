@@ -3,13 +3,14 @@ from typing import Dict
 from typing import Optional
 from typing import Union
 
-from fastapi_async_sqlalchemy.exceptions import MissingSessionError
-from fastapi_async_sqlalchemy.exceptions import SessionNotInitialisedError
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine
+
+from app.database.session_manager.exceptions import MissingSessionError
+from app.database.session_manager.exceptions import SessionNotInitialisedError
 
 
 _Session: Optional[async_sessionmaker] = None

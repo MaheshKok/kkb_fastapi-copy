@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.database.models import User
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from test.factory.user import UserFactory
 
 

@@ -12,7 +12,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.types import ASGIApp
 
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 
 
 # havent tested yet

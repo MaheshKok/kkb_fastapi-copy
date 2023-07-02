@@ -5,7 +5,7 @@ from sqlalchemy import select
 from app.database.models import StrategyModel
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.tasks.tasks import task_exit_trade
 from test.unit_tests.test_async_trade_tasks.conftest import sell_task_args

@@ -14,7 +14,7 @@ from app.core.config import get_config
 from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from app.extensions.redis_cache.on_start import cache_ongoing_trades
 
 

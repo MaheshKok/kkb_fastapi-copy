@@ -5,7 +5,7 @@ from aioredis import Redis
 from sqlalchemy import select
 
 from app.database.models import BrokerModel
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema
 from app.services.broker.alice_blue import Pya3Aliceblue
 from app.utils.constants import EDELWEISS_DATE_FORMAT

@@ -5,7 +5,7 @@ from sqlalchemy import select
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from test.unit_tests.test_data import get_test_post_trade_payload

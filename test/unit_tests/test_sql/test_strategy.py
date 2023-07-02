@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import select
 
 from app.database.models import StrategyModel
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from test.factory.strategy import StrategyFactory
 from test.factory.user import UserFactory
 

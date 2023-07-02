@@ -9,7 +9,7 @@ from sqlalchemy import update
 
 from app.database.models import TakeAwayProfit
 from app.database.models import TradeModel
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.strategy import StrategySchema

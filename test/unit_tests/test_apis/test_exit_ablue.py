@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.models import User
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.services.broker.alice_blue import Pya3Aliceblue

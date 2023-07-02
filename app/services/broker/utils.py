@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from app.api.utils import refresh_and_get_session_id
 from app.database.models import BrokerModel
-from app.database.sqlalchemy_client.client import Database
+from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import StrategySchema
