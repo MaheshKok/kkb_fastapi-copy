@@ -12,8 +12,8 @@ async def test_user_factory():
     for _ in range(10):
         await UserFactory()
 
-    async with Database():
-        result = await Database.session.scalars(select(User))
+    async with Database() as async_session:
+        result = await async_session.scalars(select(User))
         assert len(result.all()) == 10
 
 

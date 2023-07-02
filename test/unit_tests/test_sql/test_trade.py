@@ -16,8 +16,8 @@ async def test_trade_factory():
     for _ in range(10):
         _ = await CompletedTradeFactory(strategy=strategy)
 
-    async with Database():
-        result = await Database.session.scalars(select(TradeModel))
+    async with Database() as async_session:
+        result = await async_session.scalars(select(TradeModel))
         assert len(result.all()) == 10
 
 
@@ -29,6 +29,6 @@ async def test_trade_factory_with_invalid_position():
     for _ in range(10):
         _ = await CompletedTradeFactory(strategy=strategy, position="INVALID")
 
-    async with Database():
-        result = await Database.session.scalars(select(TradeModel))
+    async with Database() as async_session:
+        result = await async_session.scalars(select(TradeModel))
         assert len(result.all()) == 10

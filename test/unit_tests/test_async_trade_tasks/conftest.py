@@ -22,12 +22,12 @@ async def sell_task_args(test_async_redis_client, take_away_profit=False, ce_tra
     )
     post_trade_payload = get_test_post_trade_payload()
 
-    async with Database():
+    async with Database() as async_session:
         # query database for stragey
-        fetch_strategy_query_ = await Database.session.execute(select(StrategyModel))
+        fetch_strategy_query_ = await async_session.execute(select(StrategyModel))
         strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
-        fetch_trade_query_ = await Database.session.execute(select(TradeModel))
+        fetch_trade_query_ = await async_session.execute(select(TradeModel))
         trade_models = fetch_trade_query_.scalars().all()
 
         (

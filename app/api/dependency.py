@@ -32,8 +32,8 @@ async def get_strategy_schema(
 ) -> StrategySchema:
     redis_strategy_json = await async_redis_client.get(str(signal_payload_schema.strategy_id))
     if not redis_strategy_json:
-        async with Database():
-            fetch_strategy_query = await Database.session.execute(
+        async with Database() as async_session:
+            fetch_strategy_query = await async_session.execute(
                 select(StrategyModel).where(StrategyModel.id == signal_payload_schema.strategy_id)
             )
             strategy_model = fetch_strategy_query.scalar()

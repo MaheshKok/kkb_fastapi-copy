@@ -70,7 +70,7 @@ async def task_entry_trade(
         strategy_schema=strategy_schema,
     )
 
-    async with Database():
+    async with Database() as async_session:
         # Use the AsyncSession to perform database operations
         # Example: Create a new entry in the database
         trade_schema = TradeSchema(
@@ -82,9 +82,9 @@ async def task_entry_trade(
         trade_model = TradeModel(
             **trade_schema.dict(exclude={"premium", "broker_id", "symbol", "received_at"})
         )
-        Database.session.add(trade_model)
-        await Database.session.flush()
-        await Database.session.refresh(trade_model)
+        async_session.add(trade_model)
+        await async_session.flush()
+        await async_session.refresh(trade_model)
         # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
         # it works i confirmed this with python_console with dummy data,
         # interesting part is to get such trades i have to call lrange with 0, -1
@@ -155,8 +155,8 @@ async def task_exit_trade(
         total_profit += exit_trade_schema.profit
         total_future_profit += exit_trade_schema.future_profit
 
-    async with Database():
-        fetch_take_away_profit_query_ = await Database.session.execute(
+    async with Database() as async_session:
+        fetch_take_away_profit_query_ = await async_session.execute(
             select(TakeAwayProfit).filter_by(strategy_id=strategy_schema.id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
@@ -166,7 +166,7 @@ async def task_exit_trade(
             take_away_profit_model.future_profit += total_future_profit
             take_away_profit_model.total_trades += len(redis_trade_schema_list)
             take_away_profit_model.updated_at = datetime.now()
-            await Database.session.flush()
+            await async_session.flush()
         else:
             take_away_profit_model = TakeAwayProfit(
                 profit=total_profit,
@@ -174,8 +174,8 @@ async def task_exit_trade(
                 strategy_id=strategy_schema.id,
                 total_trades=len(redis_trade_schema_list),
             )
-            Database.session.add(take_away_profit_model)
-            await Database.session.flush()
+            async_session.add(take_away_profit_model)
+            await async_session.flush()
 
             # Build a list of update statements for each dictionary in updated_data
 
@@ -195,7 +195,7 @@ async def task_exit_trade(
             )
         )
         for mapping in updated_values:
-            await Database.session.execute(
+            await async_session.execute(
                 update_stmt,
                 {
                     "_id": mapping.id,
@@ -208,7 +208,7 @@ async def task_exit_trade(
                 },
             )
 
-        await Database.session.flush()
+        await async_session.flush()
         await async_redis_client.delete(redis_ongoing_key)
     logging.info(
         f"{redis_ongoing_key} closed trades, updated the take_away_profit with the profit and deleted the redis key"

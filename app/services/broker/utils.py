@@ -86,14 +86,14 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya
     if broker_json:
         broker_schema = BrokerSchema.parse_raw(broker_json)
     else:
-        async with Database():
+        async with Database() as async_session:
             # We have a cron that update session token every 1 hour,
             # but frequency can be brought down to 1 day, but we dont know when it expires
             # but due to some reason it doesnt work then get session token updated using get_alice_blue_obj
             # and then create pya3_obj again and we would need to do it in place_order
 
             # TODO: fetch it from redis
-            fetch_broker_query = await Database.session.execute(
+            fetch_broker_query = await async_session.execute(
                 select(BrokerModel).filter_by(id=str(broker_id))
             )
             broker_model = fetch_broker_query.scalars().one_or_none()

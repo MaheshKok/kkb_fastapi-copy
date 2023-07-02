@@ -22,11 +22,11 @@ async def post_strategy(
     strategy_schema: StrategyCreateSchema,
     async_redis_client: Redis = Depends(get_async_redis_client),
 ):
-    async with Database():
+    async with Database() as async_session:
         strategy_model = StrategyModel(**strategy_schema.dict())
-        Database.session.add(strategy_model)
-        await Database.session.flush()
-        await Database.session.refresh(strategy_model)
+        async_session.add(strategy_model)
+        await async_session.flush()
+        await async_session.refresh(strategy_model)
 
         redis_set_result = await async_redis_client.set(
             str(strategy_model.id), StrategySchema.from_orm(strategy_model).json()

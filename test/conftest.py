@@ -285,8 +285,8 @@ async def buy_task_payload_dict(test_async_redis_client):
     await create_pre_db_data(users=1, strategies=1, trades=10)
     # query database for stragey
 
-    async with Database():
-        fetch_strategy_query_ = await Database.session.execute(select(StrategyModel))
+    async with Database() as async_session:
+        fetch_strategy_query_ = await async_session.execute(select(StrategyModel))
         strategy_model = fetch_strategy_query_.scalars().one_or_none()
 
         (

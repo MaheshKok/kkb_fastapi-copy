@@ -26,6 +26,6 @@ app = get_app(ConfigFile.PRODUCTION)
 
 if __name__ == "__main__":
     try:
-        uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8001)))
+        uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
     except BaseException as e:
         logging.exception(e)

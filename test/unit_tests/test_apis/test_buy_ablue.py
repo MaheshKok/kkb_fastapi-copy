@@ -26,12 +26,12 @@ async def test_buy_alice_blue_trade(
 ):
     await create_open_trades(users=1, strategies=1)
 
-    async with Database():
-        user_model = await Database.session.scalar(select(User))
+    async with Database() as async_session:
+        user_model = await async_session.scalar(select(User))
         broker_model = await BrokerFactory(user_id=user_model.id)
-        strategy_model = await Database.session.scalar(select(StrategyModel))
+        strategy_model = await async_session.scalar(select(StrategyModel))
         strategy_model.broker_id = broker_model.id
-        await Database.session.flush()
+        await async_session.flush()
 
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
@@ -45,7 +45,7 @@ async def test_buy_alice_blue_trade(
         )
 
         # set trades in redis
-        fetch_trade_models_query = await Database.session.execute(
+        fetch_trade_models_query = await async_session.execute(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         trade_models = fetch_trade_models_query.scalars().all()
@@ -55,7 +55,7 @@ async def test_buy_alice_blue_trade(
                 RedisTradeSchema.from_orm(trade_model).json(),
             )
 
-        await Database.session.commit()
+        await async_session.commit()
 
     # Mock the place_order method
     async def mock_place_order(*args, **kwargs):
@@ -75,10 +75,10 @@ async def test_buy_alice_blue_trade(
     assert response.status_code == 200
     assert response.json() == "successfully added trade to db"
 
-    async with Database():
+    async with Database() as async_session:
         # assert trade in db
-        strategy_model = await Database.session.scalar(select(StrategyModel))
-        fetch_trade_models_query = await Database.session.execute(
+        strategy_model = await async_session.scalar(select(StrategyModel))
+        fetch_trade_models_query = await async_session.execute(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         trade_models = fetch_trade_models_query.scalars().all()
@@ -107,12 +107,12 @@ async def test_buy_alice_blue_trade_raise_401(
 ):
     await create_open_trades(users=1, strategies=1)
 
-    async with Database():
-        user_model = await Database.session.scalar(select(User))
+    async with Database() as async_session:
+        user_model = await async_session.scalar(select(User))
         broker_model = await BrokerFactory(user_id=user_model.id)
-        strategy_model = await Database.session.scalar(select(StrategyModel))
+        strategy_model = await async_session.scalar(select(StrategyModel))
         strategy_model.broker_id = broker_model.id
-        await Database.session.flush()
+        await async_session.flush()
 
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
@@ -126,7 +126,7 @@ async def test_buy_alice_blue_trade_raise_401(
         )
 
         # set trades in redis
-        fetch_trade_models_query = await Database.session.execute(
+        fetch_trade_models_query = await async_session.execute(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         trade_models = fetch_trade_models_query.scalars().all()
@@ -136,7 +136,7 @@ async def test_buy_alice_blue_trade_raise_401(
                 RedisTradeSchema.from_orm(trade_model).json(),
             )
 
-        await Database.session.commit()
+        await async_session.commit()
 
     # Mock the place_order method
     async def mock_place_order(*args, **kwargs):
@@ -150,10 +150,10 @@ async def test_buy_alice_blue_trade_raise_401(
     assert response.status_code == 403
     assert response.json() == {"detail": "401 - Unauthorized"}
 
-    async with Database():
+    async with Database() as async_session:
         # assert trade in db
-        strategy_model = await Database.session.scalar(select(StrategyModel))
-        fetch_trade_models_query = await Database.session.execute(
+        strategy_model = await async_session.scalar(select(StrategyModel))
+        fetch_trade_models_query = await async_session.execute(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         trade_models = fetch_trade_models_query.scalars().all()

@@ -49,14 +49,14 @@ async def get_current_and_next_expiry(async_redis_client, todays_date):
 async def refresh_and_get_session_id(pya3_obj: Pya3Aliceblue, async_redis_client: Redis):
     session_id = await pya3_obj.login_and_get_session_id()
 
-    async with Database():
+    async with Database() as async_session:
         # get broker model from db filtered by username
-        fetch_broker_query = await Database.session.execute(
+        fetch_broker_query = await async_session.execute(
             select(BrokerModel).where(BrokerModel.username == pya3_obj.user_id)
         )
         broker_model = fetch_broker_query.scalars().one_or_none()
         broker_model.access_token = session_id
-        await Database.session.flush()
+        await async_session.flush()
 
         # update redis cache with new session_id
         redis_set_result = await async_redis_client.set(
