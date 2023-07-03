@@ -3,12 +3,12 @@ from datetime import datetime
 from datetime import timedelta
 
 import factory
-from async_factory_boy.factory.sqlalchemy import AsyncSQLAlchemyFactory
 
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
-from test.factory.base_factory import sc_session
+from test.factory.base_factory import AsyncSQLAlchemyFactory
+from test.factory.create_async_session import async_session
 from test.factory.strategy import StrategyFactory
 
 
@@ -30,7 +30,7 @@ class LiveTradeFactory(AsyncSQLAlchemyFactory):
     class Meta:
         model = TradeModel
         sqlalchemy_session_persistence = "commit"
-        sqlalchemy_session = sc_session
+        sqlalchemy_session = async_session
 
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)
@@ -58,7 +58,7 @@ class CompletedTradeFactory(AsyncSQLAlchemyFactory):
     class Meta:
         model = TradeModel
         sqlalchemy_session_persistence = "commit"
-        sqlalchemy_session = sc_session
+        sqlalchemy_session = async_session
 
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)

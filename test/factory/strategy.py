@@ -4,11 +4,11 @@ from datetime import timedelta
 
 import factory
 import pytest
-from async_factory_boy.factory.sqlalchemy import AsyncSQLAlchemyFactory
 
 from app.database.models import StrategyModel
 from app.schemas.enums import PositionEnum
-from test.factory.base_factory import sc_session
+from test.factory.base_factory import AsyncSQLAlchemyFactory
+from test.factory.create_async_session import async_session
 from test.factory.user import UserFactory
 
 
@@ -17,7 +17,7 @@ class StrategyFactory(AsyncSQLAlchemyFactory):
     class Meta:
         model = StrategyModel
         sqlalchemy_session_persistence = "commit"
-        sqlalchemy_session = sc_session
+        sqlalchemy_session = async_session
 
     id = factory.LazyFunction(uuid.uuid4)
     exchange = "NFO"

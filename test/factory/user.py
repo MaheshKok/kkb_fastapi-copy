@@ -3,18 +3,18 @@ from datetime import datetime
 from datetime import timedelta
 
 import factory
-from async_factory_boy.factory.sqlalchemy import AsyncSQLAlchemyFactory
 from factory import Sequence
 
 from app.database.models import User
-from test.factory.base_factory import sc_session
+from test.factory.base_factory import AsyncSQLAlchemyFactory
+from test.factory.create_async_session import async_session
 
 
 class UserFactory(AsyncSQLAlchemyFactory):
     class Meta:
         model = User
         sqlalchemy_session_persistence = "commit"
-        sqlalchemy_session = sc_session
+        sqlalchemy_session = async_session
 
     id = Sequence(lambda n: uuid.uuid4())
     email = Sequence(lambda n: f"email{uuid.uuid4()}@example.com")

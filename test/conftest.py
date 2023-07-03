@@ -222,21 +222,8 @@ async def db_cleanup(test_async_engine):
         logging.info("tables created")
 
 
-@pytest.fixture()
-def db_session_ctx(test_config):
-    async_db_url = get_db_url(test_config)
-    Database.init(async_db_url, engine_kw=engine_kw)
-
-    """db session context"""
-    token = Database.set_session_ctx()
-    logging.info("db session context created")
-    yield
-    Database.reset_session_ctx(token)
-    logging.info("db session context closed")
-
-
 @pytest.fixture(autouse=True)
-async def test_async_session(test_config):
+async def initialize_db_session(test_config):
     async_db_url = get_db_url(test_config)
     Database.init(async_db_url, engine_kw=engine_kw)
 

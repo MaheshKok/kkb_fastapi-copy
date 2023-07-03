@@ -2,17 +2,17 @@ import secrets
 import uuid
 
 import factory
-from async_factory_boy.factory.sqlalchemy import AsyncSQLAlchemyFactory
 
 from app.database.models import BrokerModel
-from test.factory.base_factory import sc_session
+from test.factory.base_factory import AsyncSQLAlchemyFactory
+from test.factory.create_async_session import async_session
 
 
 class BrokerFactory(AsyncSQLAlchemyFactory):
     class Meta:
         model = BrokerModel
         sqlalchemy_session_persistence = "commit"
-        sqlalchemy_session = sc_session
+        sqlalchemy_session = async_session
 
     id = factory.LazyFunction(uuid.uuid4)
     access_token = factory.Sequence(lambda n: secrets.token_hex(128))
