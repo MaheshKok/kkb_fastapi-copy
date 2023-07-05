@@ -270,7 +270,7 @@ async def close_alice_blue_trades(
             order_history = await pya3_obj.get_order_history(order_id)
             for _ in range(20):
                 if order_history["Status"] == Status.COMPLETE:
-                    strike_exitprice_dict[strike] = order_history["Avgprc"]
+                    strike_exitprice_dict[strike] = float(order_history["Avgprc"])
                     break
                 await asyncio.sleep(0.2)
             else:

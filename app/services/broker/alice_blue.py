@@ -138,26 +138,28 @@ class Pya3Aliceblue(Aliceblue):
         header = {"Content-Type": "application/json"}
         # Get Encryption Key
         data = {"userId": self.user_id}
-        r = await self._post("getEncKey", data=data)
+        get_enc_key_response = await self._post("getEncKey", data=data)
 
-        if r.get("stat") == "Not_Ok":
-            logging.info(f"Error while retrieving Encryption Key: {r}")
+        if get_enc_key_response.get("stat") == "Not_Ok":
+            logging.info(f"Error while retrieving Encryption Key: {get_enc_key_response}")
             raise HTTPException(
-                status_code=400, detail=f"Error while retrieving Encryption Key: {r}"
+                status_code=400,
+                detail=f"Error while retrieving Encryption Key: {get_enc_key_response}",
             )
-        encKey = r["encKey"]
+        encKey = get_enc_key_response["encKey"]
 
         if not encKey:
-            logging.info(f"Error while retrieving Encryption Key: {r}")
+            logging.info(f"Error while retrieving Encryption Key: {get_enc_key_response}")
             raise HTTPException(
-                status_code=400, detail=f"Error while retrieving Encryption Key: {r['emsg']}"
+                status_code=400,
+                detail=f"Error while retrieving Encryption Key: {get_enc_key_response['emsg']}",
             )
         # Web Login
         checksum = CryptoJsAES.encrypt(self.password.encode(), encKey.encode())
         checksum = checksum.decode("utf-8")
         data = {"userId": self.user_id, "userData": checksum}
-        r = await self._post("webLogin", data=data)
-        logging.info(f"Web Login response {r}")
+        web_login_response = await self._post("webLogin", data=data)
+        logging.info(f"Web Login response {web_login_response}")
 
         # Web Login 2FA
         data = {
@@ -167,46 +169,54 @@ class Pya3Aliceblue(Aliceblue):
             "userId": self.user_id,
             "vendor": self.app_id,
         }
-        r = await self._post("twoFA", data=data)
-        logging.info(f"Web Login 2FA response {r}")
-        auth_us = r["us"]
+        two_fa_response = await self._post("twoFA", data=data)
+        logging.info(f"Web Login 2FA response {two_fa_response}")
+        try:
+            auth_us = two_fa_response["us"]
+        except KeyError:
+            logging.info(f"Error while retrieving us: {two_fa_response}")
+            raise HTTPException(
+                status_code=400, detail=f"Error while Login 2FA: {two_fa_response}"
+            )
 
         # Web Login Totp
         totp = str(pyotp.TOTP(self.totp).now())
         data = {"userId": self.user_id, "tOtp": totp}
         header["Authorization"] = f"Bearer {self.user_id} {auth_us}"
-        r = await self.async_httpx_client.post(
+        verify_totp_response = await self.async_httpx_client.post(
             self._sub_urls["verifyTotp"], data=json.dumps(data), headers=header
         )
-        logging.info(f"Totp Login response {r}")
+        logging.info(f"Totp Login response {verify_totp_response}")
 
         # Web Login Api Key
-        userSessionID = r.json()["userSessionID"]
+        userSessionID = verify_totp_response.json()["userSessionID"]
         header["Authorization"] = f"Bearer {self.user_id} {userSessionID}"
-        r = await self.async_httpx_client.post(self._sub_urls["getApiKey"], headers=header)
-        logging.info(f"Api Key response {r.text}")
-        api_key = r.json()["api_key"]
+        get_api_key_response = await self.async_httpx_client.post(
+            self._sub_urls["getApiKey"], headers=header
+        )
+        logging.info(f"Api Key response {get_api_key_response.text}")
+        api_key = get_api_key_response.json()["api_key"]
 
         # Get API Encryption Key
         data = {"userId": self.user_id}
-        r = await self.async_httpx_client.post(
+        api_enc_key_response = await self.async_httpx_client.post(
             self._sub_urls["apiGetEncKey"],
             headers=header,
             data=json.dumps(data),
         )
-        logging.info(f"Get API Encryption Key response {r.text}")
-        encKey = r.json()["encKey"]
+        logging.info(f"Get API Encryption Key response {api_enc_key_response.text}")
+        encKey = api_enc_key_response.json()["encKey"]
 
         # Get User Details/Session ID
         checksum = hashlib.sha256(f"{self.user_id}{api_key}{encKey}".encode()).hexdigest()
         data = {"userId": self.user_id, "userData": checksum}
-        r = await self.async_httpx_client.post(
+        session_id_response = await self.async_httpx_client.post(
             self._sub_urls["sessionID"],
             headers=header,
             data=json.dumps(data),
         )
-        logging.info(f"Session ID response {r.text}")
-        session_id = r.json()["sessionID"]
+        logging.info(f"Session ID response {session_id_response.text}")
+        session_id = session_id_response.json()["sessionID"]
         logging.info(f"Session ID is {session_id}")
 
         return session_id
