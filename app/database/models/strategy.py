@@ -44,5 +44,5 @@ class StrategyModel(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("user.id"), nullable=False, index=True)
     user = relationship("User", backref="strategy_list")
 
-    daily_profits = relationship("DailyProfit", back_populates="strategy")
-    take_away_profit = relationship("TakeAwayProfit", back_populates="strategy")
+    daily_profits = relationship("DailyProfitModel", back_populates="strategy")
+    take_away_profit = relationship("TakeAwayProfitModel", back_populates="strategy")

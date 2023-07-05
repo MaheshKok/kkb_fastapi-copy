@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import select
 
 from app.database.models import StrategyModel
-from app.database.models import TakeAwayProfit
+from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
@@ -41,7 +41,7 @@ async def test_sell_trade_without_take_away_profit(
     async with Database() as async_session:
         # assert we dont have takeawayprofit model before closing trades
         fetch_take_away_profit_query_ = await async_session.execute(
-            select(TakeAwayProfit).filter_by(strategy_id=strategy_model_id)
+            select(TakeAwayProfitModel).filter_by(strategy_id=strategy_model_id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
         assert take_away_profit_model is None
@@ -71,7 +71,7 @@ async def test_sell_trade_without_take_away_profit(
         profit_to_be_added = sum(trade.profit for trade in trades)
 
         fetch_take_away_profit_query_ = await async_session.execute(
-            select(TakeAwayProfit).filter_by(strategy_id=strategy_model_id)
+            select(TakeAwayProfitModel).filter_by(strategy_id=strategy_model_id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
         await async_session.refresh(take_away_profit_model)
@@ -106,7 +106,7 @@ async def test_sell_trade_updating_takeaway_profit(
     async with Database() as async_session:
         # assert we dont have takeawayprofit model before closing trades
         fetch_take_away_profit_query_ = await async_session.execute(
-            select(TakeAwayProfit).filter_by(strategy_id=strategy_model_id)
+            select(TakeAwayProfitModel).filter_by(strategy_id=strategy_model_id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
         assert take_away_profit_model is not None
@@ -138,7 +138,7 @@ async def test_sell_trade_updating_takeaway_profit(
         profit_to_be_added = sum(trade.profit for trade in trades)
 
         fetch_take_away_profit_query_ = await async_session.execute(
-            select(TakeAwayProfit).filter_by(strategy_id=strategy_model_id)
+            select(TakeAwayProfitModel).filter_by(strategy_id=strategy_model_id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
         await async_session.refresh(take_away_profit_model)

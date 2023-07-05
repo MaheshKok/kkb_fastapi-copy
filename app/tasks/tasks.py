@@ -7,7 +7,7 @@ from sqlalchemy import bindparam
 from sqlalchemy import select
 from sqlalchemy import update
 
-from app.database.models import TakeAwayProfit
+from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import OptionTypeEnum
@@ -157,7 +157,7 @@ async def task_exit_trade(
 
     async with Database() as async_session:
         fetch_take_away_profit_query_ = await async_session.execute(
-            select(TakeAwayProfit).filter_by(strategy_id=strategy_schema.id)
+            select(TakeAwayProfitModel).filter_by(strategy_id=strategy_schema.id)
         )
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
 
@@ -168,7 +168,7 @@ async def task_exit_trade(
             take_away_profit_model.updated_at = datetime.now()
             await async_session.flush()
         else:
-            take_away_profit_model = TakeAwayProfit(
+            take_away_profit_model = TakeAwayProfitModel(
                 profit=total_profit,
                 future_profit=total_future_profit,
                 strategy_id=strategy_schema.id,
