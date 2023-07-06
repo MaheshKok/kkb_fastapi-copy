@@ -16,7 +16,7 @@ from pya3 import ProductType
 from pya3 import TransactionType
 from sqlalchemy import select
 
-from app.api.utils import refresh_and_get_session_id
+from app.api.utils import update_session_token
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema
@@ -204,7 +204,7 @@ async def place_ablue_order(
     )
 
     if place_order_response["stat"] == "Not_ok":
-        session_id = await refresh_and_get_session_id(
+        session_id = await update_session_token(
             pya3_obj=pya3_obj, async_redis_client=async_redis_client
         )
         pya3_obj.session_id = session_id

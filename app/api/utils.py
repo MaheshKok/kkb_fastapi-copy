@@ -46,7 +46,7 @@ async def get_current_and_next_expiry(async_redis_client, todays_date):
     return current_expiry_date, next_expiry_date, is_today_expiry
 
 
-async def refresh_and_get_session_id(pya3_obj: Pya3Aliceblue, async_redis_client: Redis):
+async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redis):
     session_id = await pya3_obj.login_and_get_session_id()
 
     async with Database() as async_session:

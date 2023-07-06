@@ -40,8 +40,7 @@ def get_db_url(config: Config) -> URL:
 
 
 def get_redis_client(config: Config) -> aioredis.StrictRedis:
-    # Note:
-    # we dont need to use create_pool explicitly as celery does it for us
+    # Note: we dont need to use create_pool explicitly as celery does it for us
     return aioredis.StrictRedis.from_url(
         config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
     )

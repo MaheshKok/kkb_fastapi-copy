@@ -1,19 +1,17 @@
 import asyncio
 import json
 
-import aioredis
 import httpx
 
 from app.core.config import get_config
+from app.database.base import get_redis_client
 
 
 async def update_expiry_list(
     config,
     dpNm,
 ):
-    async_redis_client = aioredis.StrictRedis.from_url(
-        config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
-    )
+    async_redis_client = await get_redis_client(config)
 
     # for BankNifty and Nifty dpNm is INDX OPT
     # analyse the expiry list for other symbol
