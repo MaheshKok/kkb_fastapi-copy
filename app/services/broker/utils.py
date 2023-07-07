@@ -160,10 +160,22 @@ async def buy_alice_blue_trades(
             # TODO: send whatsapp message using Twilio API instead of Telegram
             # Rejection Reason: latest_order_status["RejReason"]
             logging.error(f"order_status: {latest_order_status}")
+            # capture_exception(
+            #     Exception(
+            #         f"buy order not placed for: {instrument.name} , place_order_response: {place_order_response}"
+            #     )
+            # )
             raise HTTPException(status_code=403, detail=latest_order_status["RejReason"])
         else:
             logging.warning(f"order_history: {latest_order_status}")
             await asyncio.sleep(0.5)
+    else:
+        # capture_exception(
+        #     Exception(
+        #         f"buy order not placed for: {instrument.name} , place_order_response: {place_order_response}"
+        #     )
+        # )
+        return None
 
 
 def get_exiting_trades_insights(redis_trade_schema_list: list[RedisTradeSchema]):
@@ -329,8 +341,8 @@ async def close_alice_blue_trades(
         strike_exitprice_dict = {}
         for strike, order_id in place_order_results:
             if order_id:
-                order_history = await pya3_obj.get_order_history(order_id)
                 for _ in range(20):
+                    order_history = await pya3_obj.get_order_history(order_id)
                     if order_history["Status"] == Status.COMPLETE:
                         strike_exitprice_dict[strike] = float(order_history["Avgprc"])
                         break
