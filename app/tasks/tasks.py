@@ -127,7 +127,7 @@ async def task_exit_trade(
         entry_price = trade.entry_price
         quantity = trade.quantity
         position = trade.position
-        exit_price = strike_exit_price_dict.get(trade.strike, None)
+        exit_price = strike_exit_price_dict.get(trade.strike) or 0.0
         if not exit_price:
             # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker
             continue

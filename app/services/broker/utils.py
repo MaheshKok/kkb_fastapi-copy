@@ -152,29 +152,50 @@ async def buy_alice_blue_trades(
         is_buy=True,
     )
 
-    for _ in range(40):
-        latest_order_status = await pya3_obj.get_order_history(order_id)
-        if latest_order_status["Status"] == Status.COMPLETE:
-            return latest_order_status["Avgprc"]
-        elif latest_order_status["Status"] == Status.REJECTED:
-            # TODO: send whatsapp message using Twilio API instead of Telegram
-            # Rejection Reason: latest_order_status["RejReason"]
-            logging.error(f"order_status: {latest_order_status}")
+    order_status = "default order status"
+    for _ in range(20):
+        try:
+            order_status = await pya3_obj.get_order_history(order_id)
+            if order_status["Status"] == Status.COMPLETE:
+                return order_status["Avgprc"]
+            elif order_status["Status"] == Status.REJECTED:
+                # TODO: send whatsapp message using Twilio API instead of Telegram
+                # Rejection Reason: order_status["RejReason"]
+                logging.error(
+                    f"buy order rejected for order_id: {order_id} , order_status: {order_status}"
+                )
+                # capture_exception(
+                #     Exception(
+                #         f"buy order not placed for: {instrument.name} , place_order_response: {place_order_response}"
+                #     )
+                # )
+                raise HTTPException(status_code=403, detail=order_status["RejReason"])
+            else:
+                logging.warning(
+                    f"buy order not placed for order_id: {order_id} , order_status: {order_status['Status']}, order_status_reason: {order_status['RejReason']}"
+                )
+                await asyncio.sleep(0.5)
+        except Exception as e:
             # capture_exception(
             #     Exception(
             #         f"buy order not placed for: {instrument.name} , place_order_response: {place_order_response}"
             #     )
             # )
-            raise HTTPException(status_code=403, detail=latest_order_status["RejReason"])
-        else:
-            logging.warning(f"order_history: {latest_order_status}")
+            logging.error(
+                f"buy order not placed for order_id: {order_id} , order_status: {order_status}, error:{e}"
+            )
+
             await asyncio.sleep(0.5)
     else:
         # capture_exception(
         #     Exception(
-        #         f"buy order not placed for: {instrument.name} , place_order_response: {place_order_response}"
+        #         f"order_id: {order_id} did not complete in 10 seconds, strike_exitprice_dict: {strike_exitprice_dict}"
         #     )
         # )
+        logging.error(
+            f"order_id: {order_id} did not complete in 10 seconds, last fetched status: {order_status}"
+        )
+
         return None
 
 
@@ -340,19 +361,45 @@ async def close_alice_blue_trades(
         place_order_results = await asyncio.gather(*tasks)
         strike_exitprice_dict = {}
         for strike, order_id in place_order_results:
+            order_status = None
             if order_id:
                 for _ in range(20):
-                    order_history = await pya3_obj.get_order_history(order_id)
-                    if order_history["Status"] == Status.COMPLETE:
-                        strike_exitprice_dict[strike] = float(order_history["Avgprc"])
-                        break
-                    await asyncio.sleep(0.2)
+                    try:
+                        order_status = await pya3_obj.get_order_history(order_id)
+                        if order_status["Status"] == Status.COMPLETE:
+                            strike_exitprice_dict[strike] = float(order_status["Avgprc"])
+                            break
+                    except Exception as e:
+                        # capture_exception(
+                        #     Exception(
+                        #         f"sell order for order_id: [ {order_id} ] has order_status: [ {order_status} ]"
+                        #     )
+                        # )
+                        logging.error(
+                            f"sell order for order_id: [ {order_id} ] has order_status: [ {order_status} ], error: {e}"
+                        )
+                    await asyncio.sleep(0.5)
                 else:
                     logging.error(
-                        f"Unable to close strike: {strike}, order_history: {order_history}"
+                        f"sell order for order_id: [ {order_id} ], could not be closed in 10 seconds and its last order_status: {order_status}"
                     )
+                    # capture_exception(
+                    #     Exception(
+                    #         f"sell order for order_id: [ {order_id} ], could not be closed in 10 seconds and its last order_status: {order_status}"
+                    #     )
+                    # )
+                    strike_exitprice_dict[strike] = None
             else:
                 # assing None to strike which is being closed and later its avg price will be fetched from option chain
+                logging.error(f"sell order_id not found for strike: {strike}")
+                # capture_exception(
+                #     Exception(
+                #          f"sell order_id not found for strike: {strike}"
+                #     )
+                # )
                 strike_exitprice_dict[strike] = None
 
         return strike_exitprice_dict
+
+
+# TODO: improve logging and delegate exception handling
