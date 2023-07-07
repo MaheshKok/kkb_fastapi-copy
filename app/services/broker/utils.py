@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import bisect
 import datetime
 import hashlib
 import os
@@ -9,6 +10,7 @@ from aioredis import Redis
 from cryptography.hazmat.primitives.ciphers import Cipher
 from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.ciphers import modes
+from dateutil import parser
 from fastapi import HTTPException
 from httpx import AsyncClient
 from pya3 import OrderType
@@ -194,6 +196,11 @@ async def place_ablue_order(
         strike=strike,
         is_CE=is_CE,
     )
+    # get execution time as per IST
+    execution_time = (
+        datetime.datetime.now().utcnow() + datetime.timedelta(hours=5, minutes=30)
+    ).replace(microsecond=0)
+    instr_token = instrument.token
 
     place_order_response = await pya3_obj.place_order(
         transaction_type=TransactionType.Buy if is_buy else TransactionType.Sell,
@@ -203,11 +210,19 @@ async def place_ablue_order(
         product_type=ProductType.Delivery,
     )
 
-    if place_order_response["stat"] == "Not_ok":
+    if "NOrdNo" in place_order_response:
+        return strike, place_order_response["NOrdNo"]
+
+    if (
+        place_order_response["stat"] == "Not_ok"
+        and "401 - Unauthorized" == place_order_response["emsg"]
+    ):
+        # update the session token and try again
         session_id = await update_session_token(
             pya3_obj=pya3_obj, async_redis_client=async_redis_client
         )
         pya3_obj.session_id = session_id
+
         place_order_response = await pya3_obj.place_order(
             transaction_type=TransactionType.Buy if is_buy else TransactionType.Sell,
             instrument=instrument,
@@ -215,12 +230,58 @@ async def place_ablue_order(
             order_type=OrderType.Market,
             product_type=ProductType.Delivery,
         )
-        if place_order_response["stat"] == "Not_ok":
-            logging.error(f"place_order_response: {place_order_response}")
-            raise HTTPException(status_code=403, detail=place_order_response["emsg"])
 
-    # TODO: handle any error like what if we dont have NOrdNo in response
-    return strike, place_order_response["NOrdNo"]
+    logging.error(f"place_order_response: {place_order_response}")
+
+    # get order book and check if order is placed
+    orders = await pya3_obj.order_data()
+    # filter orders by instrument token
+    token_orders = [order for order in orders if order["token"] == str(instr_token)]
+    if not token_orders:
+        # install sentry and uncomment below line
+        # capture_exception(
+        #     Exception(
+        #         f"buy order not placed for: {instrument.name} , place_order_response: {place_order_response}"
+        #     )
+        # )
+        if is_buy:
+            raise Exception(f"order not placed, place_order_response: {place_order_response}")
+        else:
+            # if sell order_id is not fetched, then assume it has been executed and
+            # try to fetch avg price from option chain which is done later in code
+            return strike, None
+
+    # sort orders by orderentrytime, but first convert orderentrytime to datetime using parser
+    sorted_token_orders = sorted(
+        token_orders, key=lambda order: parser.parse(order["orderentrytime"])
+    )
+
+    execution_time_orders_lst = [
+        (parser.parse(order["orderentrytime"]), order) for order in sorted_token_orders
+    ]
+    execution_time_lst = [ele[0] for ele in execution_time_orders_lst]
+    # get order which was placed just after execution_time
+    execution_time_index = bisect.bisect_left(execution_time_lst, execution_time)
+    # if order is not placed, then raise exception
+    if (
+        execution_time_index == len(execution_time_lst)
+        and execution_time_lst[-1] != execution_time
+    ):
+        # capture_exception(
+        #     Exception(
+        #         f"buy order not placed for: {instrument.name} , place_order_response: {place_order_response}"
+        #     )
+        # )
+        if is_buy:
+            raise Exception(f"order not placed, place_order_response: {place_order_response}")
+        else:
+            # if sell order_id is not fetched, then assume it has been executed and
+            # try to fetch avg price from option chain which is done later in code
+            return strike, None
+
+    placed_order = execution_time_orders_lst[execution_time_index][1]
+    # Nstordno is the order id
+    return strike, placed_order["Nstordno"]
 
 
 async def close_alice_blue_trades(
@@ -267,13 +328,19 @@ async def close_alice_blue_trades(
         place_order_results = await asyncio.gather(*tasks)
         strike_exitprice_dict = {}
         for strike, order_id in place_order_results:
-            order_history = await pya3_obj.get_order_history(order_id)
-            for _ in range(20):
-                if order_history["Status"] == Status.COMPLETE:
-                    strike_exitprice_dict[strike] = float(order_history["Avgprc"])
-                    break
-                await asyncio.sleep(0.2)
+            if order_id:
+                order_history = await pya3_obj.get_order_history(order_id)
+                for _ in range(20):
+                    if order_history["Status"] == Status.COMPLETE:
+                        strike_exitprice_dict[strike] = float(order_history["Avgprc"])
+                        break
+                    await asyncio.sleep(0.2)
+                else:
+                    logging.error(
+                        f"Unable to close strike: {strike}, order_history: {order_history}"
+                    )
             else:
-                logging.error(f"Unable to close strike: {strike}, order_history: {order_history}")
+                # assing None to strike which is being closed and later its avg price will be fetched from option chain
+                strike_exitprice_dict[strike] = None
 
         return strike_exitprice_dict
