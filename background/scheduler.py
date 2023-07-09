@@ -39,8 +39,9 @@ async def task_cron_test():
 async def task_update_session_token():
     logging.info(f"Job update_session_token executed at: {datetime.now()}")
     tasks = []
-    for url in base_urls:
-        tasks.append(get_api(f"{base_urls[url]}/update_ablue_session_token"))
+    for app in base_urls:
+        if app == "flaskstockpi":
+            tasks.append(get_api(f"{base_urls[app]}/update_ablue_session_token"))
     await asyncio.gather(*tasks)
 
 
@@ -48,8 +49,8 @@ async def task_update_session_token():
 async def task_update_expiry_list():
     logging.info(f"Job update_expiry_list executed at: {datetime.now()}")
     tasks = []
-    for url in base_urls:
-        tasks.append(get_api(f"{base_urls[url]}/update_expiry_list"))
+    for app in base_urls:
+        tasks.append(get_api(f"{base_urls[app]}/update_expiry_list"))
     await asyncio.gather(*tasks)
 
 
@@ -63,10 +64,10 @@ async def task_up_scale_dynos():
     worker = 2
 
     tasks = []
-    for url in base_urls:
+    for app in base_urls:
         tasks.append(
             get_api(
-                f"{base_urls[url]}/scale_dynos?dyno_type={dyno_type}&qty=1&action={action}&web_quantity={web}&worker_quantity={worker}"
+                f"{base_urls[app]}/scale_dynos?dyno_type={dyno_type}&qty=1&action={action}&web_quantity={web}&worker_quantity={worker}"
             )
         )
 
@@ -83,10 +84,10 @@ async def task_down_scale_dynos():
     worker = 1
 
     tasks = []
-    for url in base_urls:
+    for app in base_urls:
         tasks.append(
             get_api(
-                f"{base_urls[url]}/scale_dynos?dyno_type={dyno_type}&qty=1&action={action}&web_quantity={web}&worker_quantity={worker}"
+                f"{base_urls[app]}/scale_dynos?dyno_type={dyno_type}&qty=1&action={action}&web_quantity={web}&worker_quantity={worker}"
             )
         )
 
@@ -98,8 +99,9 @@ async def task_down_scale_dynos():
 async def task_update_till_yesterdays_profits():
     logging.info(f"Job update_till_yesterdays_profits executed at: {datetime.now()}")
     tasks = []
-    for url in base_urls:
-        tasks.append(get_api(f"{base_urls[url]}/update_till_yesterdays_profits"))
+    for app in base_urls:
+        if app == "flaskstockpi":
+            tasks.append(get_api(f"{base_urls[app]}/update_till_yesterdays_profits"))
 
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
@@ -110,8 +112,9 @@ async def task_close_and_buy_trades_in_next_expiry():
     logging.info(f"Job task_close_and_buy_trades_in_next_expiry executed at: {datetime.now()}")
 
     tasks = []
-    for url in base_urls:
-        tasks.append(get_api(f"{base_urls[url]}/rollover_to_next_expiry"))
+    for app in base_urls:
+        if app == "flaskstockpi":
+            tasks.append(get_api(f"{base_urls[app]}/rollover_to_next_expiry"))
 
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
