@@ -81,3 +81,4 @@ wsproto==1.2.0
 pya3~=1.0.29
 
 pyotp~=2.8.0
+aiocron==1.8
