@@ -60,11 +60,16 @@ async def task_up_scale_dynos():
 
     action = "upscale"
     dyno_type = "Standard-1x"
-    web = 2
-    worker = 2
 
     tasks = []
     for app in base_urls:
+        if app == "flaskstockpi":
+            web = 2
+            worker = 2
+        else:
+            web = 1
+            worker = 1
+
         tasks.append(
             get_api(
                 f"{base_urls[app]}/scale_dynos?dyno_type={dyno_type}&qty=1&action={action}&web_quantity={web}&worker_quantity={worker}"
