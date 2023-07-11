@@ -35,8 +35,19 @@ async def task_cron_test():
     logging.info(f"job cron_test executed at: {datetime.now()}")
 
 
-@aiocron.crontab("0 */1 * * *")  # Every hour
+@aiocron.crontab("10 3 * * *")  # At 03:10 every day
 async def task_update_session_token():
+    logging.info(f"Job update_session_token executed at: {datetime.now()}")
+    tasks = []
+    for app in base_urls:
+        if app == "flaskstockpi":
+            tasks.append(get_api(f"{base_urls[app]}/update_ablue_session_token"))
+    await asyncio.gather(*tasks)
+
+
+@aiocron.crontab("30 3 * * *")  # At 03:30 every day
+async def task_update_session_token_again():
+    # its a backup task
     logging.info(f"Job update_session_token executed at: {datetime.now()}")
     tasks = []
     for app in base_urls:
