@@ -98,16 +98,22 @@ async def update_daily_profit():
 
             daily_profit_models = []
             for strategy_id, ongoing_profit in strategy_id_ongoing_profit_dict.items():
+                take_away_profit_model = strategy_id_take_away_profit_dict[strategy_id]
+                if take_away_profit_model:
+                    take_away_profit = take_away_profit_model.profit
+                    take_away_future_profit = take_away_profit_model.future_profit
+                else:
+                    take_away_profit = 0.0
+                    take_away_future_profit = 0.0
+
                 daily_profit_models.append(
                     DailyProfitModel(
                         **{
-                            "profit": ongoing_profit["profit"]
-                            + strategy_id_take_away_profit_dict[strategy_id].profit
+                            "profit": ongoing_profit["profit"] + take_away_profit
                             or 0.0 - strategy_id_yesterdays_profit_dict[strategy_id].profit,
                             "future_profit": ongoing_profit["future_profit"]
-                            + strategy_id_take_away_profit_dict[strategy_id].future_profit
-                            or 0.0
-                            - strategy_id_yesterdays_profit_dict[strategy_id].future_profit,
+                            + take_away_future_profit
+                            or 0.0 - take_away_future_profit,
                             "date": todays_date,
                             "strategy_id": strategy_id,
                         }

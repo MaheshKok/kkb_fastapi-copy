@@ -9,6 +9,7 @@ import httpx
 import pandas as pd
 import pytest as pytest
 import pytest_asyncio
+from cron.update_fno_expiry import update_expiry_list
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -17,7 +18,6 @@ from sqlalchemy.pool import QueuePool
 from app.api.utils import get_current_and_next_expiry
 from app.core.config import get_config
 from app.create_app import get_app
-from app.cron.update_fno_expiry import update_expiry_list
 from app.database import Base
 from app.database.base import engine_kw
 from app.database.base import get_db_url
