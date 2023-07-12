@@ -6,6 +6,7 @@ from typing import Optional
 from pydantic import BaseConfig
 from pydantic import BaseModel
 from pydantic import Field
+from pydantic import condecimal
 from pydantic import root_validator
 
 from app.schemas.enums import OptionTypeEnum
@@ -15,7 +16,9 @@ from app.schemas.enums import PositionEnum
 class SignalPayloadSchema(BaseModel):
     symbol: str = Field(description="Symbol", example="BANKNIFTY")
     quantity: int = Field(description="Quantity", example=25)
-    future_entry_price_received: float = Field(description="Future Entry Price", example=40600.5)
+    future_entry_price_received: condecimal(decimal_places=2) = Field(
+        description="Future Entry Price", example=40600.5
+    )
     strategy_id: uuid.UUID = Field(
         description="Strategy ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3"
     )
@@ -24,8 +27,10 @@ class SignalPayloadSchema(BaseModel):
         example="CE",
     )
     received_at: datetime = Field(description="Received At", example="2023-05-22 05:11:01.117358")
-    premium: Optional[float] = Field(description="Premium", example=350.0)
-    strike: Optional[float] = Field(description="Strike", example=42500.0, default=0.0)
+    premium: Optional[condecimal(decimal_places=2)] = Field(description="Premium", example=350.0)
+    strike: Optional[condecimal(decimal_places=2)] = Field(
+        description="Strike", example=42500.0, default=0.0
+    )
     position: PositionEnum = Field(description="Position", example="LONG")
     broker_id: Optional[uuid.UUID] = Field(
         description="Broker ID", example="dd9acef9-e6c4-4792-9d43-d266b4d685c3", default=None
@@ -49,9 +54,11 @@ class RedisTradeSchema(SignalPayloadSchema):
     # main purpose is for testing
 
     id: uuid.UUID = Field(description="Trade ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3")
-    strike: float = Field(description="Strike", example=42500.0)
-    entry_price: float = Field(description="Entry Price", example=350.5)
-    future_entry_price: float = Field(description="Future Entry Price", example=40600.5)
+    strike: condecimal(decimal_places=2) = Field(description="Strike", example=42500.0)
+    entry_price: condecimal(decimal_places=2) = Field(description="Entry Price", example=350.5)
+    future_entry_price: condecimal(decimal_places=2) = Field(
+        description="Future Entry Price", example=40600.5
+    )
     expiry: date = Field(description="Expiry", example="2023-06-16")
     instrument: str = Field(description="Instrument", example="BANKNIFTY16JUN2343500CE")
     entry_received_at: datetime = Field(
@@ -78,10 +85,14 @@ class RedisTradeSchema(SignalPayloadSchema):
 
 class ExitTradeSchema(BaseModel):
     id: uuid.UUID = Field(description="Trade ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3")
-    exit_price: float = Field(description="Exit Price", example=450.5)
-    profit: float = Field(description="Profit", example=2500.0)
-    future_exit_price: float = Field(description="Future Exit Price", example=40700.5)
-    future_profit: float = Field(description="Future Profit", example=2500.0)
+    exit_price: condecimal(decimal_places=2) = Field(description="Exit Price", example=450.5)
+    profit: condecimal(decimal_places=2) = Field(description="Profit", example=2500.0)
+    future_exit_price: condecimal(decimal_places=2) = Field(
+        description="Future Exit Price", example=40700.5
+    )
+    future_profit: condecimal(decimal_places=2) = Field(
+        description="Future Profit", example=2500.0
+    )
     exit_at: datetime = Field(
         description="Exited At", default=datetime.utcnow(), example="2023-05-22 06:25:03.117358"
     )
@@ -94,13 +105,21 @@ class TradeSchema(SignalPayloadSchema):
     class Config:
         orm_mode = True
 
-    entry_price: float = Field(description="Entry Price", example=350.5)
-    exit_price: Optional[float] = Field(description="Exit Price", example=450.5)
-    profit: Optional[float] = Field(description="Profit", example=2500.0)
+    entry_price: condecimal(decimal_places=2) = Field(description="Entry Price", example=350.5)
+    exit_price: Optional[condecimal(decimal_places=2)] = Field(
+        description="Exit Price", example=450.5
+    )
+    profit: Optional[condecimal(decimal_places=2)] = Field(description="Profit", example=2500.0)
 
-    future_entry_price: float = Field(description="Future Entry Price", example=40600.5)
-    future_exit_price: Optional[float] = Field(description="Future Exit Price", example=40700.5)
-    future_profit: Optional[float] = Field(description="Future Profit", example=2500.0)
+    future_entry_price: condecimal(decimal_places=2) = Field(
+        description="Future Entry Price", example=40600.5
+    )
+    future_exit_price: Optional[condecimal(decimal_places=2)] = Field(
+        description="Future Exit Price", example=40700.5
+    )
+    future_profit: Optional[condecimal(decimal_places=2)] = Field(
+        description="Future Profit", example=2500.0
+    )
 
     entry_at: str = Field(
         description="Placed At",
