@@ -29,11 +29,59 @@ logging.basicConfig(
 )
 
 
-def get_profit(entry_price, exit_price, quantity, position):
+def calculate_futures_charges(buy_price, sell_price, total_lots):
+    # this is exact calculation
+    brokerage = 30
+    turnover = (buy_price + sell_price) * total_lots
+    stt = sell_price * total_lots * 0.0125 / 100
+    txn_charge = turnover * 0.0019 / 100
+    sebi_charges = turnover * (10 / 10000000)
+    investor_pf_charges = sebi_charges
+    stamp_duty = buy_price * total_lots * 0.002 / 100
+    gst = 0.18 * (brokerage + txn_charge + sebi_charges)
+    total_charges = sum(
+        [brokerage, stt, txn_charge, sebi_charges, investor_pf_charges, stamp_duty, gst]
+    )
+    return round(total_charges, 2)
+
+
+def calculate_options_charges(buy_price, sell_price, total_trades):
+    # this is approximate calculations as close as possible
+    # Calculate Turnover
+    turnover = (buy_price + sell_price) * total_trades
+    # Brokerage for buy side and sell side
+    brokerage = 15 * 2
+    # Transaction charge: 0.053% of the total turnover
+    txn_charges = 0.05 / 100 * turnover
+    # STT: 0.0125% on sell side
+    stt = 0.0625 / 100 * sell_price * total_trades
+    # SEBI charges: ₹10 per crore of total turnover
+    sebi_charges = 10 / 10000000 * turnover
+    # GST: 18% on (brokerage + transaction charges + SEBI charges)
+    gst = 0.18 * (brokerage + txn_charges + sebi_charges)
+    # Stamp charges: 0.003% on buy side
+    stamp_charges = 0.003 / 100 * buy_price * total_trades
+    # Calculate total charges
+    total_charges = brokerage + stt + txn_charges + sebi_charges + gst + stamp_charges
+    return total_charges
+
+
+def get_options_profit(entry_price, exit_price, quantity, position):
+    total_charges = calculate_options_charges(entry_price, exit_price, quantity)
     if position == PositionEnum.LONG:
-        profit = (exit_price - entry_price) * quantity - 60
+        profit = (exit_price - entry_price) * quantity - total_charges
     else:
-        profit = (entry_price - exit_price) * quantity - 60
+        profit = (entry_price - exit_price) * quantity - total_charges
+
+    return round(profit, 2)
+
+
+def get_futures_profit(entry_price, exit_price, quantity, position):
+    total_charges = calculate_futures_charges(entry_price, exit_price, quantity)
+    if position == PositionEnum.LONG:
+        profit = (exit_price - entry_price) * quantity - total_charges
+    else:
+        profit = (entry_price - exit_price) * quantity - total_charges
 
     return round(profit, 2)
 
@@ -131,14 +179,14 @@ async def task_exit_trade(
         if not exit_price:
             # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker
             continue
-        profit = get_profit(entry_price, exit_price, quantity, position)
+        profit = get_options_profit(entry_price, exit_price, quantity, position)
 
         future_entry_price = trade.future_entry_price
         # if option_type is PE then position is SHORT and for CE its LONG
         future_position = (
             PositionEnum.SHORT if trade.option_type == OptionTypeEnum.PE else PositionEnum.LONG
         )
-        future_profit = get_profit(
+        future_profit = get_futures_profit(
             future_entry_price, future_exit_price, quantity, future_position
         )
 
