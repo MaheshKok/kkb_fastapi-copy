@@ -68,7 +68,7 @@ async def test_sell_trade_without_take_away_profit(
 
         assert len(trades) == 10
 
-        profit_to_be_added = sum(trade.profit for trade in trades)
+        profit_to_be_added = round(sum(trade.profit for trade in trades), 2)
 
         fetch_take_away_profit_query_ = await async_session.execute(
             select(TakeAwayProfitModel).filter_by(strategy_id=strategy_model_id)
@@ -135,7 +135,7 @@ async def test_sell_trade_updating_takeaway_profit(
 
         assert len(trades) == 10
 
-        profit_to_be_added = sum(trade.profit for trade in trades)
+        profit_to_be_added = round(sum(trade.profit for trade in trades), 2)
 
         fetch_take_away_profit_query_ = await async_session.execute(
             select(TakeAwayProfitModel).filter_by(strategy_id=strategy_model_id)
@@ -149,7 +149,6 @@ async def test_sell_trade_updating_takeaway_profit(
 
 
 # TODO: assert exit_at, profit, future_profit, exit_received_at < exit_at ,
-# TODO: you havent yet deducted brokerage fees and govt charges which are approximately 60
 # TODO: add cron jobs like update yesterdays profit
 # unit test for all edge case like two days holidays consecutive
 #

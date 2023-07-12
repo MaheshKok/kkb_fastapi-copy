@@ -172,7 +172,7 @@ async def task_exit_trade(
     total_future_profit = 0
 
     for trade in redis_trade_schema_list:
-        entry_price = trade.entry_price
+        entry_price = float(trade.entry_price)
         quantity = trade.quantity
         position = trade.position
         exit_price = strike_exit_price_dict.get(trade.strike) or 0.0
@@ -181,7 +181,7 @@ async def task_exit_trade(
             continue
         profit = get_options_profit(entry_price, exit_price, quantity, position)
 
-        future_entry_price = trade.future_entry_price
+        future_entry_price = float(trade.future_entry_price)
         # if option_type is PE then position is SHORT and for CE its LONG
         future_position = (
             PositionEnum.SHORT if trade.option_type == OptionTypeEnum.PE else PositionEnum.LONG
@@ -203,6 +203,8 @@ async def task_exit_trade(
         total_profit += exit_trade_schema.profit
         total_future_profit += exit_trade_schema.future_profit
 
+    total_profit = float(total_profit)
+    total_future_profit = float(total_future_profit)
     async with Database() as async_session:
         fetch_take_away_profit_query_ = await async_session.execute(
             select(TakeAwayProfitModel).filter_by(strategy_id=strategy_schema.id)
