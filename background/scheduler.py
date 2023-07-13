@@ -25,7 +25,7 @@ async def get_api(url):
         return None
 
 
-@aiocron.crontab("*/10 * * * *")  # Every 10 minute
+@aiocron.crontab("*/60 * * * *")  # Every hour
 async def task_interval_test():
     logging.info(f"job interval_test executed at: {datetime.now()}")
 
