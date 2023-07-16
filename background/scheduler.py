@@ -123,7 +123,7 @@ async def task_update_till_yesterdays_profits():
     await asyncio.gather(*tasks)
 
 
-@aiocron.crontab("10 10 * * *")  # At 10:15 every day
+@aiocron.crontab("9 30 * * *")  # At 9:30 every day
 async def task_close_and_buy_trades_in_next_expiry():
     logging.info(f"Job task_close_and_buy_trades_in_next_expiry executed at: {datetime.now()}")
 
