@@ -146,7 +146,7 @@ aiocron.crontab("0 3 * * *", func=task_update_expiry_list)  # Every day at 03:00
 aiocron.crontab("10 3 * * *", func=task_update_session_token)  # Every day at 03:10
 aiocron.crontab("30 3 * * *", func=task_update_session_token)  # Every day at 03:30
 aiocron.crontab("30 3 * * *", func=task_up_scale_dynos)  # Every day at 03:30
-aiocron.crontab("30 9 * * *", func=task_rollover_to_next_expiry)  # Every day at 9:30
+aiocron.crontab("0 9 * * *", func=task_rollover_to_next_expiry)  # Every day at 9:00
 aiocron.crontab("0 10 * * *", func=task_down_scale_dynos)  # Every day at 10:00
 aiocron.crontab("5 10 * * *", func=task_update_till_yesterdays_profits)  # Every day at 10:05
 
