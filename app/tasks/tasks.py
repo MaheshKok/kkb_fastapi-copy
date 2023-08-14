@@ -13,10 +13,10 @@ from app.database.session_manager.db_session import Database
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.strategy import StrategySchema
+from app.schemas.trade import EntryTradeSchema
 from app.schemas.trade import ExitTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
-from app.schemas.trade import TradeSchema
 from app.tasks.utils import get_future_price
 from app.tasks.utils import get_strike_and_entry_price
 from app.tasks.utils import get_strike_and_exit_price_dict
@@ -119,7 +119,7 @@ async def task_entry_trade(
     async with Database() as async_session:
         # Use the AsyncSession to perform database operations
         # Example: Create a new entry in the database
-        trade_schema = TradeSchema(
+        trade_schema = EntryTradeSchema(
             symbol=strategy_schema.symbol,
             entry_price=entry_price,
             future_entry_price=future_entry_price,

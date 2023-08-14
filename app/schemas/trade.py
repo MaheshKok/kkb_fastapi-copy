@@ -14,7 +14,6 @@ from app.schemas.enums import PositionEnum
 
 
 class SignalPayloadSchema(BaseModel):
-    symbol: str = Field(description="Symbol", example="BANKNIFTY")
     quantity: int = Field(description="Quantity", example=25)
     future_entry_price_received: condecimal(decimal_places=2) = Field(
         description="Future Entry Price", example=40600.5
@@ -103,26 +102,13 @@ class ExitTradeSchema(BaseModel):
     )
 
 
-class TradeSchema(SignalPayloadSchema):
+class EntryTradeSchema(SignalPayloadSchema):
     class Config:
         from_attributes = True
 
     entry_price: condecimal(decimal_places=2) = Field(description="Entry Price", example=350.5)
-    exit_price: Optional[condecimal(decimal_places=2)] = Field(
-        description="Exit Price", example=450.5, default=0.0
-    )
-    profit: Optional[condecimal(decimal_places=2)] = Field(
-        description="Profit", example=2500.0, default=0.0
-    )
-
     future_entry_price: condecimal(decimal_places=2) = Field(
         description="Future Entry Price", example=40600.5
-    )
-    future_exit_price: Optional[condecimal(decimal_places=2)] = Field(
-        description="Future Exit Price", example=40700.5, default=0.0
-    )
-    future_profit: Optional[condecimal(decimal_places=2)] = Field(
-        description="Future Profit", example=2500.0, default=0.0
     )
 
     entry_at: str = Field(
@@ -130,22 +116,16 @@ class TradeSchema(SignalPayloadSchema):
         default_factory=datetime.utcnow,
         example="2023-05-22 05:11:04.117358+00",
     )
-    exit_at: Optional[str] = Field(
-        description="Exited At", example="2023-05-22 06:25:03.117358+00", default=None
-    )
-
-    expiry: date = Field(description="Expiry", example="2023-05-22")
-
-    instrument: str = Field(description="Instrument name", example="BANKNIFTY27APR23FUT")
-
     entry_received_at: datetime = Field(
         description="Received At", example="2023-05-22 05:11:01.117358", alias="received_at"
     )
 
+    expiry: date = Field(description="Expiry", example="2023-05-22")
+    instrument: str = Field(description="Instrument name", example="BANKNIFTY27APR23FUT")
+
     @model_validator(mode="before")
     def populate_instrument(cls, values):
-        # even though we dont have a out symbol field,
-        # it will be fetched from strategy and attached to the payload that will go in TradeSchema,
+        # it is must to send symbol
         if isinstance(values, dict):
             return {
                 **values,

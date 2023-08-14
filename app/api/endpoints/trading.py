@@ -19,7 +19,6 @@ from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
-from app.schemas.trade import TradeSchema
 from app.tasks.tasks import task_entry_trade
 from app.tasks.tasks import task_exit_trade
 
@@ -52,7 +51,7 @@ async def get_open_trades():
             select(TradeModel).filter(TradeModel.exit_at == None)  # noqa
         )
         trade_models = fetch_open_trades_query_.scalars().all()
-        return [TradeSchema.model_validate(trade_model) for trade_model in trade_models]
+        return [TradeModel.to_dict(trade_model) for trade_model in trade_models]
 
 
 @options_router.post("/options", status_code=200)
