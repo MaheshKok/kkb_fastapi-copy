@@ -5,6 +5,7 @@ from typing import Optional
 
 from pydantic import BaseConfig
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import condecimal
 from pydantic import model_validator
@@ -103,21 +104,20 @@ class ExitTradeSchema(BaseModel):
 
 
 class EntryTradeSchema(SignalPayloadSchema):
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     entry_price: condecimal(decimal_places=2) = Field(description="Entry Price", example=350.5)
     future_entry_price: condecimal(decimal_places=2) = Field(
         description="Future Entry Price", example=40600.5
     )
 
-    entry_at: str = Field(
+    entry_at: datetime = Field(
         description="Placed At",
         default_factory=datetime.utcnow,
         example="2023-05-22 05:11:04.117358+00",
     )
     entry_received_at: datetime = Field(
-        description="Received At", example="2023-05-22 05:11:01.117358", alias="received_at"
+        description="Received At", example="2023-05-22 05:11:01.117358"
     )
 
     expiry: date = Field(description="Expiry", example="2023-05-22")
@@ -131,3 +131,35 @@ class EntryTradeSchema(SignalPayloadSchema):
                 **values,
                 "instrument": f"{values['symbol']}{values['expiry'].strftime('%d%b%y').upper()}{values['strike']}{values['option_type']}",
             }
+
+
+class DBEntryTradeSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    quantity: int = Field(description="Quantity", example=25)
+    strategy_id: uuid.UUID = Field(
+        description="Strategy ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3"
+    )
+    option_type: OptionTypeEnum = Field(
+        description="Option Type",
+        example="CE",
+    )
+    instrument: str = Field(description="Instrument", example="BANKNIFTY16JUN2343500CE")
+    position: PositionEnum = Field(description="Position", example="LONG")
+    entry_price: condecimal(decimal_places=2) = Field(description="Entry Price", example=350.5)
+    future_entry_price: condecimal(decimal_places=2) = Field(
+        description="Future Entry Price", example=40600.5
+    )
+    future_entry_price_received: condecimal(decimal_places=2) = Field(
+        description="Future Entry Price", example=40600.5
+    )
+    entry_received_at: datetime = Field(
+        description="Received At", example="2023-05-22 05:11:01.117358"
+    )
+    entry_at: datetime = Field(
+        description="Placed At",
+        default_factory=datetime.utcnow,
+        example="2023-05-22 05:11:04.117358+00",
+    )
+    strike: condecimal(decimal_places=2) = Field(description="Strike", example=42500.0)
+    expiry: date = Field(description="Expiry", example="2023-05-22")

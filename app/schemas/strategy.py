@@ -3,14 +3,14 @@ from typing import Optional
 
 from pydantic import BaseConfig
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import Field
 
 from app.schemas.enums import InstrumentTypeEnum
 
 
 class StrategyCreateSchema(BaseModel):
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     instrument_type: InstrumentTypeEnum = Field(
         description="Instrument Type", example=InstrumentTypeEnum.OPTIDX

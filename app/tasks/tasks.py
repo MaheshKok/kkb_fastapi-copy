@@ -123,6 +123,7 @@ async def task_entry_trade(
             symbol=strategy_schema.symbol,
             entry_price=entry_price,
             future_entry_price=future_entry_price,
+            entry_received_at=signal_payload_schema.received_at,
             **signal_payload_schema.dict(exclude={"premium"}),
         )
 
