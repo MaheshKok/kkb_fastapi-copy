@@ -51,8 +51,8 @@ async def get_open_trades():
         fetch_open_trades_query_ = await async_session.execute(
             select(TradeModel).filter(TradeModel.exit_at == None)  # noqa
         )
-        take_away_profit_models = fetch_open_trades_query_.scalars().all()
-        return TradeSchema.model_validate(take_away_profit_models)
+        trade_models = fetch_open_trades_query_.scalars().all()
+        return [TradeSchema.model_validate(trade_model) for trade_model in trade_models]
 
 
 @options_router.post("/options", status_code=200)

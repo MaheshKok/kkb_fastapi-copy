@@ -91,7 +91,6 @@ async def task_entry_trade(
 ):
     option_chain = await get_option_chain(
         async_redis_client=async_redis_client,
-        symbol=signal_payload_schema.symbol,
         expiry=signal_payload_schema.expiry,
         option_type=signal_payload_schema.option_type,
         strategy_schema=strategy_schema,
@@ -114,7 +113,6 @@ async def task_entry_trade(
 
     future_entry_price = await get_future_price(
         async_redis_client=async_redis_client,
-        symbol=signal_payload_schema.symbol,
         strategy_schema=strategy_schema,
     )
 
@@ -122,6 +120,7 @@ async def task_entry_trade(
         # Use the AsyncSession to perform database operations
         # Example: Create a new entry in the database
         trade_schema = TradeSchema(
+            symbol=strategy_schema.symbol,
             entry_price=entry_price,
             future_entry_price=future_entry_price,
             **signal_payload_schema.dict(exclude={"premium"}),
@@ -165,7 +164,6 @@ async def task_exit_trade(
 
     future_exit_price = await get_future_price(
         async_redis_client=async_redis_client,
-        symbol=signal_payload_schema.symbol,
         strategy_schema=strategy_schema,
     )
 

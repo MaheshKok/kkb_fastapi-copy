@@ -50,7 +50,7 @@ async def get_strategy_schema(
                 raise Exception(f"Redis set strategy: {strategy_model.id} failed")
 
             return StrategySchema.model_validate(strategy_model)
-    return StrategySchema.parse_raw(redis_strategy_json)
+    return StrategySchema.model_validate_json(redis_strategy_json)
 
 
 async def get_async_httpx_client() -> AsyncClient:

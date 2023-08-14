@@ -10,7 +10,6 @@ from app.utils.constants import OptionType
 async def get_option_chain(
     *,
     async_redis_client,
-    symbol,
     expiry,
     strategy_schema: StrategySchema,
     option_type=None,
@@ -28,7 +27,7 @@ async def get_option_chain(
             expiry = expiry_date
 
     future_or_option_type = "FUT" if is_future else option_type
-    key = f"{symbol} {expiry} {future_or_option_type}"
+    key = f"{strategy_schema.symbol} {expiry} {future_or_option_type}"
     option_chain = await async_redis_client.hgetall(key)
     if option_chain:
         if option_type == OptionType.CE:
@@ -47,9 +46,9 @@ async def get_option_chain(
 
     if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
         raise Exception(
-            f"Option chain data for: [{symbol} {expiry} {future_or_option_type}] NOT found in redis"
+            f"Option chain data for: [{strategy_schema.symbol} {expiry} {future_or_option_type}] NOT found in redis"
         )
     else:
         logging.error(
-            f"Option chain data for: [{symbol} {expiry} {future_or_option_type}] NOT found in redis"
+            f"Option chain data for: [{strategy_schema.symbol} {expiry} {future_or_option_type}] NOT found in redis"
         )

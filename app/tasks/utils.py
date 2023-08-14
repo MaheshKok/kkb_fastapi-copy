@@ -20,7 +20,6 @@ from app.utils.option_chain import get_option_chain
 async def get_exit_price_from_option_chain(
     async_redis_client,
     redis_trade_schema_list,
-    symbol,
     expiry_date,
     option_type,
     strategy_schema: StrategySchema,
@@ -29,7 +28,6 @@ async def get_exit_price_from_option_chain(
     strikes = {trade.strike for trade in redis_trade_schema_list}
     option_chain = await get_option_chain(
         async_redis_client=async_redis_client,
-        symbol=symbol,
         expiry=expiry_date,
         strategy_schema=strategy_schema,
         option_type=option_type,
@@ -65,7 +63,7 @@ async def get_monthly_expiry_date(async_redis_client):
     return monthly_expiry_date
 
 
-async def get_future_price(async_redis_client, symbol, strategy_schema):
+async def get_future_price(async_redis_client, strategy_schema):
     monthly_expiry_date = await get_monthly_expiry_date(async_redis_client)
 
     # I hope this never happens
@@ -74,7 +72,6 @@ async def get_future_price(async_redis_client, symbol, strategy_schema):
 
     future_option_chain = await get_option_chain(
         async_redis_client=async_redis_client,
-        symbol=symbol,
         expiry=monthly_expiry_date,
         strategy_schema=strategy_schema,
         is_future=True,
@@ -109,7 +106,6 @@ async def get_strike_and_exit_price_dict(
         strike_exit_price_dict = await get_exit_price_from_option_chain(
             async_redis_client=async_redis_client,
             redis_trade_schema_list=redis_trade_schema_list,
-            symbol=signal_payload_schema.symbol,
             expiry_date=signal_payload_schema.expiry,
             option_type=ongoing_trades_option_type,
             strategy_schema=strategy_schema,
