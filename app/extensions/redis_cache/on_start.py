@@ -58,7 +58,8 @@ async def cache_ongoing_trades(async_redis_client):
                     continue
 
                 redis_trades_schema_json_list = [
-                    RedisTradeSchema.from_orm(trade_model).json() for trade_model in trade_models
+                    RedisTradeSchema.model_validate(trade_model).model_dump_json()
+                    for trade_model in trade_models
                 ]
 
                 trades_in_redis = await async_redis_client.lrange(key, 0, -1)

@@ -12,6 +12,7 @@ from starlette.types import Send
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.strategy import strategy_router
 from app.api.endpoints.trading import options_router
+from app.api.endpoints.trading import trading_router
 from app.core.config import get_config
 from app.database.base import engine_kw
 from app.database.base import get_db_url
@@ -23,6 +24,7 @@ from app.extensions.redis_cache.on_start import cache_ongoing_trades
 def register_routers(app: FastAPI):
     # include all routers
     app.include_router(healthcheck_router)
+    app.include_router(trading_router)
     app.include_router(options_router)
     app.include_router(strategy_router)
 

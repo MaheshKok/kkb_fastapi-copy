@@ -44,12 +44,12 @@ async def get_strategy_schema(
                     detail=f"Strategy: {signal_payload_schema.strategy_id} not found in redis or database",
                 )
             redis_set_result = await async_redis_client.set(
-                str(strategy_model.id), StrategySchema.from_orm(strategy_model).json()
+                str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
             )
             if not redis_set_result:
                 raise Exception(f"Redis set strategy: {strategy_model.id} failed")
 
-            return StrategySchema.from_orm(strategy_model)
+            return StrategySchema.model_validate(strategy_model)
     return StrategySchema.parse_raw(redis_strategy_json)
 
 

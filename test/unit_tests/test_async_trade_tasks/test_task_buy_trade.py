@@ -27,7 +27,7 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
         strategy_model = await async_session.get(
             StrategyModel, buy_task_payload_dict["strategy_id"]
         )
-        strategy_schema = StrategySchema.from_orm(strategy_model)
+        strategy_schema = StrategySchema.model_validate(strategy_model)
         await task_entry_trade(
             signal_payload_schema=SignalPayloadSchema(**buy_task_payload_dict),
             async_redis_client=test_async_redis_client,
@@ -66,7 +66,7 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
         strategy_model = await async_session.get(
             StrategyModel, buy_task_payload_dict["strategy_id"]
         )
-        strategy_schema = StrategySchema.from_orm(strategy_model)
+        strategy_schema = StrategySchema.model_validate(strategy_model)
         await task_entry_trade(
             signal_payload_schema=SignalPayloadSchema(**buy_task_payload_dict),
             async_redis_client=test_async_redis_client,
@@ -111,7 +111,7 @@ async def test_buy_trade_for_strike(
         strategy_model = await async_session.get(
             StrategyModel, buy_task_payload_dict["strategy_id"]
         )
-        strategy_schema = StrategySchema.from_orm(strategy_model)
+        strategy_schema = StrategySchema.model_validate(strategy_model)
         await task_entry_trade(
             signal_payload_schema=SignalPayloadSchema(**buy_task_payload_dict),
             async_redis_client=test_async_redis_client,

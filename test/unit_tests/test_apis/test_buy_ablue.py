@@ -41,7 +41,7 @@ async def test_buy_alice_blue_trade(
 
         # set strategy in redis
         await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.from_orm(strategy_model).json()
+            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
         )
 
         # set trades in redis
@@ -52,7 +52,7 @@ async def test_buy_alice_blue_trade(
         for trade_model in trade_models:
             await test_async_redis_client.rpush(
                 f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.from_orm(trade_model).json(),
+                RedisTradeSchema.model_validate(trade_model).json(),
             )
 
         await async_session.commit()
@@ -94,7 +94,7 @@ async def test_buy_alice_blue_trade(
 
         redis_trade_list = [RedisTradeSchema.parse_raw(trade) for trade in redis_trade_list_json]
         assert redis_trade_list == [
-            RedisTradeSchema.from_orm(trade_model) for trade_model in trade_models
+            RedisTradeSchema.model_validate(trade_model) for trade_model in trade_models
         ]
 
 
@@ -122,7 +122,7 @@ async def test_buy_alice_blue_trade_raise_401(
 
         # set strategy in redis
         await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.from_orm(strategy_model).json()
+            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
         )
 
         # set trades in redis
@@ -133,22 +133,44 @@ async def test_buy_alice_blue_trade_raise_401(
         for trade_model in trade_models:
             await test_async_redis_client.rpush(
                 f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.from_orm(trade_model).json(),
+                RedisTradeSchema.model_validate(trade_model).json(),
             )
 
         await async_session.commit()
 
-    # Mock the place_order method
-    async def mock_place_order(*args, **kwargs):
-        return {"stat": "Not_ok", "emsg": "401 - Unauthorized", "encKey": None}
+    # Use monkeypatch to patch the method
+    monkeypatch.setattr(
+        Pya3Aliceblue,
+        "place_order",
+        AsyncMock(
+            side_effect=[
+                {"stat": "Not_ok", "emsg": "401 - Unauthorized", "encKey": None},  # first call
+                {"stat": "ok", "NOrdNo": "1234567890"},  # second call
+            ]
+        ),
+    )
+
+    async def mock_get_order_history(*args, **kwargs):
+        return {"Avgprc": 410.5, "Status": Status.COMPLETE}
 
     # Use monkeypatch to patch the method
-    monkeypatch.setattr(Pya3Aliceblue, "place_order", AsyncMock(side_effect=mock_place_order))
+    monkeypatch.setattr(
+        Pya3Aliceblue, "get_order_history", AsyncMock(side_effect=mock_get_order_history)
+    )
+
+    async def mock_update_session_token(*args, **kwargs):
+        return "valid_session_token"
+
+    # Use monkeypatch to patch the method
+    monkeypatch.setattr(
+        "app.services.broker.utils.update_session_token",
+        AsyncMock(side_effect=mock_update_session_token),
+    )
 
     response = await test_async_client.post("/api/trading/nfo/options", json=payload)
 
-    assert response.status_code == 403
-    assert response.json() == {"detail": "401 - Unauthorized"}
+    assert response.status_code == 200
+    assert response.json() == "successfully added trade to db"
 
     async with Database() as async_session:
         # assert trade in db
@@ -157,10 +179,17 @@ async def test_buy_alice_blue_trade_raise_401(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         trade_models = fetch_trade_models_query.scalars().all()
-        # there wont be any trades in db
-        assert len(trade_models) == 0
+        assert len(trade_models) == 1
 
         # assert trade in redis
-        redis_keys = await test_async_redis_client.keys()
-        # there wont be any trades in redis
-        assert any(str(strategy_model.id) in key for key in redis_keys)
+        redis_trade_list_json = await test_async_redis_client.lrange(
+            f"{strategy_model.id} {trade_models[0].expiry} {trade_models[0].option_type}",
+            0,
+            -1,
+        )
+        assert len(redis_trade_list_json) == 1
+
+        redis_trade_list = [RedisTradeSchema.parse_raw(trade) for trade in redis_trade_list_json]
+        assert redis_trade_list == [
+            RedisTradeSchema.model_validate(trade_model) for trade_model in trade_models
+        ]

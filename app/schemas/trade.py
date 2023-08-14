@@ -7,7 +7,7 @@ from pydantic import BaseConfig
 from pydantic import BaseModel
 from pydantic import Field
 from pydantic import condecimal
-from pydantic import root_validator
+from pydantic import model_validator
 
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
@@ -27,7 +27,9 @@ class SignalPayloadSchema(BaseModel):
         example="CE",
     )
     received_at: datetime = Field(description="Received At", example="2023-05-22 05:11:01.117358")
-    premium: Optional[condecimal(decimal_places=2)] = Field(description="Premium", example=350.0)
+    premium: Optional[condecimal(decimal_places=2)] = Field(
+        description="Premium", example=350.0, default=0.0
+    )
     strike: Optional[condecimal(decimal_places=2)] = Field(
         description="Strike", example=42500.0, default=0.0
     )
@@ -35,9 +37,10 @@ class SignalPayloadSchema(BaseModel):
     broker_id: Optional[uuid.UUID] = Field(
         description="Broker ID", example="dd9acef9-e6c4-4792-9d43-d266b4d685c3", default=None
     )
-    expiry: Optional[date] = Field(description="Expiry", example="2023-06-16")
+    expiry: Optional[date] = Field(description="Expiry", example="2023-06-16", default=None)
 
     class Config:
+        from_attributes = True
         example = {
             "symbol": "BANKNIFTY",
             "quantity": 25,
@@ -66,14 +69,13 @@ class RedisTradeSchema(SignalPayloadSchema):
     )
     # the reason i am making it as optional even though its being inherited from
     # EntryTradeSchema, because when i use from_orm then TradeModel doesnt have symbol and validation fails
-    symbol: Optional[str] = Field(description="Symbol", example="BANKNIFTY")
+    symbol: Optional[str] = Field(description="Symbol", example="BANKNIFTY", default="")
     received_at: Optional[datetime] = Field(
-        description="Received At", example="2023-05-22 05:11:01.117358"
+        description="Received At", example="2023-05-22 05:11:01.117358", default=None
     )
 
     class Config(BaseConfig):
         exclude = {"symbol", "receive_at"}
-        orm_mode = True
         json_encoders = {
             datetime: lambda dt: dt.isoformat(),
             datetime.date: lambda d: d.isoformat(),
@@ -103,22 +105,24 @@ class ExitTradeSchema(BaseModel):
 
 class TradeSchema(SignalPayloadSchema):
     class Config:
-        orm_mode = True
+        from_attributes = True
 
     entry_price: condecimal(decimal_places=2) = Field(description="Entry Price", example=350.5)
     exit_price: Optional[condecimal(decimal_places=2)] = Field(
-        description="Exit Price", example=450.5
+        description="Exit Price", example=450.5, default=0.0
     )
-    profit: Optional[condecimal(decimal_places=2)] = Field(description="Profit", example=2500.0)
+    profit: Optional[condecimal(decimal_places=2)] = Field(
+        description="Profit", example=2500.0, default=0.0
+    )
 
     future_entry_price: condecimal(decimal_places=2) = Field(
         description="Future Entry Price", example=40600.5
     )
     future_exit_price: Optional[condecimal(decimal_places=2)] = Field(
-        description="Future Exit Price", example=40700.5
+        description="Future Exit Price", example=40700.5, default=0.0
     )
     future_profit: Optional[condecimal(decimal_places=2)] = Field(
-        description="Future Profit", example=2500.0
+        description="Future Profit", example=2500.0, default=0.0
     )
 
     entry_at: str = Field(
@@ -127,7 +131,7 @@ class TradeSchema(SignalPayloadSchema):
         example="2023-05-22 05:11:04.117358+00",
     )
     exit_at: Optional[str] = Field(
-        description="Exited At", example="2023-05-22 06:25:03.117358+00"
+        description="Exited At", example="2023-05-22 06:25:03.117358+00", default=None
     )
 
     expiry: date = Field(description="Expiry", example="2023-05-22")
@@ -138,11 +142,12 @@ class TradeSchema(SignalPayloadSchema):
         description="Received At", example="2023-05-22 05:11:01.117358", alias="received_at"
     )
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
     def populate_instrument(cls, values):
         # even though we dont have a out symbol field,
         # it will be fetched from strategy and attached to the payload that will go in TradeSchema,
-        return {
-            **values,
-            "instrument": f"{values['symbol']}{values['expiry'].strftime('%d%b%y').upper()}{values['strike']}{values['option_type']}",
-        }
+        if isinstance(values, dict):
+            return {
+                **values,
+                "instrument": f"{values['symbol']}{values['expiry'].strftime('%d%b%y').upper()}{values['strike']}{values['option_type']}",
+            }

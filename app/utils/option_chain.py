@@ -28,7 +28,8 @@ async def get_option_chain(
             expiry = expiry_date
 
     future_or_option_type = "FUT" if is_future else option_type
-    option_chain = await async_redis_client.hgetall(f"{symbol} {expiry} {future_or_option_type}")
+    key = f"{symbol} {expiry} {future_or_option_type}"
+    option_chain = await async_redis_client.hgetall(key)
     if option_chain:
         if option_type == OptionType.CE:
             return dict(
@@ -42,7 +43,7 @@ async def get_option_chain(
                 )
             )
         else:
-            return option_chain
+            return {"FUT": option_chain[key]}
 
     if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
         raise Exception(

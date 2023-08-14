@@ -32,7 +32,7 @@ async def test_trading_nfo_options_with_no_existing_trades(
 
         # set strategy in redis
         await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.from_orm(strategy_model).json()
+            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
         )
 
         response = await test_async_client.post("/api/trading/nfo/options", json=payload)
@@ -50,7 +50,7 @@ async def test_trading_nfo_options_with_no_existing_trades(
             f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}", 0, -1
         )
         redis_trade_list = [RedisTradeSchema.parse_raw(trade) for trade in redis_trade_list_json]
-        assert redis_trade_list == [RedisTradeSchema.from_orm(trade_model)]
+        assert redis_trade_list == [RedisTradeSchema.model_validate(trade_model)]
 
 
 @pytest.mark.asyncio
@@ -74,7 +74,7 @@ async def test_trading_nfo_options_with_existing_trade_of_same_type(
 
         # set strategy in redis
         await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.from_orm(strategy_model).json()
+            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
         )
 
         # set trades in redis
@@ -85,7 +85,7 @@ async def test_trading_nfo_options_with_existing_trade_of_same_type(
         for trade_model in trade_models:
             await test_async_redis_client.rpush(
                 f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.from_orm(trade_model).json(),
+                RedisTradeSchema.model_validate(trade_model).json(),
             )
 
         response = await test_async_client.post("/api/trading/nfo/options", json=payload)
@@ -109,7 +109,7 @@ async def test_trading_nfo_options_with_existing_trade_of_same_type(
 
         redis_trade_list = [RedisTradeSchema.parse_raw(trade) for trade in redis_trade_list_json]
         assert redis_trade_list == [
-            RedisTradeSchema.from_orm(trade_model) for trade_model in trade_models
+            RedisTradeSchema.model_validate(trade_model) for trade_model in trade_models
         ]
 
 
@@ -134,7 +134,7 @@ async def test_trading_nfo_options_with_existing_trade_of_opposite_type(
 
         # set strategy in redis
         await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.from_orm(strategy_model).json()
+            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
         )
 
         # set trades in redis
@@ -145,7 +145,7 @@ async def test_trading_nfo_options_with_existing_trade_of_opposite_type(
         for trade_model in exited_trade_models:
             await test_async_redis_client.rpush(
                 f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.from_orm(trade_model).json(),
+                RedisTradeSchema.model_validate(trade_model).json(),
             )
 
         response = await test_async_client.post("/api/trading/nfo/options", json=payload)

@@ -341,7 +341,7 @@ async def buy_task_payload_dict(test_async_redis_client):
 #     mock_redis.exists = AsyncMock(return_value=True)
 #     mock_redis.lrange = AsyncMock(
 #         return_value=[
-#             RedisTradeSchema.from_orm(trade_model).json() for trade_model in trade_models
+#             RedisTradeSchema.model_validate(trade_model).json() for trade_model in trade_models
 #         ]
 #     )
 #     mock_redis.delete = AsyncMock(return_value=True)

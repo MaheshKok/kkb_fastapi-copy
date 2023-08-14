@@ -48,7 +48,7 @@ async def test_sell_trade_without_take_away_profit(
 
         assert await test_async_redis_client.exists(redis_ongoing_key)
         strategy_model = await async_session.get(StrategyModel, strategy_model_id)
-        strategy_schema = StrategySchema.from_orm(strategy_model)
+        strategy_schema = StrategySchema.model_validate(strategy_model)
 
         await task_exit_trade(
             signal_payload_schema=signal_payload_schema,
@@ -115,7 +115,7 @@ async def test_sell_trade_updating_takeaway_profit(
         assert await test_async_redis_client.exists(redis_ongoing_key)
 
         strategy_model = await async_session.get(StrategyModel, strategy_model_id)
-        strategy_schema = StrategySchema.from_orm(strategy_model)
+        strategy_schema = StrategySchema.model_validate(strategy_model)
 
         await task_exit_trade(
             signal_payload_schema=signal_payload_schema,

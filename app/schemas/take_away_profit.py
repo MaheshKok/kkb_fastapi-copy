@@ -7,7 +7,7 @@ from pydantic import Field
 
 class TakeAwayProfitSchema(BaseModel):
     class Config:
-        orm_mode = True
+        from_attributes = True
 
     id: uuid.UUID = Field(
         description="Completed Profit ID", example="ff80cf6b-3c4a-4d28-82b0-631eafb4cdd1"

@@ -42,7 +42,7 @@ async def sell_task_args(test_async_redis_client, take_away_profit=False, ce_tra
         post_trade_payload["option_type"] = "PE" if ce_trade else "CE"
 
         redis_key = f"{strategy_model.id} {trade_models[0].expiry} {trade_models[0].option_type}"
-        redis_trades = [RedisTradeSchema.from_orm(trade) for trade in trade_models]
+        redis_trades = [RedisTradeSchema.model_validate(trade) for trade in trade_models]
 
         await test_async_redis_client.rpush(redis_key, *[trade.json() for trade in redis_trades])
         return (

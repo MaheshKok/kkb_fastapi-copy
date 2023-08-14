@@ -128,7 +128,7 @@ async def task_entry_trade(
         )
 
         trade_model = TradeModel(
-            **trade_schema.dict(exclude={"premium", "broker_id", "symbol", "received_at"})
+            **trade_schema.model_dump(exclude={"premium", "broker_id", "symbol", "received_at"})
         )
         async_session.add(trade_model)
         await async_session.flush()
@@ -137,7 +137,9 @@ async def task_entry_trade(
         # it works i confirmed this with python_console with dummy data,
         # interesting part is to get such trades i have to call lrange with 0, -1
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
-        redis_trade_json = RedisTradeSchema.from_orm(trade_model).json(exclude={"received_at"})
+        redis_trade_json = RedisTradeSchema.model_validate(trade_model).json(
+            exclude={"received_at"}
+        )
         await async_redis_client.rpush(trade_key, redis_trade_json)
         logging.info(f"{trade_model.id} added to db and redis")
 

@@ -102,7 +102,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya
 
             if not broker_model:
                 raise HTTPException(status_code=404, detail=f"Broker: {broker_id} not found")
-            broker_schema = BrokerSchema.from_orm(broker_model)
+            broker_schema = BrokerSchema.model_validate(broker_model)
             await async_redis_client.set(broker_id, broker_schema.json())
 
     # TODO: update cron updating alice blue access token to update redis as well with the latest access token
@@ -264,6 +264,12 @@ async def place_ablue_order(
             product_type=ProductType.Delivery,
         )
 
+        if "NOrdNo" in place_order_response:
+            return strike, place_order_response["NOrdNo"]
+
+    # TODO: i think below code is stale as i dont know which scenario below code handles,
+    # below code was developed when i assumed some scenario might occur which i dont remember now
+    # now i dont think below code is required, but still keeping it for now
     logging.error(f"place_order_response: {place_order_response}")
 
     # get order book and check if order is placed
