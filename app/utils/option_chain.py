@@ -42,7 +42,7 @@ async def get_option_chain(
                 )
             )
         else:
-            return {"FUT": option_chain[key]}
+            return option_chain
 
     if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
         raise Exception(

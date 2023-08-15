@@ -93,7 +93,8 @@ async def setup_redis():
         for key, option_chain in all_option_chain.items():
             if "FUT" in key:
                 # For future option chain first and second argument are same
-                pipe.hset(key, key, option_chain["FUT"])
+                pipe.delete(key)
+                pipe.hset(key, "FUT", option_chain["FUT"])
             else:
                 for strike, premium in option_chain.items():
                     pipe.hset(key, strike, premium)
