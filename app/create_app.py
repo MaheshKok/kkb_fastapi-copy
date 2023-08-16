@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 from starlette.types import Send
 
@@ -51,6 +52,9 @@ def get_app(config_file) -> FastAPI:
     # Include routers
     register_routers(app)
     app.add_middleware(TimingMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+    )
 
     # TODO: register scout and new relic
 
