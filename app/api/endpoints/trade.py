@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 trading_router = APIRouter(
-    prefix="/api/trading",
+    prefix="/api/trades",
     tags=["trading"],
 )
 

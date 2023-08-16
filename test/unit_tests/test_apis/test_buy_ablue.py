@@ -70,7 +70,7 @@ async def test_buy_alice_blue_trade(
         Pya3Aliceblue, "get_order_history", AsyncMock(side_effect=mock_get_order_history)
     )
 
-    response = await test_async_client.post("/api/trading/nfo/options", json=payload)
+    response = await test_async_client.post("/api/trades/nfo/options", json=payload)
 
     assert response.status_code == 200
     assert response.json() == "successfully added trade to db"
@@ -167,7 +167,7 @@ async def test_buy_alice_blue_trade_raise_401(
         AsyncMock(side_effect=mock_update_session_token),
     )
 
-    response = await test_async_client.post("/api/trading/nfo/options", json=payload)
+    response = await test_async_client.post("/api/trades/nfo/options", json=payload)
 
     assert response.status_code == 200
     assert response.json() == "successfully added trade to db"

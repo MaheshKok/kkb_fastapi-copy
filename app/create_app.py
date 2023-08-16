@@ -12,8 +12,8 @@ from starlette.types import Send
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.strategy import strategy_router
 from app.api.endpoints.takeaway_profit import takeaway_profit
-from app.api.endpoints.trading import options_router
-from app.api.endpoints.trading import trading_router
+from app.api.endpoints.trade import options_router
+from app.api.endpoints.trade import trading_router
 from app.core.config import get_config
 from app.database.base import engine_kw
 from app.database.base import get_db_url

@@ -3,6 +3,7 @@ import logging
 from aioredis import Redis
 from fastapi import APIRouter
 from fastapi import Depends
+from sqlalchemy import select
 
 from app.api.dependency import get_async_redis_client
 from app.database.models import StrategyModel
@@ -15,6 +16,14 @@ strategy_router = APIRouter(
     prefix="/api/strategy",
     tags=["strategy"],
 )
+
+
+@strategy_router.get("", response_model=list[StrategySchema])
+async def get_strategies():
+    async with Database() as async_session:
+        fetch_strategy_query = await async_session.execute(select(StrategyModel))
+        strategy_models = fetch_strategy_query.scalars().all()
+        return strategy_models
 
 
 @strategy_router.post("", response_model=StrategySchema)

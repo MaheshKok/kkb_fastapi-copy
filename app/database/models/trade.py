@@ -46,6 +46,3 @@ class TradeModel(Base):
         UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
     )
     strategy = relationship(StrategyModel, backref="trades")
-
-    def to_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}

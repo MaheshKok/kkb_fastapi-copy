@@ -35,7 +35,7 @@ async def test_trading_nfo_options_with_no_existing_trades(
             str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
         )
 
-        response = await test_async_client.post("/api/trading/nfo/options", json=payload)
+        response = await test_async_client.post("/api/trades/nfo/options", json=payload)
 
         assert response.status_code == 200
         assert response.json() == "successfully added trade to db"
@@ -88,7 +88,7 @@ async def test_trading_nfo_options_with_existing_trade_of_same_type(
                 RedisTradeSchema.model_validate(trade_model).json(),
             )
 
-        response = await test_async_client.post("/api/trading/nfo/options", json=payload)
+        response = await test_async_client.post("/api/trades/nfo/options", json=payload)
 
         assert response.status_code == 200
         assert response.json() == "successfully added trade to db"
@@ -148,7 +148,7 @@ async def test_trading_nfo_options_with_existing_trade_of_opposite_type(
                 RedisTradeSchema.model_validate(trade_model).json(),
             )
 
-        response = await test_async_client.post("/api/trading/nfo/options", json=payload)
+        response = await test_async_client.post("/api/trades/nfo/options", json=payload)
 
         assert response.status_code == 200
         assert response.json() == "successfully added trade to db"
