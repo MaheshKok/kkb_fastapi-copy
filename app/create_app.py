@@ -11,6 +11,7 @@ from starlette.types import Send
 
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.strategy import strategy_router
+from app.api.endpoints.takeaway_profit import takeaway_profit
 from app.api.endpoints.trading import options_router
 from app.api.endpoints.trading import trading_router
 from app.core.config import get_config
@@ -27,6 +28,7 @@ def register_routers(app: FastAPI):
     app.include_router(trading_router)
     app.include_router(options_router)
     app.include_router(strategy_router)
+    app.include_router(takeaway_profit)
 
 
 class TimingMiddleware(BaseHTTPMiddleware):

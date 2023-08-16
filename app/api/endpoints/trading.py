@@ -8,7 +8,6 @@ from aioredis import Redis
 from fastapi import APIRouter
 from fastapi import Depends
 from httpx import AsyncClient
-from pydantic import TypeAdapter
 from pydantic import parse_obj_as
 from sqlalchemy import select
 
@@ -35,7 +34,6 @@ trading_router = APIRouter(
     tags=["trading"],
 )
 
-
 options_router = APIRouter(
     prefix=f"{trading_router.prefix}/nfo",
     tags=["options"],
@@ -54,7 +52,7 @@ async def get_open_trades():
             select(TradeModel).filter(TradeModel.exit_at == None)  # noqa
         )
         trade_models = fetch_open_trades_query_.scalars().all()
-        return TypeAdapter(List[DBEntryTradeSchema]).validate_python(trade_models)
+        return trade_models
 
 
 @options_router.post("/options", status_code=200)

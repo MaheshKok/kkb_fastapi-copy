@@ -1,13 +1,13 @@
 from uuid import UUID
 
 from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import Field
 
 
 class BrokerSchema(BaseModel):
     # create pydantic model for broker based on database model (BrokerModel)
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     id: UUID = Field(description="Broker ID", example="ff80cf6b-3c4a-4d28-82b0-631eafb4cdd1")
     access_token: str = Field(

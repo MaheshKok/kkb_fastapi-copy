@@ -15,6 +15,8 @@ from app.schemas.enums import PositionEnum
 
 
 class SignalPayloadSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     quantity: int = Field(description="Quantity", example=25)
     future_entry_price_received: condecimal(decimal_places=2) = Field(
         description="Future Entry Price", example=40600.5
@@ -38,19 +40,6 @@ class SignalPayloadSchema(BaseModel):
         description="Broker ID", example="dd9acef9-e6c4-4792-9d43-d266b4d685c3", default=None
     )
     expiry: Optional[date] = Field(description="Expiry", example="2023-06-16", default=None)
-
-    class Config:
-        from_attributes = True
-        example = {
-            "symbol": "BANKNIFTY",
-            "quantity": 25,
-            "future_entry_price_received": 40600.5,
-            "strategy_id": "0d478355-1439-4f73-a72c-04bb0b3917c7",
-            "option_type": "CE",
-            "position": "LONG",
-            "received_at": "2023-05-22 05:11:01.117358",
-            "premium": 350.0,
-        }
 
 
 class RedisTradeSchema(SignalPayloadSchema):

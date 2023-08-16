@@ -1,7 +1,6 @@
 import uuid
 from typing import Optional
 
-from pydantic import BaseConfig
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -32,6 +31,4 @@ class StrategySchema(StrategyCreateSchema):
         description="Strategy ID", example="ff80cf6b-3c4a-4d28-82b0-631eafb4cdd1"
     )
 
-    class Config(BaseConfig):
-        from_attributes = True
-        json_encoders = {uuid.UUID: str}
+    model_config = ConfigDict(from_attributes=True, json_encoders={uuid.UUID: str})
