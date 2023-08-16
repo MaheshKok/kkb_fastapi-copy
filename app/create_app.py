@@ -52,8 +52,20 @@ def get_app(config_file) -> FastAPI:
     # Include routers
     register_routers(app)
     app.add_middleware(TimingMiddleware)
+
+    # Set up CORS middleware
+    origins = [
+        "http://localhost:3000",  # For local development
+        "https://kokobrothers.herokuapp.com/",
+        # Add any other origins as needed
+    ]
+
     app.add_middleware(
         CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     # TODO: register scout and new relic
