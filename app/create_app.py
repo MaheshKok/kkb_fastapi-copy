@@ -56,7 +56,7 @@ def get_app(config_file) -> FastAPI:
     # Set up CORS middleware
     origins = [
         "http://localhost:3000",  # For local development
-        "https://kokobrothers.herokuapp.com/",
+        "https://kokobrothers.herokuapp.com",
         # Add any other origins as needed
     ]
 
