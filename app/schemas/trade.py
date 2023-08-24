@@ -85,7 +85,7 @@ class ExitTradeSchema(BaseModel):
         description="Future Profit", example=2500.0
     )
     exit_at: datetime = Field(
-        description="Exited At", default=datetime.utcnow, example="2023-05-22 06:25:03.117358"
+        description="Exited At", default=datetime.utcnow(), example="2023-05-22 06:25:03.117358"
     )
     exit_received_at: datetime = Field(
         description="Received Exit At", example="2023-05-22 06:25:03.117358"
