@@ -8,6 +8,7 @@ from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.utils.constants import OptionType
 from app.utils.constants import update_trade_mappings
+from test.unit_tests.test_apis.trade import trading_options_url
 from test.unit_tests.test_data import get_test_post_trade_payload
 from test.utils import create_open_trades
 from test.utils import create_pre_db_data
@@ -17,7 +18,7 @@ from test.utils import create_pre_db_data
 @pytest.mark.parametrize(
     "option_type", [OptionType.CE, OptionType.PE], ids=["CE Options", "PE Options"]
 )
-async def test_trading_nfo_options_with_no_existing_trades(
+async def test_trading_nfo_options_first_ever_trade(
     option_type, test_async_client, test_async_redis_client
 ):
     await create_pre_db_data(users=1, strategies=1)
@@ -35,7 +36,7 @@ async def test_trading_nfo_options_with_no_existing_trades(
             str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
         )
 
-        response = await test_async_client.post("/api/trades/nfo/options", json=payload)
+        response = await test_async_client.post(trading_options_url, json=payload)
 
         assert response.status_code == 200
         assert response.json() == "successfully added trade to db"
@@ -57,7 +58,7 @@ async def test_trading_nfo_options_with_no_existing_trades(
 @pytest.mark.parametrize(
     "option_type", [OptionType.CE, OptionType.PE], ids=["CE Options", "PE Options"]
 )
-async def test_trading_nfo_options_with_existing_trade_of_same_type(
+async def test_trading_nfo_options_buy_only(
     option_type, test_async_client, test_async_redis_client
 ):
     await create_open_trades(
@@ -88,7 +89,7 @@ async def test_trading_nfo_options_with_existing_trade_of_same_type(
                 RedisTradeSchema.model_validate(trade_model).json(),
             )
 
-        response = await test_async_client.post("/api/trades/nfo/options", json=payload)
+        response = await test_async_client.post(trading_options_url, json=payload)
 
         assert response.status_code == 200
         assert response.json() == "successfully added trade to db"
@@ -117,7 +118,7 @@ async def test_trading_nfo_options_with_existing_trade_of_same_type(
 @pytest.mark.parametrize(
     "option_type", [OptionType.CE, OptionType.PE], ids=["CE Options", "PE Options"]
 )
-async def test_trading_nfo_options_with_existing_trade_of_opposite_type(
+async def test_trading_nfo_options_sell_and_buy(
     option_type, test_async_client, test_async_redis_client
 ):
     await create_open_trades(
@@ -148,7 +149,7 @@ async def test_trading_nfo_options_with_existing_trade_of_opposite_type(
                 RedisTradeSchema.model_validate(trade_model).json(),
             )
 
-        response = await test_async_client.post("/api/trades/nfo/options", json=payload)
+        response = await test_async_client.post(trading_options_url, json=payload)
 
         assert response.status_code == 200
         assert response.json() == "successfully added trade to db"

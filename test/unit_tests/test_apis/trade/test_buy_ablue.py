@@ -13,6 +13,7 @@ from app.services.broker.alice_blue import Pya3Aliceblue
 from app.utils.constants import OptionType
 from app.utils.constants import Status
 from test.factory.broker import BrokerFactory
+from test.unit_tests.test_apis.trade import trading_options_url
 from test.unit_tests.test_data import get_test_post_trade_payload
 from test.utils import create_open_trades
 
@@ -70,7 +71,7 @@ async def test_buy_alice_blue_trade(
         Pya3Aliceblue, "get_order_history", AsyncMock(side_effect=mock_get_order_history)
     )
 
-    response = await test_async_client.post("/api/trades/nfo/options", json=payload)
+    response = await test_async_client.post(trading_options_url, json=payload)
 
     assert response.status_code == 200
     assert response.json() == "successfully added trade to db"
@@ -167,7 +168,7 @@ async def test_buy_alice_blue_trade_raise_401(
         AsyncMock(side_effect=mock_update_session_token),
     )
 
-    response = await test_async_client.post("/api/trades/nfo/options", json=payload)
+    response = await test_async_client.post(trading_options_url, json=payload)
 
     assert response.status_code == 200
     assert response.json() == "successfully added trade to db"
