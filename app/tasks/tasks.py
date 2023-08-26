@@ -3,6 +3,7 @@ from datetime import datetime
 
 from aioredis import Redis
 from httpx import AsyncClient
+from line_profiler import profile  # noqa
 from sqlalchemy import bindparam
 from sqlalchemy import select
 from sqlalchemy import update
@@ -86,6 +87,7 @@ def get_futures_profit(entry_price, exit_price, quantity, position):
     return round(profit, 2)
 
 
+# @profile
 async def task_entry_trade(
     *, signal_payload_schema, async_redis_client, strategy_schema, async_httpx_client
 ):
@@ -131,13 +133,12 @@ async def task_entry_trade(
             **trade_schema.model_dump(exclude={"premium", "broker_id", "symbol", "received_at"})
         )
         async_session.add(trade_model)
-        await async_session.flush()
-        await async_session.refresh(trade_model)
+        await async_session.commit()
         # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
         # it works i confirmed this with python_console with dummy data,
         # interesting part is to get such trades i have to call lrange with 0, -1
         trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
-        redis_trade_json = RedisTradeSchema.model_validate(trade_model).json(
+        redis_trade_json = RedisTradeSchema.model_validate(trade_model).model_dump_json(
             exclude={"received_at"}
         )
         await async_redis_client.rpush(trade_key, redis_trade_json)
@@ -146,6 +147,7 @@ async def task_entry_trade(
     return "successfully added trade to db"
 
 
+# @profile
 async def task_exit_trade(
     *,
     signal_payload_schema: SignalPayloadSchema,
@@ -259,7 +261,7 @@ async def task_exit_trade(
                 },
             )
 
-        await async_session.flush()
+        await async_session.commit()
         await async_redis_client.delete(redis_ongoing_key)
     logging.info(
         f"{redis_ongoing_key} closed trades, updated the take_away_profit with the profit and deleted the redis key"
