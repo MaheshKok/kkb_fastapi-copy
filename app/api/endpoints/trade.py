@@ -8,7 +8,7 @@ from aioredis import Redis
 from fastapi import APIRouter
 from fastapi import Depends
 from httpx import AsyncClient
-from pydantic import parse_obj_as
+from pydantic import TypeAdapter
 from sqlalchemy import select
 
 from app.api.dependency import get_async_httpx_client
@@ -87,9 +87,10 @@ async def post_nfo(
         if exiting_trades_list_json := await async_redis_client.lrange(exiting_trades_key, 0, -1):
             # initiate exit_trade
             logging.info(f"Total: {len(exiting_trades_list_json)} trades to be closed")
-            redis_trade_schema_list = parse_obj_as(
-                list[RedisTradeSchema], [json.loads(trade) for trade in exiting_trades_list_json]
+            redis_trade_schema_list = TypeAdapter(List[RedisTradeSchema]).validate_python(
+                [json.loads(trade) for trade in exiting_trades_list_json]
             )
+
             await task_exit_trade(
                 **kwargs,
                 redis_ongoing_key=exiting_trades_key,

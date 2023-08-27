@@ -22,6 +22,7 @@ from app.schemas.trade import SignalPayloadSchema
 from app.tasks.utils import get_future_price
 from app.tasks.utils import get_strike_and_entry_price
 from app.tasks.utils import get_strike_and_exit_price_dict
+from app.utils.constants import update_trade_columns
 from app.utils.option_chain import get_option_chain
 
 
@@ -148,6 +149,38 @@ async def task_entry_trade(
     return "successfully added trade to db"
 
 
+def construct_update_query(updated_data):
+    # First, create a function to generate the CASE clause for a column:
+    def generate_case_clause(column_name, data_dict):
+        case_clauses = [f"{column_name} = CASE id"]
+        for _id, values in data_dict.items():
+            if (
+                column_name in ["exit_received_at", "exit_at"]
+                and values.get(column_name) != "NULL"
+            ):
+                value = f"'{values.get(column_name)}'::TIMESTAMP WITH TIME ZONE"
+            else:
+                value = values.get(column_name)
+            case_clauses.append(f"WHEN '{_id}'::UUID THEN {value}")
+        case_clauses.append(f"ELSE {column_name} END")
+        return " ".join(case_clauses)
+
+    # Create the SET clauses:
+    set_clauses = [generate_case_clause(column, updated_data) for column in update_trade_columns]
+    # Extract ids from updated_values:
+    ids_str = ",".join(["'{}'".format(_id) for _id in list(updated_data.keys())])
+    # Construct the final query:
+    query_ = text(
+        f"""
+              UPDATE trade
+              SET
+                {", ".join(set_clauses)}
+              WHERE id IN ({", ".join([_id + "::UUID" for _id in ids_str.split(",")])})
+          """
+    )
+    return query_
+
+
 # @profile
 async def task_exit_trade(
     *,
@@ -175,6 +208,8 @@ async def task_exit_trade(
     total_profit = 0
     total_future_profit = 0
 
+    exit_at = datetime.utcnow()
+    exit_received_at = signal_payload_schema.received_at
     for trade in redis_trade_schema_list:
         entry_price = float(trade.entry_price)
         quantity = trade.quantity
@@ -200,8 +235,10 @@ async def task_exit_trade(
             "profit": profit,
             "future_exit_price": future_exit_price,
             "future_profit": future_profit,
-            "exit_received_at": str(signal_payload_schema.received_at),
+            "exit_received_at": exit_received_at,
+            "exit_at": exit_at,
         }
+
         updated_data[trade.id] = mapping
         total_profit += profit
         total_future_profit += future_profit
@@ -213,44 +250,8 @@ async def task_exit_trade(
     total_profit = float(total_profit)
     total_future_profit = float(total_future_profit)
     async with Database() as async_session:
-        # First, create a function to generate the CASE clause for a column:
-        def generate_case_clause(column_name, data_dict):
-            case_clauses = [f"{column_name} = CASE id"]
-            for id, values in data_dict.items():
-                if column_name == "exit_received_at" and values.get(column_name) != "NULL":
-                    value = f"'{values.get(column_name)}'::TIMESTAMP WITH TIME ZONE"
-                else:
-                    value = values.get(column_name)
-                case_clauses.append(f"WHEN '{id}'::UUID THEN {value}")
-            case_clauses.append(f"ELSE {column_name} END")
-            return " ".join(case_clauses)
-
-        # Create the SET clauses:
-        set_clauses = []
-        columns = [
-            "exit_price",
-            "profit",
-            "future_exit_price",
-            "future_profit",
-            "exit_received_at",
-        ]
-        for column in columns:
-            set_clauses.append(generate_case_clause(column, updated_data))
-
-        # Extract ids from updated_values:
-        ids_list = list(updated_data.keys())
-        ids_str = ",".join(["'{}'".format(id) for id in ids_list])
-        # Construct the final query:
-        query = text(
-            f"""
-            UPDATE trade
-            SET
-              {", ".join(set_clauses)}
-            WHERE id IN ({", ".join([id + "::UUID" for id in ids_str.split(",")])})
-        """
-        )
-
-        await async_session.execute(query)
+        query_ = construct_update_query(updated_data)
+        await async_session.execute(query_)
         await async_session.flush()
 
         fetch_take_away_profit_query_ = await async_session.execute(

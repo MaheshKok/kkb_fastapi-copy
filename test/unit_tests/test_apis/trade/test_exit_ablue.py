@@ -12,7 +12,7 @@ from app.schemas.trade import RedisTradeSchema
 from app.services.broker.alice_blue import Pya3Aliceblue
 from app.utils.constants import OptionType
 from app.utils.constants import Status
-from app.utils.constants import update_trade_mappings
+from app.utils.constants import update_trade_columns
 from test.factory.broker import BrokerFactory
 from test.unit_tests.test_apis.trade import trading_options_url
 from test.unit_tests.test_data import get_test_post_trade_payload
@@ -93,7 +93,7 @@ async def test_exit_alice_blue_trade(
 
         # assert all trades are closed
         updated_values_dict = [
-            {key: getattr(trade_model, key) for key in update_trade_mappings}
+            {key: getattr(trade_model, key) for key in update_trade_columns}
             for trade_model in exited_trade_models
         ]
         # all parameters of a trade are updated

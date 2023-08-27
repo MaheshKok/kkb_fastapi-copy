@@ -1,5 +1,6 @@
 import pytest
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
@@ -7,7 +8,7 @@ from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.utils.constants import OptionType
-from app.utils.constants import update_trade_mappings
+from app.utils.constants import update_trade_columns
 from test.unit_tests.test_apis.trade import trading_options_url
 from test.unit_tests.test_data import get_test_post_trade_payload
 from test.utils import create_open_trades
@@ -128,7 +129,9 @@ async def test_trading_nfo_options_sell_and_buy(
     )
 
     async with Database() as async_session:
-        strategy_model = await async_session.scalar(select(StrategyModel))
+        strategy_model = await async_session.scalar(
+            select(StrategyModel).options(selectinload(StrategyModel.trades))
+        )
         payload = get_test_post_trade_payload()
         payload["strategy_id"] = str(strategy_model.id)
 
@@ -141,16 +144,15 @@ async def test_trading_nfo_options_sell_and_buy(
             StrategySchema.model_validate(strategy_model).model_dump_json(),
         )
 
+        await async_session.refresh(strategy_model)
+
         # set trades in redis
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(strategy_id=strategy_model.id)
-        )
-        exited_trade_models = fetch_trade_models_query.scalars().all()
-        for trade_model in exited_trade_models:
+        for trade_model in strategy_model.trades:
             await test_async_redis_client.rpush(
                 f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
                 RedisTradeSchema.model_validate(trade_model).model_dump_json(),
             )
+            async_session.expunge(trade_model)
 
         response = await test_async_client.post(trading_options_url, json=payload)
 
@@ -158,7 +160,6 @@ async def test_trading_nfo_options_sell_and_buy(
         assert response.json() == "successfully added trade to db"
 
         # fetch closed trades in db
-        await async_session.refresh(strategy_model)
         fetch_trade_models_query = await async_session.execute(
             select(TradeModel).filter_by(
                 strategy_id=strategy_model.id,
@@ -170,7 +171,8 @@ async def test_trading_nfo_options_sell_and_buy(
 
         # assert all trades are closed
         updated_values_dict = [
-            {key: getattr(trade_model, key) for key in update_trade_mappings}
+            getattr(trade_model, key)
+            for key in update_trade_columns
             for trade_model in exited_trade_models
         ]
         # all parameters of a trade are updated

@@ -36,11 +36,11 @@ ALICE_BLUE_DATE_FORMAT = "%d%b%y"
 FUT = "FUT"
 
 
-update_trade_mappings = {
-    "id",
+update_trade_columns = {
     "exit_price",
     "profit",
     "future_exit_price",
     "future_profit",
     "exit_received_at",
+    "exit_at",
 }
