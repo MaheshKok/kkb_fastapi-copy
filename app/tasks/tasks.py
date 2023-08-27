@@ -4,7 +4,8 @@ from typing import List
 
 from aioredis import Redis
 from httpx import AsyncClient
-from line_profiler import profile  # noqa
+
+# from line_profiler import profile  # noqa
 from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy import text
