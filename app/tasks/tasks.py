@@ -1,9 +1,11 @@
 import logging
 from datetime import datetime
+from typing import List
 
 from aioredis import Redis
 from httpx import AsyncClient
 from line_profiler import profile  # noqa
+from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy import text
 
@@ -169,7 +171,7 @@ async def task_exit_trade(
         strategy_schema=strategy_schema,
     )
 
-    updated_values = {}
+    updated_data = {}
     total_profit = 0
     total_future_profit = 0
 
@@ -181,8 +183,8 @@ async def task_exit_trade(
         if not exit_price:
             # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker
             continue
-        profit = get_options_profit(entry_price, exit_price, quantity, position)
 
+        profit = get_options_profit(entry_price, exit_price, quantity, position)
         future_entry_price = float(trade.future_entry_price)
         # if option_type is PE then position is SHORT and for CE its LONG
         future_position = (
@@ -198,12 +200,15 @@ async def task_exit_trade(
             "profit": profit,
             "future_exit_price": future_exit_price,
             "future_profit": future_profit,
-            "exit_received_at": signal_payload_schema.received_at,
+            "exit_received_at": str(signal_payload_schema.received_at),
         }
-        exit_trade_schema = ExitTradeSchema(**mapping)
-        updated_values[str(exit_trade_schema.id)] = exit_trade_schema.model_dump(exclude={"id"})
-        total_profit += exit_trade_schema.profit
-        total_future_profit += exit_trade_schema.future_profit
+        updated_data[trade.id] = mapping
+        total_profit += profit
+        total_future_profit += future_profit
+
+    # validate all mappings via ExitTradeSchema
+    ExitTradeListValidator = TypeAdapter(List[ExitTradeSchema])
+    ExitTradeListValidator.validate_python(list(updated_data.values()))
 
     total_profit = float(total_profit)
     total_future_profit = float(total_future_profit)
@@ -230,10 +235,10 @@ async def task_exit_trade(
             "exit_received_at",
         ]
         for column in columns:
-            set_clauses.append(generate_case_clause(column, updated_values))
+            set_clauses.append(generate_case_clause(column, updated_data))
 
         # Extract ids from updated_values:
-        ids_list = list(updated_values.keys())
+        ids_list = list(updated_data.keys())
         ids_str = ",".join(["'{}'".format(id) for id in ids_list])
         # Construct the final query:
         query = text(
