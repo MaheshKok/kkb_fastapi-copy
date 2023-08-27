@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import traceback
@@ -83,6 +84,7 @@ async def post_nfo(
         "strategy_schema": strategy_schema,
         "async_httpx_client": async_httpx_client,
     }
+    exit_task = None
     try:
         if exiting_trades_list_json := await async_redis_client.lrange(exiting_trades_key, 0, -1):
             # initiate exit_trade
@@ -91,16 +93,27 @@ async def post_nfo(
                 [json.loads(trade) for trade in exiting_trades_list_json]
             )
 
-            await task_exit_trade(
-                **kwargs,
-                redis_ongoing_key=exiting_trades_key,
-                redis_trade_schema_list=redis_trade_schema_list,
+            exit_task = asyncio.create_task(
+                task_exit_trade(
+                    **kwargs,
+                    redis_ongoing_key=exiting_trades_key,
+                    redis_trade_schema_list=redis_trade_schema_list,
+                )
             )
     except Exception as e:
         logging.error(f"Exception while exiting trade: {e}")
         traceback.print_exc()
 
     # initiate buy_trade
-    return await task_entry_trade(
-        **kwargs,
+    buy_task = asyncio.create_task(
+        task_entry_trade(
+            **kwargs,
+        )
     )
+
+    if exit_task:
+        await asyncio.gather(exit_task, buy_task)
+        return "successfully closed existing trades and bought a new trade"
+    else:
+        await asyncio.gather(buy_task)
+        return "successfully bought a new trade"

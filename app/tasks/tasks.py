@@ -211,7 +211,7 @@ async def task_exit_trade(
     exit_at = datetime.utcnow()
     exit_received_at = signal_payload_schema.received_at
     for trade in redis_trade_schema_list:
-        entry_price = float(trade.entry_price)
+        entry_price = trade.entry_price
         quantity = trade.quantity
         position = trade.position
         exit_price = strike_exit_price_dict.get(trade.strike) or 0.0
@@ -220,7 +220,7 @@ async def task_exit_trade(
             continue
 
         profit = get_options_profit(entry_price, exit_price, quantity, position)
-        future_entry_price = float(trade.future_entry_price)
+        future_entry_price = trade.future_entry_price
         # if option_type is PE then position is SHORT and for CE its LONG
         future_position = (
             PositionEnum.SHORT if trade.option_type == OptionTypeEnum.PE else PositionEnum.LONG
@@ -247,8 +247,8 @@ async def task_exit_trade(
     ExitTradeListValidator = TypeAdapter(List[ExitTradeSchema])
     ExitTradeListValidator.validate_python(list(updated_data.values()))
 
-    total_profit = float(total_profit)
-    total_future_profit = float(total_future_profit)
+    total_profit = round(total_profit, 2)
+    total_future_profit = round(total_future_profit, 0)
     async with Database() as async_session:
         query_ = construct_update_query(updated_data)
         await async_session.execute(query_)

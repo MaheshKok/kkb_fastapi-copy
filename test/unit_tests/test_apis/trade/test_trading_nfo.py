@@ -41,7 +41,7 @@ async def test_trading_nfo_options_first_ever_trade(
         response = await test_async_client.post(trading_options_url, json=payload)
 
         assert response.status_code == 200
-        assert response.json() == "successfully added trade to db"
+        assert response.json() == "successfully bought a new trade"
 
         # assert trade in db
         trade_model = await async_session.scalar(select(TradeModel))
@@ -95,7 +95,7 @@ async def test_trading_nfo_options_buy_only(
         response = await test_async_client.post(trading_options_url, json=payload)
 
         assert response.status_code == 200
-        assert response.json() == "successfully added trade to db"
+        assert response.json() == "successfully bought a new trade"
 
         # assert trade in db
         await async_session.refresh(strategy_model)
@@ -157,7 +157,7 @@ async def test_trading_nfo_options_sell_and_buy(
         response = await test_async_client.post(trading_options_url, json=payload)
 
         assert response.status_code == 200
-        assert response.json() == "successfully added trade to db"
+        assert response.json() == "successfully closed existing trades and bought a new trade"
 
         # fetch closed trades in db
         fetch_trade_models_query = await async_session.execute(

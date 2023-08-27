@@ -74,7 +74,7 @@ async def test_buy_alice_blue_trade(
     response = await test_async_client.post(trading_options_url, json=payload)
 
     assert response.status_code == 200
-    assert response.json() == "successfully added trade to db"
+    assert response.json() == "successfully bought a new trade"
 
     async with Database() as async_session:
         # assert trade in db
@@ -171,7 +171,7 @@ async def test_buy_alice_blue_trade_raise_401(
     response = await test_async_client.post(trading_options_url, json=payload)
 
     assert response.status_code == 200
-    assert response.json() == "successfully added trade to db"
+    assert response.json() == "successfully bought a new trade"
 
     async with Database() as async_session:
         # assert trade in db

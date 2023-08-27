@@ -127,7 +127,6 @@ async def get_strike_and_entry_price_from_option_chain(
             return strike, premium
         # even if strike is not present in option chain then the closest strike will be fetched
         # convert it to float for comparison
-        strike = float(strike)
         for option_strike, option_strike_premium in option_chain.items():
             if option_strike_premium != 0.0 and option_strike <= strike:
                 return strike, option_strike_premium
