@@ -4,9 +4,8 @@ from datetime import datetime
 from aioredis import Redis
 from httpx import AsyncClient
 from line_profiler import profile  # noqa
-from sqlalchemy import bindparam
 from sqlalchemy import select
-from sqlalchemy import update
+from sqlalchemy import text
 
 from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
@@ -126,7 +125,7 @@ async def task_entry_trade(
             entry_price=entry_price,
             future_entry_price=future_entry_price,
             entry_received_at=signal_payload_schema.received_at,
-            **signal_payload_schema.dict(exclude={"premium"}),
+            **signal_payload_schema.model_dump(exclude={"premium"}),
         )
 
         trade_model = TradeModel(
@@ -170,7 +169,7 @@ async def task_exit_trade(
         strategy_schema=strategy_schema,
     )
 
-    updated_values = []
+    updated_values = {}
     total_profit = 0
     total_future_profit = 0
 
@@ -202,13 +201,53 @@ async def task_exit_trade(
             "exit_received_at": signal_payload_schema.received_at,
         }
         exit_trade_schema = ExitTradeSchema(**mapping)
-        updated_values.append(exit_trade_schema)
+        updated_values[str(exit_trade_schema.id)] = exit_trade_schema.model_dump(exclude={"id"})
         total_profit += exit_trade_schema.profit
         total_future_profit += exit_trade_schema.future_profit
 
     total_profit = float(total_profit)
     total_future_profit = float(total_future_profit)
     async with Database() as async_session:
+        # First, create a function to generate the CASE clause for a column:
+        def generate_case_clause(column_name, data_dict):
+            case_clauses = [f"{column_name} = CASE id"]
+            for id, values in data_dict.items():
+                if column_name == "exit_received_at" and values.get(column_name) != "NULL":
+                    value = f"'{values.get(column_name)}'::TIMESTAMP WITH TIME ZONE"
+                else:
+                    value = values.get(column_name)
+                case_clauses.append(f"WHEN '{id}'::UUID THEN {value}")
+            case_clauses.append(f"ELSE {column_name} END")
+            return " ".join(case_clauses)
+
+        # Create the SET clauses:
+        set_clauses = []
+        columns = [
+            "exit_price",
+            "profit",
+            "future_exit_price",
+            "future_profit",
+            "exit_received_at",
+        ]
+        for column in columns:
+            set_clauses.append(generate_case_clause(column, updated_values))
+
+        # Extract ids from updated_values:
+        ids_list = list(updated_values.keys())
+        ids_str = ",".join(["'{}'".format(id) for id in ids_list])
+        # Construct the final query:
+        query = text(
+            f"""
+            UPDATE trade
+            SET
+              {", ".join(set_clauses)}
+            WHERE id IN ({", ".join([id + "::UUID" for id in ids_str.split(",")])})
+        """
+        )
+
+        await async_session.execute(query)
+        await async_session.flush()
+
         fetch_take_away_profit_query_ = await async_session.execute(
             select(TakeAwayProfitModel).filter_by(strategy_id=strategy_schema.id)
         )
@@ -219,7 +258,6 @@ async def task_exit_trade(
             take_away_profit_model.future_profit += total_future_profit
             take_away_profit_model.total_trades += len(redis_trade_schema_list)
             take_away_profit_model.updated_at = datetime.now()
-            await async_session.flush()
         else:
             take_away_profit_model = TakeAwayProfitModel(
                 profit=total_profit,
@@ -228,38 +266,6 @@ async def task_exit_trade(
                 total_trades=len(redis_trade_schema_list),
             )
             async_session.add(take_away_profit_model)
-            await async_session.flush()
-
-            # Build a list of update statements for each dictionary in updated_data
-
-        update_stmt = (
-            update(TradeModel)
-            .where(TradeModel.id == bindparam("_id"))
-            .values(
-                {
-                    "exit_price": bindparam("exit_price"),
-                    "profit": bindparam("profit"),
-                    "future_exit_price": bindparam("future_exit_price"),
-                    "future_profit": bindparam("future_profit"),
-                    # received_exit_at is basically received_at
-                    "exit_received_at": bindparam("exit_received_at"),
-                    "exit_at": bindparam("exit_at"),
-                }
-            )
-        )
-        for mapping in updated_values:
-            await async_session.execute(
-                update_stmt,
-                {
-                    "_id": mapping.id,
-                    "exit_price": mapping.exit_price,
-                    "profit": mapping.profit,
-                    "future_exit_price": mapping.future_exit_price,
-                    "future_profit": mapping.future_profit,
-                    "exit_received_at": mapping.exit_received_at,
-                    "exit_at": mapping.exit_at,
-                },
-            )
 
         await async_session.commit()
         await async_redis_client.delete(redis_ongoing_key)

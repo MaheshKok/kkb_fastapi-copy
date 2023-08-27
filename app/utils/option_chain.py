@@ -31,16 +31,19 @@ async def get_option_chain(
     option_chain = await async_redis_client.hgetall(key)
     if option_chain:
         if option_type == OptionType.CE:
-            return dict(
-                sorted([(float(key), float(value)) for key, value in option_chain.items()])
-            )
+            option_chain = {
+                float(strike): float(ltp)
+                for strike, ltp in sorted(option_chain.items(), key=lambda item: float(item[0]))
+            }
+            return option_chain
         elif option_type == OptionType.PE:
-            return dict(
-                sorted(
-                    [(float(key), float(value)) for key, value in option_chain.items()],
-                    reverse=True,
+            option_chain = {
+                float(strike): float(ltp)
+                for strike, ltp in sorted(
+                    option_chain.items(), key=lambda item: float(item[0]), reverse=True
                 )
-            )
+            }
+            return option_chain
         else:
             return option_chain
 

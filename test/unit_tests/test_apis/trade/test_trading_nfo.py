@@ -33,7 +33,8 @@ async def test_trading_nfo_options_first_ever_trade(
 
         # set strategy in redis
         await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
+            str(strategy_model.id),
+            StrategySchema.model_validate(strategy_model).model_dump_json(),
         )
 
         response = await test_async_client.post(trading_options_url, json=payload)
@@ -75,7 +76,8 @@ async def test_trading_nfo_options_buy_only(
 
         # set strategy in redis
         await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
+            str(strategy_model.id),
+            StrategySchema.model_validate(strategy_model).model_dump_json(),
         )
 
         # set trades in redis
@@ -86,7 +88,7 @@ async def test_trading_nfo_options_buy_only(
         for trade_model in trade_models:
             await test_async_redis_client.rpush(
                 f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.model_validate(trade_model).json(),
+                RedisTradeSchema.model_validate(trade_model).model_dump_json(),
             )
 
         response = await test_async_client.post(trading_options_url, json=payload)
@@ -122,7 +124,7 @@ async def test_trading_nfo_options_sell_and_buy(
     option_type, test_async_client, test_async_redis_client
 ):
     await create_open_trades(
-        users=1, strategies=1, trades=10, ce_trade=option_type != OptionType.CE
+        users=1, strategies=1, trades=100, ce_trade=option_type != OptionType.CE
     )
 
     async with Database() as async_session:
@@ -135,7 +137,8 @@ async def test_trading_nfo_options_sell_and_buy(
 
         # set strategy in redis
         await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
+            str(strategy_model.id),
+            StrategySchema.model_validate(strategy_model).model_dump_json(),
         )
 
         # set trades in redis
@@ -146,7 +149,7 @@ async def test_trading_nfo_options_sell_and_buy(
         for trade_model in exited_trade_models:
             await test_async_redis_client.rpush(
                 f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.model_validate(trade_model).json(),
+                RedisTradeSchema.model_validate(trade_model).model_dump_json(),
             )
 
         response = await test_async_client.post(trading_options_url, json=payload)
@@ -163,7 +166,7 @@ async def test_trading_nfo_options_sell_and_buy(
             )
         )
         exited_trade_models = fetch_trade_models_query.scalars().all()
-        assert len(exited_trade_models) == 10
+        assert len(exited_trade_models) == 100
 
         # assert all trades are closed
         updated_values_dict = [
