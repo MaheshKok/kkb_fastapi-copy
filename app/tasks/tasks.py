@@ -27,9 +27,6 @@ from app.utils.constants import update_trade_columns
 from app.utils.option_chain import get_option_chain
 
 
-logger = logging.getLogger(__name__)
-
-
 def calculate_futures_charges(buy_price, sell_price, total_lots):
     # this is exact calculation
     brokerage = 30
@@ -187,7 +184,7 @@ async def dump_trade_in_db(
         )
         async_session.add(trade_model)
         await async_session.commit()
-        logger.info(
+        logging.info(
             f"Strategy: [ {strategy_schema.name} ], new trade: [{trade_model.id}] added to DB"
         )
         # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
@@ -198,7 +195,7 @@ async def dump_trade_in_db(
             exclude={"received_at"}
         )
         await async_redis_client.rpush(trade_key, redis_trade_json)
-        logger.info(
+        logging.info(
             f"Strategy: [ {strategy_schema.name} ], new Trade: [ {trade_model.id} ] added to Redis"
         )
 
@@ -238,11 +235,11 @@ async def close_trades_in_db(
             async_session.add(take_away_profit_model)
 
         await async_session.commit()
-        logger.info(
+        logging.info(
             f"Total Trade: [ {total_redis_trades} ] closed successfully for strategy: [ {strategy_schema.name} ]"
         )
         await async_redis_client.delete(redis_ongoing_key)
-        logger.info(
+        logging.info(
             f"Redis Key: [ {redis_ongoing_key} ] deleted from redis successfully for strategy: [ {strategy_schema.name} ]"
         )
 
@@ -276,15 +273,15 @@ async def task_entry_trade(
 
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
     if not strike:
-        logger.info(
+        logging.info(
             f"Strategy: [ {strategy_schema.name} ], skipping entry of new tradde as strike is Null: {entry_price}"
         )
         return None
 
-    logger.info(
+    logging.info(
         f"Strategy: [ {strategy_schema.name} ], new trade with strike: [ {strike} ] and entry price: [ {entry_price} ] entering into db"
     )
-    logger.info(
+    logging.info(
         f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
     )
 
@@ -325,14 +322,14 @@ async def task_exit_trade(
             strategy_schema=strategy_schema,
         ),
     )
-    logger.info(
+    logging.info(
         f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
     )
 
     updated_data, total_profit, total_future_profit = await calculate_profits(
         strike_exit_price_dict, future_exit_price, signal_payload_schema, redis_trade_schema_list
     )
-    logger.info(
+    logging.info(
         f"Strategy: [ {strategy_schema.name} ], adding profit: [ {total_profit} ] and future profit: [ {total_future_profit} ]"
     )
 

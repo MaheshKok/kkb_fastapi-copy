@@ -24,9 +24,6 @@ from app.database.session_manager.db_session import Database
 from app.extensions.redis_cache.on_start import cache_ongoing_trades
 
 
-logger = logging.getLogger(__name__)
-
-
 def register_routers(app: FastAPI):
     # include all routers
     app.include_router(healthcheck_router)
@@ -42,11 +39,11 @@ class TimingMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         process_time = time.time() - start_time
         try:
-            logger.info(
+            logging.info(
                 f" API: [ {request.scope['route'].path} ] request processing time: {process_time} seconds"
             )
         except KeyError:
-            logger.info(f" Invalid Api Endpoint: [ {request.scope['path']} ]")
+            logging.info(f" Invalid Api Endpoint: [ {request.scope['path']} ]")
 
         return response
 
@@ -97,7 +94,7 @@ async def lifespan(app):
 
     # create a task to cache ongoing trades in Redis
     asyncio.create_task(cache_ongoing_trades(async_redis_client))
-    logger.info("Triggered background tasks to sync redis with database")
+    logging.info("Triggered background tasks to sync redis with database")
 
     try:
         yield

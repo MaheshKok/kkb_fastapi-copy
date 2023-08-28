@@ -1,4 +1,3 @@
-import logging
 from typing import List
 
 from fastapi import APIRouter
@@ -8,9 +7,6 @@ from app.database.models import TakeAwayProfitModel
 from app.database.session_manager.db_session import Database
 from app.schemas.take_away_profit import TakeAwayProfitSchema
 
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 takeaway_profit = APIRouter(
     prefix="/api/takeaway_profit",

@@ -26,10 +26,6 @@ from app.tasks.tasks import task_entry_trade
 from app.tasks.tasks import task_exit_trade
 
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
 trading_router = APIRouter(
     prefix="/api/trading",
     tags=["trading"],
@@ -63,7 +59,7 @@ async def post_nfo(
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
 ):
-    logger.info(
+    logging.info(
         f"Received signal payload to buy: [ {signal_payload_schema.option_type} ] for strategy: {strategy_schema.name}"
     )
     todays_date = datetime.now().date()
@@ -91,7 +87,7 @@ async def post_nfo(
     try:
         if exiting_trades_list_json := await async_redis_client.lrange(exiting_trades_key, 0, -1):
             # initiate exit_trade
-            logger.info(f"Existing total: {len(exiting_trades_list_json)} trades to be closed")
+            logging.info(f"Existing total: {len(exiting_trades_list_json)} trades to be closed")
             redis_trade_schema_list = TypeAdapter(List[RedisTradeSchema]).validate_python(
                 [json.loads(trade) for trade in exiting_trades_list_json]
             )
@@ -104,7 +100,7 @@ async def post_nfo(
                 )
             )
     except Exception as e:
-        logger.error(f"Exception while exiting trade: {e}")
+        logging.error(f"Exception while exiting trade: {e}")
         traceback.print_exc()
 
     # initiate buy_trade
