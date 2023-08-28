@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import logging.config
 import time
 from contextlib import asynccontextmanager
 
@@ -23,8 +24,7 @@ from app.database.session_manager.db_session import Database
 from app.extensions.redis_cache.on_start import cache_ongoing_trades
 
 
-logging.basicConfig(level=logging.INFO)
-
+logging.config.fileConfig("log.ini")
 logger = logging.getLogger(__name__)
 
 
@@ -42,9 +42,13 @@ class TimingMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
         response = await call_next(request)
         process_time = time.time() - start_time
-        logger.info(
-            f" API: [ {request.scope['route'].path} ] request processing time: {process_time} seconds"
-        )
+        try:
+            logger.info(
+                f" API: [ {request.scope['route'].path} ] request processing time: {process_time} seconds"
+            )
+        except KeyError:
+            logger.info(f" Invalid Api Endpoint: [ {request.scope['path']} ]")
+
         return response
 
 
