@@ -7,8 +7,6 @@ from app.create_app import get_app
 from app.utils.constants import ConfigFile
 
 
-logging.config.fileConfig("../log.ini")
-
 app = get_app(ConfigFile.PRODUCTION)
 
 
@@ -18,7 +16,6 @@ if __name__ == "__main__":
             app,
             host="0.0.0.0",
             port=int(os.environ.get("PORT", 8000)),
-            log_config="../log.ini",
             log_level="debug",
         )
     except BaseException as e:
