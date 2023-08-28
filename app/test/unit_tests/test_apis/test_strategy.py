@@ -5,8 +5,8 @@ from sqlalchemy import select
 
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
-from test.factory.strategy import StrategyFactory
-from test.factory.user import UserFactory
+from app.test.factory.strategy import StrategyFactory
+from app.test.factory.user import UserFactory
 
 
 @pytest.mark.asyncio

@@ -8,7 +8,7 @@ from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.tasks.tasks import task_exit_trade
-from test.unit_tests.test_async_trade_tasks.conftest import sell_task_args
+from app.test.unit_tests.test_async_trade_tasks.conftest import sell_task_args
 
 
 # I just fixed them , but didnt assert so many things which are mentioned at the bottom

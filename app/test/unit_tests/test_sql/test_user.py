@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.database.models import User
 from app.database.session_manager.db_session import Database
-from test.factory.user import UserFactory
+from app.test.factory.user import UserFactory
 
 
 @pytest.mark.asyncio

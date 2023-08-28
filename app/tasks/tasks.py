@@ -27,10 +27,7 @@ from app.utils.constants import update_trade_columns
 from app.utils.option_chain import get_option_chain
 
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+logger = logging.getLogger(__name__)
 
 
 def calculate_futures_charges(buy_price, sell_price, total_lots):
@@ -168,7 +165,7 @@ async def calculate_profits(
     ExitTradeListValidator = TypeAdapter(List[ExitTradeSchema])
     ExitTradeListValidator.validate_python(list(updated_data.values()))
 
-    return updated_data, round(total_profit, 2), round(total_future_profit, 0)
+    return updated_data, round(total_profit, 2), round(total_future_profit, 2)
 
 
 async def dump_trade_in_db(
@@ -190,6 +187,9 @@ async def dump_trade_in_db(
         )
         async_session.add(trade_model)
         await async_session.commit()
+        logger.info(
+            f"Strategy: [ {strategy_schema.name} ], new trade: [{trade_model.id}] added to DB"
+        )
         # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
         # it works i confirmed this with python_console with dummy data,
         # interesting part is to get such trades i have to call lrange with 0, -1
@@ -198,7 +198,9 @@ async def dump_trade_in_db(
             exclude={"received_at"}
         )
         await async_redis_client.rpush(trade_key, redis_trade_json)
-        logging.info(f"{trade_model.id} added to db and redis")
+        logger.info(
+            f"Strategy: [ {strategy_schema.name} ], new Trade: [ {trade_model.id} ] added to Redis"
+        )
 
 
 async def close_trades_in_db(
@@ -236,7 +238,13 @@ async def close_trades_in_db(
             async_session.add(take_away_profit_model)
 
         await async_session.commit()
+        logger.info(
+            f"Total Trade: [ {total_redis_trades} ] closed successfully for strategy: [ {strategy_schema.name} ]"
+        )
         await async_redis_client.delete(redis_ongoing_key)
+        logger.info(
+            f"Redis Key: [ {redis_ongoing_key} ] deleted from redis successfully for strategy: [ {strategy_schema.name} ]"
+        )
 
 
 # @profile
@@ -268,7 +276,17 @@ async def task_entry_trade(
 
     # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
     if not strike:
+        logger.info(
+            f"Strategy: [ {strategy_schema.name} ], skipping entry of new tradde as strike is Null: {entry_price}"
+        )
         return None
+
+    logger.info(
+        f"Strategy: [ {strategy_schema.name} ], new trade with strike: [ {strike} ] and entry price: [ {entry_price} ] entering into db"
+    )
+    logger.info(
+        f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
+    )
 
     # this is very important to set strike to signal_payload_schema as it would be used hereafter
     signal_payload_schema.strike = strike
@@ -307,9 +325,15 @@ async def task_exit_trade(
             strategy_schema=strategy_schema,
         ),
     )
+    logger.info(
+        f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
+    )
 
     updated_data, total_profit, total_future_profit = await calculate_profits(
         strike_exit_price_dict, future_exit_price, signal_payload_schema, redis_trade_schema_list
+    )
+    logger.info(
+        f"Strategy: [ {strategy_schema.name} ], adding profit: [ {total_profit} ] and future profit: [ {total_future_profit} ]"
     )
 
     # update database with the updated data
@@ -323,7 +347,4 @@ async def task_exit_trade(
         redis_ongoing_key=redis_ongoing_key,
     )
 
-    logging.info(
-        f"{redis_ongoing_key} closed trades, updated the take_away_profit with the profit and deleted the redis key"
-    )
     return f"{redis_ongoing_key} closed trades, updated the take_away_profit with the profit and deleted the redis key"

@@ -24,9 +24,9 @@ from app.database.base import get_db_url
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
 from app.tasks.utils import get_monthly_expiry_date
+from app.test.unit_tests.test_data import get_test_post_trade_payload
+from app.test.utils import create_pre_db_data
 from app.utils.constants import ConfigFile
-from test.unit_tests.test_data import get_test_post_trade_payload
-from test.utils import create_pre_db_data
 
 
 logging.basicConfig(

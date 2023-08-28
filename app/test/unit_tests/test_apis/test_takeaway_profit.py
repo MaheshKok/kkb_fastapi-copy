@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.database.models import TakeAwayProfitModel
 from app.database.session_manager.db_session import Database
-from test.utils import create_open_trades
+from app.test.utils import create_open_trades
 
 
 @pytest.mark.asyncio

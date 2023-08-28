@@ -1,11 +1,11 @@
 from datetime import timedelta
 
+from app.test.factory.strategy import StrategyFactory
+from app.test.factory.take_away_profit import TakeAwayProfitFactory
+from app.test.factory.trade import CompletedTradeFactory
+from app.test.factory.trade import LiveTradeFactory
+from app.test.factory.user import UserFactory
 from app.utils.constants import OptionType
-from test.factory.strategy import StrategyFactory
-from test.factory.take_away_profit import TakeAwayProfitFactory
-from test.factory.trade import CompletedTradeFactory
-from test.factory.trade import LiveTradeFactory
-from test.factory.user import UserFactory
 
 
 async def create_open_trades(

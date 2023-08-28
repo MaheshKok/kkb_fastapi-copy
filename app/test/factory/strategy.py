@@ -7,9 +7,9 @@ import pytest
 
 from app.database.models import StrategyModel
 from app.schemas.enums import PositionEnum
-from test.factory.base_factory import AsyncSQLAlchemyFactory
-from test.factory.create_async_session import async_session
-from test.factory.user import UserFactory
+from app.test.factory.base_factory import AsyncSQLAlchemyFactory
+from app.test.factory.create_async_session import async_session
+from app.test.factory.user import UserFactory
 
 
 @pytest.mark.asyncio

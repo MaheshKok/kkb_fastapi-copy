@@ -4,8 +4,8 @@ import uuid
 import factory
 
 from app.database.models import BrokerModel
-from test.factory.base_factory import AsyncSQLAlchemyFactory
-from test.factory.create_async_session import async_session
+from app.test.factory.base_factory import AsyncSQLAlchemyFactory
+from app.test.factory.create_async_session import async_session
 
 
 class BrokerFactory(AsyncSQLAlchemyFactory):

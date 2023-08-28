@@ -10,13 +10,13 @@ from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.services.broker.alice_blue import Pya3Aliceblue
+from app.test.factory.broker import BrokerFactory
+from app.test.unit_tests.test_apis.trade import trading_options_url
+from app.test.unit_tests.test_data import get_test_post_trade_payload
+from app.test.utils import create_open_trades
 from app.utils.constants import OptionType
 from app.utils.constants import Status
 from app.utils.constants import update_trade_columns
-from test.factory.broker import BrokerFactory
-from test.unit_tests.test_apis.trade import trading_options_url
-from test.unit_tests.test_data import get_test_post_trade_payload
-from test.utils import create_open_trades
 
 
 @pytest.mark.asyncio

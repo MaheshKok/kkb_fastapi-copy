@@ -8,8 +8,8 @@ from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
-from test.unit_tests.test_data import get_test_post_trade_payload
-from test.utils import create_open_trades
+from app.test.unit_tests.test_data import get_test_post_trade_payload
+from app.test.utils import create_open_trades
 
 
 async def sell_task_args(test_async_redis_client, take_away_profit=False, ce_trade=False):

@@ -5,9 +5,9 @@ from datetime import timedelta
 import factory
 
 from app.database.models import DailyProfitModel
-from test.factory.base_factory import AsyncSQLAlchemyFactory
-from test.factory.create_async_session import async_session
-from test.factory.strategy import StrategyFactory
+from app.test.factory.base_factory import AsyncSQLAlchemyFactory
+from app.test.factory.create_async_session import async_session
+from app.test.factory.strategy import StrategyFactory
 
 
 class DailyProfitFactory(AsyncSQLAlchemyFactory):

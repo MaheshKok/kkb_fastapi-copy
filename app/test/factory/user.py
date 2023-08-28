@@ -6,8 +6,8 @@ import factory
 from factory import Sequence
 
 from app.database.models import User
-from test.factory.base_factory import AsyncSQLAlchemyFactory
-from test.factory.create_async_session import async_session
+from app.test.factory.base_factory import AsyncSQLAlchemyFactory
+from app.test.factory.create_async_session import async_session
 
 
 class UserFactory(AsyncSQLAlchemyFactory):

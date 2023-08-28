@@ -7,12 +7,12 @@ from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
+from app.test.unit_tests.test_apis.trade import trading_options_url
+from app.test.unit_tests.test_data import get_test_post_trade_payload
+from app.test.utils import create_open_trades
+from app.test.utils import create_pre_db_data
 from app.utils.constants import OptionType
 from app.utils.constants import update_trade_columns
-from test.unit_tests.test_apis.trade import trading_options_url
-from test.unit_tests.test_data import get_test_post_trade_payload
-from test.utils import create_open_trades
-from test.utils import create_pre_db_data
 
 
 @pytest.mark.asyncio

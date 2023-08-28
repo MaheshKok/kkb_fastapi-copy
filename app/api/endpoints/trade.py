@@ -63,6 +63,9 @@ async def post_nfo(
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
 ):
+    logger.info(
+        f"Received signal payload to buy: [ {signal_payload_schema.option_type} ] for strategy: {strategy_schema.name}"
+    )
     todays_date = datetime.now().date()
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
         async_redis_client, todays_date
@@ -88,7 +91,7 @@ async def post_nfo(
     try:
         if exiting_trades_list_json := await async_redis_client.lrange(exiting_trades_key, 0, -1):
             # initiate exit_trade
-            logging.info(f"Total: {len(exiting_trades_list_json)} trades to be closed")
+            logger.info(f"Existing total: {len(exiting_trades_list_json)} trades to be closed")
             redis_trade_schema_list = TypeAdapter(List[RedisTradeSchema]).validate_python(
                 [json.loads(trade) for trade in exiting_trades_list_json]
             )
@@ -101,7 +104,7 @@ async def post_nfo(
                 )
             )
     except Exception as e:
-        logging.error(f"Exception while exiting trade: {e}")
+        logger.error(f"Exception while exiting trade: {e}")
         traceback.print_exc()
 
     # initiate buy_trade
