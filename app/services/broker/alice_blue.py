@@ -115,6 +115,7 @@ class Pya3Aliceblue(Aliceblue):
 
     def __init__(
         self,
+        *,
         user_id,
         password,
         api_key,
@@ -132,6 +133,7 @@ class Pya3Aliceblue(Aliceblue):
         self.totp = totp
         self.twoFA = twoFA
         self.app_id = app_id
+        self.api_key = api_key
 
     async def login_and_get_session_id(self):
         """Login and get Session ID"""
@@ -191,11 +193,6 @@ class Pya3Aliceblue(Aliceblue):
         # Web Login Api Key
         userSessionID = verify_totp_response.json()["userSessionID"]
         header["Authorization"] = f"Bearer {self.user_id} {userSessionID}"
-        get_api_key_response = await self.async_httpx_client.post(
-            self._sub_urls["getApiKey"], headers=header
-        )
-        logging.info(f"Api Key response {get_api_key_response.text}")
-        api_key = get_api_key_response.json()["api_key"]
 
         # Get API Encryption Key
         data = {"userId": self.user_id}
@@ -208,7 +205,7 @@ class Pya3Aliceblue(Aliceblue):
         encKey = api_enc_key_response.json()["encKey"]
 
         # Get User Details/Session ID
-        checksum = hashlib.sha256(f"{self.user_id}{api_key}{encKey}".encode()).hexdigest()
+        checksum = hashlib.sha256(f"{self.user_id}{self.api_key}{encKey}".encode()).hexdigest()
         data = {"userId": self.user_id, "userData": checksum}
         session_id_response = await self.async_httpx_client.post(
             self._sub_urls["sessionID"],
