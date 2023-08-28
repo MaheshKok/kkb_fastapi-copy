@@ -24,7 +24,6 @@ from app.database.session_manager.db_session import Database
 from app.extensions.redis_cache.on_start import cache_ongoing_trades
 
 
-logging.config.fileConfig("log.ini")
 logger = logging.getLogger(__name__)
 
 
@@ -96,9 +95,9 @@ async def lifespan(app):
     logging.info("Initialized redis")
     app.state.async_redis_client = async_redis_client
 
-    logger.info("Starting background tasks to sync redis with database")
     # create a task to cache ongoing trades in Redis
     asyncio.create_task(cache_ongoing_trades(async_redis_client))
+    logger.info("Triggered background tasks to sync redis with database")
 
     try:
         yield
