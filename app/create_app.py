@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import logging.config
 import time
 from contextlib import asynccontextmanager
 
