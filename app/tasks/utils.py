@@ -63,7 +63,7 @@ async def get_monthly_expiry_date(async_redis_client):
     return monthly_expiry_date
 
 
-async def get_future_price(async_redis_client, strategy_schema):
+async def get_future_price(async_redis_client, strategy_schema) -> float:
     monthly_expiry_date = await get_monthly_expiry_date(async_redis_client)
 
     # I hope this never happens
@@ -151,7 +151,7 @@ async def get_strike_and_entry_price(
     signal_payload_schema: SignalPayloadSchema,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
-):
+) -> tuple[float, float]:
     strike, premium = await get_strike_and_entry_price_from_option_chain(
         option_chain=option_chain, signal_payload_schema=signal_payload_schema
     )
