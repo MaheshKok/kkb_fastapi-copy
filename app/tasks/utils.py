@@ -17,6 +17,11 @@ from app.utils.constants import OptionType
 from app.utils.option_chain import get_option_chain
 
 
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+
 async def get_exit_price_from_option_chain(
     async_redis_client,
     redis_trade_schema_list,

@@ -26,6 +26,10 @@ from app.tasks.tasks import task_entry_trade
 from app.tasks.tasks import task_exit_trade
 
 
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
 trading_router = APIRouter(
     prefix="/api/trading",
     tags=["trading"],

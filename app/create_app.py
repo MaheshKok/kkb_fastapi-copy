@@ -23,6 +23,11 @@ from app.database.session_manager.db_session import Database
 from app.extensions.redis_cache.on_start import cache_ongoing_trades
 
 
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+
 def register_routers(app: FastAPI):
     # include all routers
     app.include_router(healthcheck_router)

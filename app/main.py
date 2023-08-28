@@ -1,3 +1,4 @@
+import logging
 import logging.config
 import os
 
@@ -7,6 +8,9 @@ from app.create_app import get_app
 from app.utils.constants import ConfigFile
 
 
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 app = get_app(ConfigFile.PRODUCTION)
 
 
