@@ -1,14 +1,17 @@
 import asyncio
+import json
 import logging
 from datetime import datetime
 from typing import List
 
+import aioredis
 from aioredis import Redis
 from httpx import AsyncClient
 from line_profiler import profile  # noqa
 from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
@@ -165,8 +168,34 @@ async def calculate_profits(
     return updated_data, round(total_profit, 2), round(total_future_profit, 2)
 
 
-async def dump_trade_in_db(
-    *, strategy_schema, entry_price, future_entry_price, signal_payload_schema, async_redis_client
+async def push_trade_to_redis(
+    async_redis_client: aioredis.StrictRedis, trade_model: TradeModel, async_session: AsyncSession
+):
+    # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
+    # it works i confirmed this with python_console with dummy data,
+    # interesting part is to get such trades i have to call lrange with 0, -1
+    redis_key = str(trade_model.strategy_id)
+    redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
+    redis_trades = await async_redis_client.hgetall(f"{redis_key} {redis_hash}")
+    new_trade_json = RedisTradeSchema.model_validate(trade_model).model_dump_json(
+        exclude={"received_at"}
+    )
+    if not redis_trades:
+        redis_trades_list = []
+    else:
+        redis_trades_list = json.loads(redis_trades)
+    redis_trades_list.append(new_trade_json)
+    await async_redis_client.delete(redis_key)
+    await async_redis_client.hset(redis_key, redis_hash, json.dumps(redis_trades_list))
+
+
+async def dump_trade_in_db_and_redis(
+    *,
+    strategy_schema: StrategySchema,
+    entry_price: float,
+    future_entry_price: float,
+    signal_payload_schema: SignalPayloadSchema,
+    async_redis_client: aioredis.StrictRedis,
 ):
     async with Database() as async_session:
         # Use the AsyncSession to perform database operations
@@ -187,28 +216,21 @@ async def dump_trade_in_db(
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], new trade: [{trade_model.id}] added to DB"
         )
-        # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
-        # it works i confirmed this with python_console with dummy data,
-        # interesting part is to get such trades i have to call lrange with 0, -1
-        trade_key = f"{trade_model.strategy_id} {trade_model.expiry} {trade_model.option_type}"
-        redis_trade_json = RedisTradeSchema.model_validate(trade_model).model_dump_json(
-            exclude={"received_at"}
-        )
-        await async_redis_client.rpush(trade_key, redis_trade_json)
+        await push_trade_to_redis(async_redis_client, trade_model, async_session)
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], new Trade: [ {trade_model.id} ] added to Redis"
         )
 
 
-async def close_trades_in_db(
+async def update_trades_in_db(
     *,
-    updated_data,
-    strategy_schema,
-    total_profit,
-    total_future_profit,
-    total_redis_trades,
-    async_redis_client,
-    redis_ongoing_key,
+    updated_data: dict,
+    strategy_schema: StrategySchema,
+    total_profit: float,
+    total_future_profit: float,
+    total_redis_trades: int,
+    async_redis_client: aioredis.StrictRedis,
+    redis_strategy_key_hash: str,
 ):
     async with Database() as async_session:
         query_ = construct_update_query(updated_data)
@@ -238,15 +260,21 @@ async def close_trades_in_db(
         logging.info(
             f"Total Trade: [ {total_redis_trades} ] closed successfully for strategy: [ {strategy_schema.name} ]"
         )
-        await async_redis_client.delete(redis_ongoing_key)
+        redis_strategy_key = redis_strategy_key_hash.split()[0]
+        redis_strategy_hash = " ".join(redis_strategy_key_hash.split()[1:])
+        await async_redis_client.hdel(redis_strategy_key, redis_strategy_hash)
         logging.info(
-            f"Redis Key: [ {redis_ongoing_key} ] deleted from redis successfully for strategy: [ {strategy_schema.name} ]"
+            f"Redis Key: [ {redis_strategy_key_hash} ] deleted from redis successfully for strategy: [ {strategy_schema.name} ]"
         )
 
 
 # @profile
 async def task_entry_trade(
-    *, signal_payload_schema, async_redis_client, strategy_schema, async_httpx_client
+    *,
+    signal_payload_schema: SignalPayloadSchema,
+    async_redis_client: aioredis.StrictRedis,
+    strategy_schema: StrategySchema,
+    async_httpx_client: AsyncClient,
 ):
     option_chain = await get_option_chain(
         async_redis_client=async_redis_client,
@@ -288,7 +316,7 @@ async def task_entry_trade(
     # this is very important to set strike to signal_payload_schema as it would be used hereafter
     signal_payload_schema.strike = strike
 
-    await dump_trade_in_db(
+    await dump_trade_in_db_and_redis(
         strategy_schema=strategy_schema,
         entry_price=entry_price,
         future_entry_price=future_entry_price,
@@ -303,7 +331,7 @@ async def task_entry_trade(
 async def task_exit_trade(
     *,
     signal_payload_schema: SignalPayloadSchema,
-    redis_ongoing_key: str,
+    redis_strategy_key_hash: str,
     redis_trade_schema_list: list[RedisTradeSchema],
     async_redis_client: Redis,
     strategy_schema: StrategySchema,
@@ -334,14 +362,14 @@ async def task_exit_trade(
     )
 
     # update database with the updated data
-    await close_trades_in_db(
+    await update_trades_in_db(
         updated_data=updated_data,
         strategy_schema=strategy_schema,
         total_profit=total_profit,
         total_future_profit=total_future_profit,
         total_redis_trades=len(redis_trade_schema_list),
         async_redis_client=async_redis_client,
-        redis_ongoing_key=redis_ongoing_key,
+        redis_strategy_key_hash=redis_strategy_key_hash,
     )
 
-    return f"{redis_ongoing_key} closed trades, updated the take_away_profit with the profit and deleted the redis key"
+    return f"{redis_strategy_key_hash} closed trades, updated the take_away_profit with the profit and deleted the redis key"

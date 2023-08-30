@@ -52,7 +52,7 @@ async def test_sell_trade_without_take_away_profit(
 
         await task_exit_trade(
             signal_payload_schema=signal_payload_schema,
-            redis_ongoing_key=redis_ongoing_key,
+            redis_strategy_key_hash=redis_ongoing_key,
             redis_trade_schema_list=redis_trade_schema_list,
             async_redis_client=test_async_redis_client,
             strategy_schema=strategy_schema,
@@ -119,7 +119,7 @@ async def test_sell_trade_updating_takeaway_profit(
 
         await task_exit_trade(
             signal_payload_schema=signal_payload_schema,
-            redis_ongoing_key=redis_ongoing_key,
+            redis_strategy_key_hash=redis_ongoing_key,
             redis_trade_schema_list=redis_trade_schema_list,
             async_redis_client=test_async_redis_client,
             strategy_schema=strategy_schema,

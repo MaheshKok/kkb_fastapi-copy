@@ -31,7 +31,9 @@ async def get_strategy_schema(
     signal_payload_schema: SignalPayloadSchema,
     async_redis_client: Redis = Depends(get_async_redis_client),
 ) -> StrategySchema:
-    redis_strategy_json = await async_redis_client.get(str(signal_payload_schema.strategy_id))
+    redis_strategy_json = await async_redis_client.hget(
+        str(signal_payload_schema.strategy_id), "strategy"
+    )
     if not redis_strategy_json:
         async with Database() as async_session:
             fetch_strategy_query = await async_session.execute(

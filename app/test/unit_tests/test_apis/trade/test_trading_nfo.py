@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -49,10 +51,12 @@ async def test_trading_nfo_options_first_ever_trade(
         assert trade_model.strategy_id == strategy_model.id
 
         # assert trade in redis
-        redis_trade_list_json = await test_async_redis_client.lrange(
-            f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}", 0, -1
+        redis_trade_json = await test_async_redis_client.hget(
+            f"{strategy_model.id}", f"{trade_model.expiry} {trade_model.option_type}"
         )
-        redis_trade_list = [RedisTradeSchema.parse_raw(trade) for trade in redis_trade_list_json]
+        redis_trade_list = [
+            RedisTradeSchema.model_validate_json(trade) for trade in json.loads(redis_trade_json)
+        ]
         assert redis_trade_list == [RedisTradeSchema.model_validate(trade_model)]
 
 
@@ -139,20 +143,28 @@ async def test_trading_nfo_options_sell_and_buy(
             payload["option_type"] = OptionType.PE
 
         # set strategy in redis
-        await test_async_redis_client.set(
+        await test_async_redis_client.hset(
             str(strategy_model.id),
+            "strategy",
             StrategySchema.model_validate(strategy_model).model_dump_json(),
         )
 
         await async_session.refresh(strategy_model)
 
         # set trades in redis
-        for trade_model in strategy_model.trades:
-            await test_async_redis_client.rpush(
-                f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.model_validate(trade_model).model_dump_json(),
-            )
-            async_session.expunge(trade_model)
+        redis_trade_schema_list = json.dumps(
+            [
+                RedisTradeSchema.model_validate(trade).model_dump_json()
+                for trade in strategy_model.trades
+            ]
+        )
+
+        trade_model = strategy_model.trades[0]
+        await test_async_redis_client.hset(
+            f"{strategy_model.id}",
+            f"{trade_model.expiry} {trade_model.option_type}",
+            redis_trade_schema_list,
+        )
 
         response = await test_async_client.post(trading_options_url, json=payload)
 
