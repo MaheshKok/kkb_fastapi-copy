@@ -141,7 +141,7 @@ async def task_backup_db():
 aiocron.crontab("*/60 * * * *", func=task_interval_test)  # Every 60 minutes
 aiocron.crontab("20 23 * * *", func=task_cron_test)  # At 23:19 every day
 aiocron.crontab("0 2 * * *", func=task_backup_db)  # Every day at 02:00
-aiocron.crontab("0 3 * * 5", func=task_clean_redis)  # Every Friday at 03:00
+aiocron.crontab("0 1 * * 1", func=task_clean_redis)  # Every Friday at 03:00
 aiocron.crontab("0 3 * * *", func=task_update_expiry_list)  # Every day at 03:00
 aiocron.crontab("10 3 * * *", func=task_update_session_token)  # Every day at 03:10
 aiocron.crontab("30 3 * * *", func=task_update_session_token)  # Every day at 03:30
