@@ -176,16 +176,17 @@ async def push_trade_to_redis(
     # interesting part is to get such trades i have to call lrange with 0, -1
     redis_key = str(trade_model.strategy_id)
     redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
-    redis_trades = await async_redis_client.hgetall(f"{redis_key} {redis_hash}")
+    redis_trades_json = await async_redis_client.hget(redis_key, redis_hash)
     new_trade_json = RedisTradeSchema.model_validate(trade_model).model_dump_json(
         exclude={"received_at"}
     )
-    if not redis_trades:
-        redis_trades_list = []
-    else:
-        redis_trades_list = json.loads(redis_trades)
+    redis_trades_list = []
+    if redis_trades_json:
+        redis_trades_list = json.loads(redis_trades_json)
     redis_trades_list.append(new_trade_json)
-    await async_redis_client.delete(redis_key)
+    redis_key_type = await async_redis_client.type(redis_key)
+    if type(redis_key_type) == str:
+        await async_redis_client.delete(redis_key)
     await async_redis_client.hset(redis_key, redis_hash, json.dumps(redis_trades_list))
 
 
