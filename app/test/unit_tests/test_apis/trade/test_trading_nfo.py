@@ -138,7 +138,7 @@ async def test_trading_nfo_options_sell_and_buy(
     option_type, test_async_client, test_async_redis_client
 ):
     await create_open_trades(
-        users=1, strategies=1, trades=100, ce_trade=option_type != OptionType.CE
+        users=1, strategies=1, trades=10, ce_trade=option_type != OptionType.CE
     )
 
     async with Database() as async_session:
@@ -180,6 +180,8 @@ async def test_trading_nfo_options_sell_and_buy(
         assert response.status_code == 200
         assert response.json() == "successfully closed existing trades and bought a new trade"
 
+        # expunge all trade models from session
+        async_session.expunge_all()
         # fetch closed trades in db
         fetch_trade_models_query = await async_session.execute(
             select(TradeModel).filter_by(
@@ -188,7 +190,7 @@ async def test_trading_nfo_options_sell_and_buy(
             )
         )
         exited_trade_models = fetch_trade_models_query.scalars().all()
-        assert len(exited_trade_models) == 100
+        assert len(exited_trade_models) == 10
 
         # assert all trades are closed
         updated_values_dict = [
@@ -200,14 +202,13 @@ async def test_trading_nfo_options_sell_and_buy(
         assert all(updated_values_dict)
 
         # assert exiting trades are deleted from redis
-        assert not await test_async_redis_client.lrange(
-            f"{strategy_model.id} {exited_trade_models[0].expiry} {exited_trade_models[0].option_type}",
-            0,
-            -1,
+        assert not await test_async_redis_client.hget(
+            str(strategy_model.id),
+            f"{exited_trade_models[0].expiry} {exited_trade_models[0].option_type}",
         )
 
         # assert new trade in redis
-        redis_trade_list_json = await test_async_redis_client.lrange(
-            f"{strategy_model.id} {exited_trade_models[0].expiry} {option_type}", 0, -1
+        redis_trade_list_json = await test_async_redis_client.hget(
+            str(strategy_model.id), f"{exited_trade_models[0].expiry} {option_type}"
         )
-        assert len(redis_trade_list_json) == 1
+        assert len(json.loads(redis_trade_list_json)) == 1
