@@ -190,6 +190,7 @@ async def push_trade_to_redis(
     hset_result = await async_redis_client.hset(
         redis_key, redis_hash, json.dumps(redis_trades_list)
     )
+    await async_session.refresh(trade_model)
     if not hset_result:
         logging.error(
             f"Strategy: [ {trade_model.strategy_id} ], new trade: [{trade_model.id}] failed to be added to Redis"
