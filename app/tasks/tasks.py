@@ -184,13 +184,9 @@ async def push_trade_to_redis(
     if redis_trades_json:
         redis_trades_list = json.loads(redis_trades_json)
     redis_trades_list.append(new_trade_json)
-    redis_key_type = await async_redis_client.type(redis_key)
-    if type(redis_key_type) == str:
-        await async_redis_client.delete(redis_key)
     hset_result = await async_redis_client.hset(
         redis_key, redis_hash, json.dumps(redis_trades_list)
     )
-    await async_session.refresh(trade_model)
     if not hset_result:
         logging.error(
             f"Strategy: [ {trade_model.strategy_id} ], new trade: [{trade_model.id}] failed to be added to Redis"
@@ -272,7 +268,7 @@ async def update_trades_in_db(
         redis_strategy_key = redis_strategy_key_hash.split()[0]
         redis_strategy_hash = " ".join(redis_strategy_key_hash.split()[1:])
         result = await async_redis_client.hdel(redis_strategy_key, redis_strategy_hash)
-        if result == 0:
+        if result == 1:
             logging.info(
                 f"Redis Key: [ {redis_strategy_key_hash} ] deleted from redis successfully for strategy: [ {strategy_schema.name} ]"
             )

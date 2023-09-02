@@ -12,6 +12,7 @@ from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import SignalPayloadSchema
+from app.utils.constants import STRATEGY
 
 
 def get_app(request: Request) -> FastAPI:
@@ -45,8 +46,10 @@ async def get_strategy_schema(
                     status_code=404,
                     detail=f"Strategy: {signal_payload_schema.strategy_id} not found in redis or database",
                 )
-            redis_set_result = await async_redis_client.set(
-                str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
+            redis_set_result = await async_redis_client.hset(
+                str(strategy_model.id),
+                STRATEGY,
+                StrategySchema.model_validate(strategy_model).model_dump_json(),
             )
             if not redis_set_result:
                 raise Exception(f"Redis set strategy: {strategy_model.id} failed")
