@@ -79,7 +79,7 @@ async def test_sell_trade_without_take_away_profit(
 
         # key and hash has been removed from redis
         assert not await test_async_redis_client.hget(
-            redis_trade_key_hash.split()[0], redis_trade_key_hash.split()[1]
+            str(trades[0].strategy_id), redis_trade_key_hash
         )
 
 
@@ -148,7 +148,7 @@ async def test_sell_trade_updating_takeaway_profit(
 
         # key has been removed from redis
         assert not await test_async_redis_client.hget(
-            redis_trade_key_hash.split()[0], redis_trade_key_hash.split()[1]
+            str(trades[0].strategy_id), redis_trade_key_hash
         )
 
 
