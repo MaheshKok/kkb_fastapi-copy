@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from sqlalchemy import select
@@ -41,13 +42,22 @@ async def sell_task_args(test_async_redis_client, take_away_profit=False, ce_tra
         post_trade_payload["expiry"] = current_expiry_date
         post_trade_payload["option_type"] = "PE" if ce_trade else "CE"
 
-        redis_key = f"{strategy_model.id} {trade_models[0].expiry} {trade_models[0].option_type}"
-        redis_trades = [RedisTradeSchema.model_validate(trade) for trade in trade_models]
+        redis_trade_schema_list = [
+            RedisTradeSchema.model_validate(trade) for trade in trade_models
+        ]
 
-        await test_async_redis_client.rpush(redis_key, *[trade.json() for trade in redis_trades])
+        redis_trade_key_hash = (
+            f"{strategy_model.id} {trade_models[0].expiry} {trade_models[0].option_type}"
+        )
+
+        await test_async_redis_client.hset(
+            redis_trade_key_hash.split()[0],
+            redis_trade_key_hash.split()[1],
+            json.dumps([trade.model_dump_json() for trade in redis_trade_schema_list]),
+        )
         return (
             strategy_model.id,
             SignalPayloadSchema(**post_trade_payload),
-            redis_key,
-            redis_trades,
+            redis_trade_key_hash,
+            redis_trade_schema_list,
         )

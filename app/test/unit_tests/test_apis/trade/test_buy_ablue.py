@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock
 
 import pytest
@@ -14,6 +15,7 @@ from app.test.factory.broker import BrokerFactory
 from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_open_trades
+from app.utils.constants import STRATEGY
 from app.utils.constants import OptionType
 from app.utils.constants import Status
 
@@ -41,8 +43,10 @@ async def test_buy_alice_blue_trade(
             payload["option_type"] = OptionType.PE
 
         # set strategy in redis
-        await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
+        await test_async_redis_client.hset(
+            str(strategy_model.id),
+            STRATEGY,
+            StrategySchema.model_validate(strategy_model).model_dump_json(),
         )
 
         # set trades in redis
@@ -51,9 +55,10 @@ async def test_buy_alice_blue_trade(
         )
         trade_models = fetch_trade_models_query.scalars().all()
         for trade_model in trade_models:
-            await test_async_redis_client.rpush(
-                f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.model_validate(trade_model).json(),
+            await test_async_redis_client.hset(
+                f"{strategy_model.id}",
+                f"{trade_model.expiry} {trade_model.option_type}",
+                RedisTradeSchema.model_validate(trade_model).model_dump_json(),
             )
 
         await async_session.commit()
@@ -86,14 +91,16 @@ async def test_buy_alice_blue_trade(
         assert len(trade_models) == 1
 
         # assert trade in redis
-        redis_trade_list_json = await test_async_redis_client.lrange(
-            f"{strategy_model.id} {trade_models[0].expiry} {trade_models[0].option_type}",
-            0,
-            -1,
+        redis_trade_json = await test_async_redis_client.hget(
+            f"{strategy_model.id}",
+            f"{trade_models[0].expiry} {trade_models[0].option_type}",
         )
-        assert len(redis_trade_list_json) == 1
+        redis_trade_json_list = json.loads(redis_trade_json)
+        assert len(redis_trade_json_list) == 1
 
-        redis_trade_list = [RedisTradeSchema.parse_raw(trade) for trade in redis_trade_list_json]
+        redis_trade_list = [
+            RedisTradeSchema.model_validate_json(trade) for trade in redis_trade_json_list
+        ]
         assert redis_trade_list == [
             RedisTradeSchema.model_validate(trade_model) for trade_model in trade_models
         ]
@@ -122,8 +129,10 @@ async def test_buy_alice_blue_trade_raise_401(
             payload["option_type"] = OptionType.PE
 
         # set strategy in redis
-        await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
+        await test_async_redis_client.hset(
+            str(strategy_model.id),
+            STRATEGY,
+            StrategySchema.model_validate(strategy_model).model_dump_json(),
         )
 
         # set trades in redis
@@ -132,9 +141,10 @@ async def test_buy_alice_blue_trade_raise_401(
         )
         trade_models = fetch_trade_models_query.scalars().all()
         for trade_model in trade_models:
-            await test_async_redis_client.rpush(
-                f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.model_validate(trade_model).json(),
+            await test_async_redis_client.hset(
+                str(strategy_model.id),
+                f"{trade_model.expiry} {trade_model.option_type}",
+                RedisTradeSchema.model_validate(trade_model).model_dump_json(),
             )
 
         await async_session.commit()
@@ -183,14 +193,17 @@ async def test_buy_alice_blue_trade_raise_401(
         assert len(trade_models) == 1
 
         # assert trade in redis
-        redis_trade_list_json = await test_async_redis_client.lrange(
-            f"{strategy_model.id} {trade_models[0].expiry} {trade_models[0].option_type}",
-            0,
-            -1,
+        redis_trade_json = await test_async_redis_client.hget(
+            f"{strategy_model.id}",
+            f"{trade_models[0].expiry} {trade_models[0].option_type}",
         )
-        assert len(redis_trade_list_json) == 1
 
-        redis_trade_list = [RedisTradeSchema.parse_raw(trade) for trade in redis_trade_list_json]
+        redis_trade_json_list = json.loads(redis_trade_json)
+        assert len(redis_trade_json_list) == 1
+
+        redis_trade_list = [
+            RedisTradeSchema.model_validate_json(trade) for trade in redis_trade_json_list
+        ]
         assert redis_trade_list == [
             RedisTradeSchema.model_validate(trade_model) for trade_model in trade_models
         ]

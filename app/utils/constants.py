@@ -44,3 +44,5 @@ update_trade_columns = {
     "exit_received_at",
     "exit_at",
 }
+
+STRATEGY = "strategy"

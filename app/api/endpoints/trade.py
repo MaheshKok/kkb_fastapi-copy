@@ -71,7 +71,10 @@ async def post_nfo(
         async_redis_client, todays_date
     )
 
-    exiting_trades_key = f"{signal_payload_schema.strategy_id} {current_expiry_date} {'PE' if signal_payload_schema.option_type == 'CE' else 'CE' }"
+    trades_key = f"{signal_payload_schema.strategy_id}"
+    redis_hash = (
+        f"{current_expiry_date} {'PE' if signal_payload_schema.option_type == 'CE' else 'CE' }"
+    )
 
     # TODO: in future decide based on strategy new column, strategy_type:
     # if strategy_position is "every" then close all ongoing trades and buy new trade
@@ -89,17 +92,18 @@ async def post_nfo(
     }
     exit_task = None
     try:
-        if exiting_trades_list_json := await async_redis_client.lrange(exiting_trades_key, 0, -1):
+        if exiting_trades_json := await async_redis_client.hget(trades_key, redis_hash):
             # initiate exit_trade
-            logging.info(f"Existing total: {len(exiting_trades_list_json)} trades to be closed")
+            exiting_trades_json_list = json.loads(exiting_trades_json)
+            logging.info(f"Existing total: {len(exiting_trades_json_list)} trades to be closed")
             redis_trade_schema_list = TypeAdapter(List[RedisTradeSchema]).validate_python(
-                [json.loads(trade) for trade in exiting_trades_list_json]
+                [json.loads(trade) for trade in exiting_trades_json_list]
             )
 
             exit_task = asyncio.create_task(
                 task_exit_trade(
                     **kwargs,
-                    redis_ongoing_key=exiting_trades_key,
+                    redis_strategy_key_hash=f"{trades_key} {redis_hash}",
                     redis_trade_schema_list=redis_trade_schema_list,
                 )
             )

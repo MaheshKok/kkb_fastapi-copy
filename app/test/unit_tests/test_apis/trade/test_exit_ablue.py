@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock
 
 import pytest
@@ -14,6 +15,7 @@ from app.test.factory.broker import BrokerFactory
 from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_open_trades
+from app.utils.constants import STRATEGY
 from app.utils.constants import OptionType
 from app.utils.constants import Status
 from app.utils.constants import update_trade_columns
@@ -44,8 +46,10 @@ async def test_exit_alice_blue_trade(
             payload["option_type"] = OptionType.PE
 
         # set strategy in redis
-        await test_async_redis_client.set(
-            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
+        await test_async_redis_client.hset(
+            str(strategy_model.id),
+            STRATEGY,
+            StrategySchema.model_validate(strategy_model).model_dump_json(),
         )
 
         # set trades in redis
@@ -53,11 +57,17 @@ async def test_exit_alice_blue_trade(
             select(TradeModel).filter_by(strategy_id=strategy_model.id)
         )
         trade_models = fetch_trade_models_query.scalars().all()
-        for trade_model in trade_models:
-            await test_async_redis_client.rpush(
-                f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.model_validate(trade_model).json(),
-            )
+        trade_model = trade_models[0]
+        await test_async_redis_client.hset(
+            f"{strategy_model.id}",
+            f"{trade_model.expiry} {trade_model.option_type}",
+            json.dumps(
+                [
+                    RedisTradeSchema.model_validate(trade_model).model_dump_json()
+                    for trade_model in trade_models
+                ]
+            ),
+        )
 
         await async_session.commit()
 
@@ -100,17 +110,16 @@ async def test_exit_alice_blue_trade(
         assert all(updated_values_dict)
 
         # assert exiting trades are deleted from redis
-        assert not await test_async_redis_client.lrange(
-            f"{strategy_model.id} {exited_trade_models[0].expiry} {exited_trade_models[0].option_type}",
-            0,
-            -1,
+        assert not await test_async_redis_client.hget(
+            f"{strategy_model.id}",
+            f"{exited_trade_models[0].expiry} {exited_trade_models[0].option_type}",
         )
 
         # assert new trade in redis
-        redis_trade_list_json = await test_async_redis_client.lrange(
-            f"{strategy_model.id} {exited_trade_models[0].expiry} {option_type}", 0, -1
+        redis_trade_json = await test_async_redis_client.hget(
+            f"{strategy_model.id}", f"{exited_trade_models[0].expiry} {option_type}"
         )
-        assert len(redis_trade_list_json) == 1
+        assert len(json.loads(redis_trade_json)) == 1
 
 
 # TODO: we dont need below unit test because

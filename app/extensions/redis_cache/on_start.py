@@ -6,7 +6,6 @@ from sqlalchemy import select
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.trade import RedisTradeSchema
-from app.utils.constants import OptionType
 
 
 async def cache_ongoing_trades(async_redis_client):
@@ -39,38 +38,66 @@ async def cache_ongoing_trades(async_redis_client):
         ongoing_trades_model = live_trades_query.scalars().all()
         redis_key_trade_models_dict = {}
         for ongoing_trade_model in ongoing_trades_model:
-            redis_key = f"{ongoing_trade_model.strategy_id} {ongoing_trade_model.expiry} {ongoing_trade_model.option_type}"
-            if redis_key not in redis_key_trade_models_dict:
-                redis_key_trade_models_dict[redis_key] = []
-            redis_key_trade_models_dict[redis_key].append(ongoing_trade_model)
-            # counter_key is used to store the counter trade for the ongoing trade
-            # if the ongoing trade is CE then the counter trade is PE and vice versa
-            counter_key = f"{ongoing_trade_model.strategy_id} {ongoing_trade_model.expiry} {OptionType.CE if ongoing_trade_model.option_type == OptionType.PE else OptionType.PE}"
-            redis_key_trade_models_dict[counter_key] = []
+            redis_hash = f"{ongoing_trade_model.expiry} {ongoing_trade_model.option_type}"
+            strategy_id = f"{ongoing_trade_model.strategy_id}"
+            if strategy_id not in redis_key_trade_models_dict:
+                redis_key_trade_models_dict[strategy_id] = {redis_hash: []}
+            if (
+                strategy_id in redis_key_trade_models_dict
+                and redis_hash not in redis_key_trade_models_dict[strategy_id]
+            ):
+                redis_key_trade_models_dict[strategy_id][redis_hash] = []
+
+            redis_key_trade_models_dict[strategy_id][redis_hash].append(ongoing_trade_model)
 
         # pipeline ensures theres one round trip to redis
         async with async_redis_client.pipeline() as pipe:
             # store ongoing trades in redis for faster access
-            for key, trade_models in redis_key_trade_models_dict.items():
-                # this will make sure that if theres any discrepancy in db and redis, then redis will be updated
-                if not trade_models:
-                    await async_redis_client.delete(key)
-                    continue
+            for (
+                strategy_id,
+                redis_strategy_hash_trade_models_dict,
+            ) in redis_key_trade_models_dict.items():
+                for (
+                    redis_strategy_hash,
+                    trade_models_list,
+                ) in redis_strategy_hash_trade_models_dict.items():
+                    # if ongoing trades are not present in redis or
+                    # if the length of ongoing trades in redis is not equal to the length of ongoing trades in db
+                    # then update the ongoing trades in redis
 
-                redis_trades_schema_json_list = [
-                    RedisTradeSchema.model_validate(trade_model).model_dump_json()
-                    for trade_model in trade_models
-                ]
+                    # this will make sure that if theres any discrepancy in db and redis, then redis will be updated
+                    if not trade_models_list:
+                        async_redis_client.hdel(strategy_id, redis_strategy_hash)
+                        continue
 
-                trades_in_redis = await async_redis_client.lrange(key, 0, -1)
-                # if ongoing trades are not present in redis or
-                # if the length of ongoing trades in redis is not equal to the length of ongoing trades in db
-                # then update the ongoing trades in redis
-                if not trades_in_redis:
-                    await async_redis_client.rpush(key, json.dumps(redis_trades_schema_json_list))
-                elif trades_in_redis and len(trades_in_redis) != len(trade_models):
-                    await async_redis_client.delete(key)
-                    await async_redis_client.rpush(key, *redis_trades_schema_json_list)
+                    trades_in_redis_json = await async_redis_client.hget(
+                        strategy_id, redis_strategy_hash
+                    )
+                    trades_in_redis = None
+                    if trades_in_redis_json:
+                        trades_in_redis = json.loads(trades_in_redis_json)
+                    if (
+                        not trades_in_redis
+                        or trades_in_redis
+                        and len(trades_in_redis) != len(trade_models_list)
+                    ):
+                        redis_trades_schema_json_list = [
+                            RedisTradeSchema.model_validate(trade_model).model_dump_json()
+                            for trade_model in trade_models_list
+                        ]
+                        result = await async_redis_client.hset(
+                            strategy_id,
+                            redis_strategy_hash,
+                            json.dumps(redis_trades_schema_json_list),
+                        )
+                        if result:
+                            logging.info(
+                                f"Ongoing trades cached in redis for {strategy_id} {redis_strategy_hash}"
+                            )
+                        else:
+                            logging.error(
+                                f"Ongoing trades not cached in redis for {strategy_id} {redis_strategy_hash}"
+                            )
 
-            await pipe.execute()
-            logging.info("Ongoing trades cached in redis")
+        await pipe.execute()
+        logging.info("Ongoing trades cached in redis")
