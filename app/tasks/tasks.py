@@ -263,10 +263,15 @@ async def update_trades_in_db(
         )
         redis_strategy_key = redis_strategy_key_hash.split()[0]
         redis_strategy_hash = " ".join(redis_strategy_key_hash.split()[1:])
-        await async_redis_client.hdel(redis_strategy_key, redis_strategy_hash)
-        logging.info(
-            f"Redis Key: [ {redis_strategy_key_hash} ] deleted from redis successfully for strategy: [ {strategy_schema.name} ]"
-        )
+        result = await async_redis_client.hdel(redis_strategy_key, redis_strategy_hash)
+        if result == 0:
+            logging.info(
+                f"Redis Key: [ {redis_strategy_key_hash} ] deleted from redis successfully for strategy: [ {strategy_schema.name} ]"
+            )
+        else:
+            logging.error(
+                f"Redis Key: [ {redis_strategy_key_hash} ] not deleted from redis for strategy: [ {strategy_schema.name} ]"
+            )
 
 
 # @profile

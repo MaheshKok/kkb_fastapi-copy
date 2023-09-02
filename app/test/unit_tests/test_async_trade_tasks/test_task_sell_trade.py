@@ -32,7 +32,7 @@ async def test_sell_trade_without_take_away_profit(
     (
         strategy_model_id,
         signal_payload_schema,
-        redis_ongoing_key,
+        redis_trade_key_hash,
         redis_trade_schema_list,
     ) = await sell_task_args(
         test_async_redis_client, take_away_profit=take_away_profit, ce_trade=ce_trade
@@ -46,13 +46,13 @@ async def test_sell_trade_without_take_away_profit(
         take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
         assert take_away_profit_model is None
 
-        assert await test_async_redis_client.exists(redis_ongoing_key)
+        assert await test_async_redis_client.exists(str(strategy_model_id))
         strategy_model = await async_session.get(StrategyModel, strategy_model_id)
         strategy_schema = StrategySchema.model_validate(strategy_model)
 
         await task_exit_trade(
             signal_payload_schema=signal_payload_schema,
-            redis_strategy_key_hash=redis_ongoing_key,
+            redis_strategy_key_hash=redis_trade_key_hash,
             redis_trade_schema_list=redis_trade_schema_list,
             async_redis_client=test_async_redis_client,
             strategy_schema=strategy_schema,
@@ -77,8 +77,10 @@ async def test_sell_trade_without_take_away_profit(
         await async_session.refresh(take_away_profit_model)
         assert take_away_profit_model.profit == profit_to_be_added
 
-        # key has been removed from redis
-        assert not await test_async_redis_client.exists(redis_ongoing_key)
+        # key and hash has been removed from redis
+        assert not await test_async_redis_client.hget(
+            redis_trade_key_hash.split()[0], redis_trade_key_hash.split()[1]
+        )
 
 
 @pytest.mark.asyncio
@@ -99,7 +101,7 @@ async def test_sell_trade_updating_takeaway_profit(
     (
         strategy_model_id,
         signal_payload_schema,
-        redis_ongoing_key,
+        redis_trade_key_hash,
         redis_trade_schema_list,
     ) = await sell_task_args(test_async_redis_client, take_away_profit=True, ce_trade=False)
 
@@ -112,14 +114,14 @@ async def test_sell_trade_updating_takeaway_profit(
         assert take_away_profit_model is not None
         earlier_take_away_profit = take_away_profit_model.profit
 
-        assert await test_async_redis_client.exists(redis_ongoing_key)
+        assert await test_async_redis_client.exists(str(strategy_model_id))
 
         strategy_model = await async_session.get(StrategyModel, strategy_model_id)
         strategy_schema = StrategySchema.model_validate(strategy_model)
 
         await task_exit_trade(
             signal_payload_schema=signal_payload_schema,
-            redis_strategy_key_hash=redis_ongoing_key,
+            redis_strategy_key_hash=redis_trade_key_hash,
             redis_trade_schema_list=redis_trade_schema_list,
             async_redis_client=test_async_redis_client,
             strategy_schema=strategy_schema,
@@ -145,7 +147,9 @@ async def test_sell_trade_updating_takeaway_profit(
         assert take_away_profit_model.profit == earlier_take_away_profit + profit_to_be_added
 
         # key has been removed from redis
-        assert not await test_async_redis_client.exists(redis_ongoing_key)
+        assert not await test_async_redis_client.hget(
+            redis_trade_key_hash.split()[0], redis_trade_key_hash.split()[1]
+        )
 
 
 # TODO: assert exit_at, profit, future_profit, exit_received_at < exit_at ,

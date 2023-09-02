@@ -45,10 +45,12 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
 
         assert trade_model.strategy.id == strategy_model.id
         assert trade_model.entry_price <= buy_task_payload_dict["premium"]
-        key = f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}"
-        redis_in_trades_list = await test_async_redis_client.lrange(key, 0, -1)
-        assert len(redis_in_trades_list) == 1
-        assert json.loads(redis_in_trades_list[0])["id"] == str(trade_model.id)
+        redis_trades_json = await test_async_redis_client.hget(
+            f"{strategy_model.id}", f"{trade_model.expiry} {trade_model.option_type}"
+        )
+        redis_trades_json_list = json.loads(redis_trades_json)
+        assert len(redis_trades_json_list) == 1
+        assert json.loads(redis_trades_json_list[0])["id"] == str(trade_model.id)
 
 
 @pytest.mark.asyncio
@@ -88,10 +90,12 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
         assert trade_model.entry_price <= buy_task_payload_dict["premium"]
 
         # trades are being added to redis
-        key = f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}"
-        redis_in_trades_list = await test_async_redis_client.lrange(key, 0, -1)
-        assert len(redis_in_trades_list) == 1
-        assert json.loads(redis_in_trades_list[0])["id"] == str(trade_model.id)
+        redis_trades_json = await test_async_redis_client.hget(
+            f"{strategy_model.id}", f"{trade_model.expiry} {trade_model.option_type}"
+        )
+        redis_in_trades_list_json = json.loads(redis_trades_json)
+        assert len(redis_in_trades_list_json) == 1
+        assert json.loads(redis_in_trades_list_json[0])["id"] == str(trade_model.id)
 
 
 @pytest.mark.parametrize(
@@ -133,7 +137,9 @@ async def test_buy_trade_for_strike(
         assert trade_model.strategy.id == strategy_model.id
         assert trade_model.strike <= float(payload_strike)
 
-        key = f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}"
-        redis_in_trades_list = await test_async_redis_client.lrange(key, 0, -1)
-        assert len(redis_in_trades_list) == 1
-        assert json.loads(redis_in_trades_list[0])["id"] == str(trade_model.id)
+        redis_trades_json = await test_async_redis_client.hget(
+            f"{strategy_model.id}", f"{trade_model.expiry} {trade_model.option_type}"
+        )
+        redis_in_trades_list_json = json.loads(redis_trades_json)
+        assert len(redis_in_trades_list_json) == 1
+        assert json.loads(redis_in_trades_list_json[0])["id"] == str(trade_model.id)
