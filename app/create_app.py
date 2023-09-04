@@ -6,7 +6,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 from starlette.types import Send
 
@@ -65,19 +64,19 @@ def get_app(config_file) -> FastAPI:
     app.add_middleware(TimingMiddleware)
 
     # Set up CORS middleware
-    origins = [
-        "http://localhost:3000",  # For local development
-        "https://kokobrothers.herokuapp.com",
-        # Add any other origins as needed
-    ]
+    # origins = [
+    #     "http://localhost:3000",  # For local development
+    #     "https://kokobrothers.herokuapp.com",
+    #     # Add any other origins as needed
+    # ]
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # app.add_middleware(
+    #     CORSMiddleware,
+    #     allow_origins=origins,
+    #     allow_credentials=True,
+    #     allow_methods=["*"],
+    #     allow_headers=["*"],
+    # )
 
     # TODO: register scout and new relic
 
