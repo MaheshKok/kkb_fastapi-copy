@@ -9,6 +9,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import model_validator
 
+from app.schemas.enums import DirectionEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 
@@ -133,3 +134,10 @@ class DBEntryTradeSchema(BaseModel):
     )
     strike: float = Field(description="Strike", example=42500.0)
     expiry: date = Field(description="Expiry", example="2023-05-22")
+
+
+class CFDPayloadSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    size: int = Field(description="Quantity", example=1000)
+    direction: DirectionEnum = Field(description="Position", example="BUY")
+    instrument: str = Field(description="Instrument", example="EURUSD")

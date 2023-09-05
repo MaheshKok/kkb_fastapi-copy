@@ -6,6 +6,11 @@ class PositionEnum(str, Enum):
     SHORT = "SHORT"
 
 
+class DirectionEnum(str, Enum):
+    BUY = "BUY"
+    SELL = "SELL"
+
+
 class OptionTypeEnum(str, Enum):
     CE = "CE"
     PE = "PE"

@@ -20,9 +20,11 @@ from app.api.utils import get_current_and_next_expiry
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
+from app.schemas.trade import CFDPayloadSchema
 from app.schemas.trade import DBEntryTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
+from app.services.broker.Capital import CapitalClient
 from app.tasks.tasks import task_entry_trade
 from app.tasks.tasks import task_exit_trade
 
@@ -45,6 +47,31 @@ futures_router = APIRouter(
     prefix=f"{trading_router.prefix}/nfo",
     tags=["futures"],
 )
+
+forex_router = APIRouter(
+    prefix=f"{trading_router.prefix}/cfd",
+    tags=["forex"],
+)
+
+
+@forex_router.post("/", status_code=200)
+async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
+    client = CapitalClient(
+        username="maheshkokare100@gmail.com",
+        password="SUua9Ydc83G.i!d",
+        api_key="qshPG64m0RCWQ3fe",
+        demo=True,
+    )
+    # size would be twice of payload,
+    # reason: we have to close the existing position first and enter a new one
+    response = client.create_position(
+        epic=cfd_payload_schema.instrument,
+        direction=cfd_payload_schema.direction,
+        size=cfd_payload_schema.size * 2,
+    )
+    logging.info(
+        f"deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+    )
 
 
 @trading_router.get("/", status_code=200, response_model=List[DBEntryTradeSchema])
