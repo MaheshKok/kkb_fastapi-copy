@@ -1,13 +1,8 @@
 import asyncio
 import logging
-import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
-from starlette.types import Send
 
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.strategy import strategy_router
@@ -36,21 +31,6 @@ def register_routers(app: FastAPI):
     app.include_router(takeaway_profit)
 
 
-class TimingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Send) -> Response:
-        start_time = time.time()
-        response = await call_next(request)
-        process_time = time.time() - start_time
-        try:
-            logging.info(
-                f" API: [ {request.scope['route'].path} ] request processing time: {process_time} seconds"
-            )
-        except KeyError:
-            logging.error(f" Invalid Api Endpoint: [ {request.scope['path']} ]")
-
-        return response
-
-
 def get_app(config_file) -> FastAPI:
     config = get_config(config_file)
     app = FastAPI(
@@ -61,7 +41,6 @@ def get_app(config_file) -> FastAPI:
     # app.add_middleware(DBSessionMiddleware)
     # Include routers
     register_routers(app)
-    app.add_middleware(TimingMiddleware)
 
     # Set up CORS middleware
     # origins = [

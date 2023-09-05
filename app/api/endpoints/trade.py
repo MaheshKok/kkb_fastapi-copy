@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 import traceback
 from datetime import datetime
 from typing import List
@@ -63,6 +64,7 @@ async def post_nfo(
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
 ):
+    start_time = time.perf_counter()
     logging.info(
         f"Received signal payload to buy: [ {signal_payload_schema.option_type} ] for strategy: {strategy_schema.name}"
     )
@@ -120,7 +122,12 @@ async def post_nfo(
 
     if exit_task:
         await asyncio.gather(exit_task, buy_task)
-        return "successfully closed existing trades and bought a new trade"
+        msg = "successfully closed existing trades and bought a new trade"
+        process_time = time.perf_counter() - start_time
     else:
         await asyncio.gather(buy_task)
-        return "successfully bought a new trade"
+        msg = "successfully bought a new trade"
+        process_time = time.perf_counter() - start_time
+
+    logging.info(f" API: [ post_nfo ] request processing time: {process_time} seconds")
+    return msg
