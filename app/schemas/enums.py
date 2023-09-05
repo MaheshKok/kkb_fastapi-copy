@@ -7,8 +7,8 @@ class PositionEnum(str, Enum):
 
 
 class DirectionEnum(str, Enum):
-    BUY = "BUY"
-    SELL = "SELL"
+    BUY = "buy"
+    SELL = "sell"
 
 
 class OptionTypeEnum(str, Enum):
