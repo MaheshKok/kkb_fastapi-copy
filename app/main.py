@@ -1,7 +1,6 @@
 import logging.config
 import os
 
-import newrelic.agent
 import uvicorn
 from fastapi import HTTPException
 from starlette.responses import JSONResponse
@@ -10,14 +9,10 @@ from app.create_app import get_app
 from app.utils.constants import ConfigFile
 
 
-newrelic.agent.initialize(config_file="../newrelic.ini")
-
-
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 app = get_app(ConfigFile.PRODUCTION)
-app = newrelic.agent.ASGIApplicationWrapper(app)
 
 
 @app.exception_handler(HTTPException)
