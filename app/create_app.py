@@ -46,7 +46,7 @@ class TimingMiddleware(BaseHTTPMiddleware):
                 f" API: [ {request.scope['route'].path} ] request processing time: {process_time} seconds"
             )
         except KeyError:
-            logging.info(f" Invalid Api Endpoint: [ {request.scope['path']} ]")
+            logging.error(f" Invalid Api Endpoint: [ {request.scope['path']} ]")
 
         return response
 

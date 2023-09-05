@@ -1,17 +1,29 @@
-import logging
 import logging.config
 import os
 
+import newrelic.agent
 import uvicorn
+from fastapi import HTTPException
+from starlette.responses import JSONResponse
 
 from app.create_app import get_app
 from app.utils.constants import ConfigFile
+
+
+newrelic.agent.initialize(config_file="../newrelic.ini")
 
 
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 app = get_app(ConfigFile.PRODUCTION)
+app = newrelic.agent.ASGIApplicationWrapper(app)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    logging.error(f"HTTPException occurred: {exc.detail}")
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 if __name__ == "__main__":
@@ -22,4 +34,4 @@ if __name__ == "__main__":
             port=int(os.environ.get("PORT", 8000)),
         )
     except BaseException as e:
-        logging.exception(e)
+        logging.error(f"Error running fastapi: {e}")
