@@ -64,14 +64,23 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
     )
     # size would be twice of payload,
     # reason: we have to close the existing position first and enter a new one
+    lot_to_trade = 0
+    if positions := client.all_positions():
+        for position in positions["positions"]:
+            if position["market"]["epic"] == cfd_payload_schema.instrument:
+                existing_direction = position["position"]["direction"]
+                if existing_direction != cfd_payload_schema.direction.upper():
+                    # to close exisitng position add those many positions to new trade
+                    lot_to_trade = int(position["position"]["size"])
+    # it doesnt give exact size of open position, i have to have a local position in db
     response = client.create_position(
         epic=cfd_payload_schema.instrument,
         direction=cfd_payload_schema.direction,
-        size=cfd_payload_schema.size * 2,
+        size=cfd_payload_schema.size + lot_to_trade,
     )
-    logging.info(
-        f"deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
-    )
+    msg = f"deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+    logging.info(msg)
+    return msg
 
 
 @trading_router.get("/", status_code=200, response_model=List[DBEntryTradeSchema])
