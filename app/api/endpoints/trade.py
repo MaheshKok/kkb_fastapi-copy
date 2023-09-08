@@ -109,6 +109,9 @@ async def post_nfo(
         async_redis_client, todays_date
     )
 
+    if strategy_schema.symbol == "BANKNIFTY":
+        current_expiry_date = "13 SEP 2023"
+
     trades_key = f"{signal_payload_schema.strategy_id}"
     redis_hash = (
         f"{current_expiry_date} {'PE' if signal_payload_schema.option_type == 'CE' else 'CE' }"
