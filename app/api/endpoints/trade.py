@@ -72,15 +72,21 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
                 if existing_direction != cfd_payload_schema.direction.upper():
                     # to close exisitng position add those many positions to new trade
                     lot_to_trade = int(position["position"]["size"])
-    # it doesnt give exact size of open position, i have to have a local position in db
-    response = client.create_position(
-        epic=cfd_payload_schema.instrument,
-        direction=cfd_payload_schema.direction,
-        size=cfd_payload_schema.size + lot_to_trade,
-    )
-    msg = f"deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
-    logging.info(msg)
-    return msg
+
+    attempt = 1
+    while attempt < 5:
+        # it doesnt give exact size of open position, i have to have a local position in db
+        response = client.create_position(
+            epic=cfd_payload_schema.instrument,
+            direction=cfd_payload_schema.direction,
+            size=cfd_payload_schema.size + lot_to_trade,
+        )
+        msg = f"deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+        logging.info(msg)
+        if response["dealStatus"] == "REJECTED":
+            attempt += 1
+            continue
+        return msg
 
 
 @trading_router.get("/", status_code=200, response_model=List[DBEntryTradeSchema])
