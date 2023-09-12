@@ -20,7 +20,9 @@ async def get_option_chain(
 
     if is_future:
         current_month_number = datetime.now().date().month
-        expiry_list = await get_expiry_list(async_redis_client)
+        expiry_list = await get_expiry_list(
+            async_redis_client, InstrumentTypeEnum.FUTIDX, strategy_schema.symbol
+        )
         for _, expiry_date in enumerate(expiry_list):
             if expiry_date.month > current_month_number:
                 break

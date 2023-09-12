@@ -3,7 +3,6 @@ import json
 import logging
 import time
 import traceback
-from datetime import datetime
 from typing import List
 
 from aioredis import Redis
@@ -110,13 +109,10 @@ async def post_nfo(
     logging.info(
         f"Received signal payload to buy: [ {signal_payload_schema.option_type} ] for strategy: {strategy_schema.name}"
     )
-    todays_date = datetime.now().date()
-    current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-        async_redis_client, todays_date
-    )
 
-    if strategy_schema.symbol == "BANKNIFTY":
-        current_expiry_date = "13 SEP 2023"
+    current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
+        async_redis_client, strategy_schema
+    )
 
     trades_key = f"{signal_payload_schema.strategy_id}"
     redis_hash = (

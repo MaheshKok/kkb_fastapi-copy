@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from httpx import AsyncClient
 
 from app.api.utils import get_expiry_list
+from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
@@ -40,7 +41,7 @@ async def get_exit_price_from_option_chain(
     return {strike: option_chain[strike] for strike in strikes}
 
 
-async def get_monthly_expiry_date(async_redis_client):
+async def get_monthly_expiry_date(async_redis_client, instrument_type, symbol) -> datetime:
     """
     if expiry_list = ["06 Jul 2023", "13 Jul 2023", "20 Jul 2023", "27 Jul 2023", "03 Aug 2023", "31 Aug 2023", "28 Sep 2023", "28 Dec 2023", "31 Dec 2026", "24 Jun 2027", "30 Dec 2027"]
     and today is 27th June then we have to find july months expiry
@@ -53,7 +54,7 @@ async def get_monthly_expiry_date(async_redis_client):
 
     """
 
-    expiry_dates = await get_expiry_list(async_redis_client)
+    expiry_dates = await get_expiry_list(async_redis_client, instrument_type, symbol)
     monthly_expiry_date = None
 
     current_month = datetime.now().date().month
@@ -69,7 +70,9 @@ async def get_monthly_expiry_date(async_redis_client):
 
 
 async def get_future_price(async_redis_client, strategy_schema) -> float:
-    monthly_expiry_date = await get_monthly_expiry_date(async_redis_client)
+    monthly_expiry_date = await get_monthly_expiry_date(
+        async_redis_client, InstrumentTypeEnum.FUTIDX, strategy_schema.symbol
+    )
 
     # I hope this never happens
     if not monthly_expiry_date:
