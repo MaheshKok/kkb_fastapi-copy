@@ -3,6 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from starlette.middleware.cors import CORSMiddleware
 
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.strategy import strategy_router
@@ -45,19 +46,19 @@ def get_app(config_file) -> FastAPI:
     register_routers(app)
 
     # Set up CORS middleware
-    # origins = [
-    #     "http://localhost:3000",  # For local development
-    #     "https://kokobrothers.herokuapp.com",
-    #     # Add any other origins as needed
-    # ]
+    origins = [
+        "http://localhost:3000",  # For local development
+        "https://kokobrothers.herokuapp.com",
+        # Add any other origins as needed
+    ]
 
-    # app.add_middleware(
-    #     CORSMiddleware,
-    #     allow_origins=origins,
-    #     allow_credentials=True,
-    #     allow_methods=["*"],
-    #     allow_headers=["*"],
-    # )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # TODO: register scout and new relic
 
