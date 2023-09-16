@@ -67,7 +67,9 @@ def calculate_options_charges(buy_price, sell_price, total_trades):
     return total_charges
 
 
-def get_options_profit(entry_price, exit_price, quantity, position):
+def get_options_profit(
+    *, entry_price: float, exit_price: float, quantity: int, position: PositionEnum
+):
     total_charges = calculate_options_charges(entry_price, exit_price, quantity)
     if position == PositionEnum.LONG:
         profit = (exit_price - entry_price) * quantity - total_charges
@@ -77,7 +79,9 @@ def get_options_profit(entry_price, exit_price, quantity, position):
     return round(profit, 2)
 
 
-def get_futures_profit(entry_price, exit_price, quantity, position):
+def get_futures_profit(
+    *, entry_price: float, exit_price: float, quantity: int, position: PositionEnum
+):
     total_charges = calculate_futures_charges(entry_price, exit_price, quantity)
     if position == PositionEnum.LONG:
         profit = (exit_price - entry_price) * quantity - total_charges
@@ -137,14 +141,19 @@ async def calculate_profits(
             # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker
             continue
 
-        profit = get_options_profit(entry_price, exit_price, quantity, position)
+        profit = get_options_profit(
+            entry_price=entry_price, exit_price=exit_price, quantity=quantity, position=position
+        )
         future_entry_price = trade.future_entry_price
         # if option_type is PE then position is SHORT and for CE its LONG
         future_position = (
             PositionEnum.SHORT if trade.option_type == OptionTypeEnum.PE else PositionEnum.LONG
         )
         future_profit = get_futures_profit(
-            future_entry_price, future_exit_price, quantity, future_position
+            entry_price=future_entry_price,
+            exit_price=future_exit_price,
+            quantity=quantity,
+            position=future_position,
         )
 
         mapping = {
