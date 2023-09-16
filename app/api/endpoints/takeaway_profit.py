@@ -10,7 +10,7 @@ from app.schemas.take_away_profit import TakeAwayProfitSchema
 
 takeaway_profit = APIRouter(
     prefix="/api/takeaway_profit",
-    tags=["trading"],
+    tags=["takeaway_profit"],
 )
 
 

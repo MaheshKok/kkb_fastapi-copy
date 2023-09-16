@@ -109,7 +109,8 @@ async def task_update_till_yesterdays_profits():
     for app in base_urls:
         if app == "flaskstockpi":
             tasks.append(get_api(f"{base_urls[app]}/update_till_yesterdays_profits"))
-
+        elif app == "kokobrothers-be":
+            tasks.append(get_api(f"{base_urls[app]}/update/daily_profit"))
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
 
