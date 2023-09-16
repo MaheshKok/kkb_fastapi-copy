@@ -16,6 +16,19 @@ from app.services.broker.utils import get_pya3_obj
 logging.basicConfig(level=logging.DEBUG)
 
 
+# refactored update and logging into a separate coroutine
+async def update_session_token_with_logging(pya3_obj, async_redis_client, broker_model):
+    try:
+        await update_session_token(pya3_obj=pya3_obj, async_redis_client=async_redis_client)
+        logging.info(
+            f"successfully updated session token for: [ {broker_model.name} ] user: [ {broker_model.username} ]"
+        )
+    except Exception as e:
+        logging.error(
+            f"Error while updating session token for: [ {broker_model.name} ] user: [ {broker_model.username} ], {e}"
+        )
+
+
 async def task_update_session_token():
     config = get_config()
     async_redis_client = await get_redis_client(config)
@@ -24,9 +37,7 @@ async def task_update_session_token():
 
     async with Database() as async_session:
         # get broker model from db filtered by username
-        fetch_broker_query = await async_session.execute(
-            select(BrokerModel).filter(BrokerModel.username == "921977")
-        )
+        fetch_broker_query = await async_session.execute(select(BrokerModel))
         broker_models = fetch_broker_query.scalars().all()
         async_httpx_client = httpx.AsyncClient()
 
@@ -44,19 +55,6 @@ async def task_update_session_token():
 
         # wait for all tasks to complete
         await asyncio.gather(*tasks)
-
-
-# refactored update and logging into a separate coroutine
-async def update_session_token_with_logging(pya3_obj, async_redis_client, broker_model):
-    try:
-        await update_session_token(pya3_obj=pya3_obj, async_redis_client=async_redis_client)
-        logging.info(
-            f"successfully updated session token for: [ {broker_model.name} ] user: [ {broker_model.username} ]"
-        )
-    except Exception as e:
-        logging.error(
-            f"Error while updating session token for: [ {broker_model.name} ] user: [ {broker_model.username} ], {e}"
-        )
 
 
 if __name__ == "__main__":
