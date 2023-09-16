@@ -18,7 +18,6 @@ from app.tasks.tasks import get_options_profit
 from app.tasks.utils import get_monthly_expiry_date
 
 
-# Not yet tested
 async def update_daily_profit():
     config = get_config()
     Database.init(get_db_url(config))
