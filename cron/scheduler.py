@@ -110,7 +110,7 @@ async def task_update_till_yesterdays_profits():
         if app == "flaskstockpi":
             tasks.append(get_api(f"{base_urls[app]}/update_till_yesterdays_profits"))
         elif app == "kokobrothers-be":
-            tasks.append(get_api(f"{base_urls[app]}/update/daily_profit"))
+            tasks.append(get_api(f"{base_urls[app]}/cron/update/daily_profit"))
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
 
@@ -122,6 +122,8 @@ async def task_rollover_to_next_expiry():
     for app in base_urls:
         if app == "flaskstockpi":
             tasks.append(get_api(f"{base_urls[app]}/rollover_to_next_expiry"))
+        elif app == "kokobrothers-be":
+            tasks.append(get_api(f"{base_urls[app]}/cron/rollover_to_next_expiry"))
 
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
