@@ -124,7 +124,12 @@ def construct_update_query(updated_data):
 
 
 async def calculate_profits(
-    strike_exit_price_dict, future_exit_price, signal_payload_schema, redis_trade_schema_list
+    *,
+    strike_exit_price_dict: dict,
+    future_exit_price: float,
+    signal_payload_schema: SignalPayloadSchema,
+    redis_trade_schema_list: List[RedisTradeSchema],
+    strategy_schema: StrategySchema,
 ):
     updated_data = {}
     total_profit = 0
@@ -367,7 +372,11 @@ async def task_exit_trade(
     )
 
     updated_data, total_profit, total_future_profit = await calculate_profits(
-        strike_exit_price_dict, future_exit_price, signal_payload_schema, redis_trade_schema_list
+        strike_exit_price_dict=strike_exit_price_dict,
+        future_exit_price=future_exit_price,
+        signal_payload_schema=signal_payload_schema,
+        strategy_schema=strategy_schema,
+        redis_trade_schema_list=redis_trade_schema_list,
     )
     logging.info(
         f"Strategy: [ {strategy_schema.name} ], adding profit: [ {total_profit} ] and future profit: [ {total_future_profit} ]"

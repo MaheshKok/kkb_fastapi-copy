@@ -46,3 +46,8 @@ update_trade_columns = {
 }
 
 STRATEGY = "strategy"
+
+
+class SYMBOL:
+    BANKNIFTY = "BANKNIFTY"
+    NIFTY = "NIFTY"

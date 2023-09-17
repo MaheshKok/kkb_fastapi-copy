@@ -116,7 +116,7 @@ async def post_nfo(
 
     trades_key = f"{signal_payload_schema.strategy_id}"
     redis_hash = (
-        f"{current_expiry_date} {'PE' if signal_payload_schema.option_type == 'CE' else 'CE' }"
+        f"{current_expiry_date} {'PE' if signal_payload_schema.option_type == 'CE' else 'CE'}"
     )
 
     # TODO: in future decide based on strategy new column, strategy_type:
