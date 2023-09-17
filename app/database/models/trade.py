@@ -9,10 +9,8 @@ from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
 
 from app.database import Base
-from app.database.models import StrategyModel
 
 
 class TradeModel(Base):
@@ -43,6 +41,8 @@ class TradeModel(Base):
     expiry = Column(Date, index=True)
 
     strategy_id = Column(
-        UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
+        UUID(as_uuid=True),
+        ForeignKey("strategy.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
-    strategy = relationship(StrategyModel, backref="trades")

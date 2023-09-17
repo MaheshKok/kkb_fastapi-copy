@@ -23,5 +23,7 @@ class BrokerModel(Base):
     totp = Column(String, nullable=False)
     twoFA = Column(Integer, nullable=False)
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id"), nullable=False, index=True)
-    user = relationship("User", backref="brokers")
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    strategymodels = relationship("StrategyModel", backref="strategy", cascade="all, delete")

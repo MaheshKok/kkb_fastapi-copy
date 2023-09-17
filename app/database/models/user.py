@@ -5,6 +5,7 @@ from sqlalchemy import Column
 from sqlalchemy import DateTime
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -19,3 +20,14 @@ class User(Base):
     token_expiry = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime)
+
+    brokermodels = relationship(
+        "BrokerModel",
+        backref="user",
+        cascade="all, delete",
+    )
+    strategymodels = relationship(
+        "StrategyModel",
+        backref="user",
+        cascade="all, delete",
+    )

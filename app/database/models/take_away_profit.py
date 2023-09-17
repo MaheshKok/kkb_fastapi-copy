@@ -8,7 +8,6 @@ from sqlalchemy import ForeignKey
 from sqlalchemy import Integer
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -20,10 +19,12 @@ class TakeAwayProfitModel(Base):
     profit = Column(Float, nullable=True)
     future_profit = Column(Float, nullable=True, default=0.0)
     strategy_id = Column(
-        UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
+        UUID(as_uuid=True),
+        ForeignKey("strategy.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     created_at = Column(DateTime, nullable=False, default=func.now())
     updated_at = Column(DateTime, nullable=True)
     total_trades = Column(Integer, nullable=False)
-    strategy = relationship("StrategyModel", back_populates="take_away_profit")

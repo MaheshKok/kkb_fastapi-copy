@@ -6,7 +6,6 @@ from sqlalchemy import Date
 from sqlalchemy import Float
 from sqlalchemy import ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -18,8 +17,9 @@ class DailyProfitModel(Base):
     profit = Column(Float, nullable=False)
     future_profit = Column(Float, nullable=False, default=0.0)
     strategy_id = Column(
-        UUID(as_uuid=True), ForeignKey("strategy.id"), nullable=False, index=True
+        UUID(as_uuid=True),
+        ForeignKey("strategy.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
-    strategy = relationship("StrategyModel", back_populates="daily_profits")
-
     date = Column(Date, nullable=False)

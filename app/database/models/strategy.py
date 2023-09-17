@@ -38,11 +38,18 @@ class StrategyModel(Base):
     # strategy details
     name = Column(String, nullable=False, default="Renko Strategy Every Candle")
 
-    broker_id = Column(UUID(as_uuid=True), ForeignKey("broker.id"), nullable=True, index=True)
-    broker = relationship("BrokerModel", backref="strategies")
+    broker_id = Column(
+        UUID(as_uuid=True), ForeignKey("broker.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("user.id"), nullable=False, index=True)
-    user = relationship("User", backref="strategy_list")
+    daily_profit_models = relationship(
+        "DailyProfitModel", backref="strategy", cascade="all, delete"
+    )
+    take_away_profit_models = relationship(
+        "TakeAwayProfitModel", backref="strategy", cascade="all, delete"
+    )
 
-    daily_profits = relationship("DailyProfitModel", back_populates="strategy")
-    take_away_profit = relationship("TakeAwayProfitModel", back_populates="strategy")
+    trades = relationship("TradeModel", backref="strategy", cascade="all, delete")
