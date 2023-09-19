@@ -6,6 +6,7 @@ import traceback
 from typing import List
 
 from aioredis import Redis
+from binance.client import AsyncClient as BinanceAsyncClient
 from fastapi import APIRouter
 from fastapi import Depends
 from httpx import AsyncClient
@@ -19,6 +20,7 @@ from app.api.utils import get_current_and_next_expiry
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
+from app.schemas.trade import BinanceFuturesPayloadSchema
 from app.schemas.trade import CFDPayloadSchema
 from app.schemas.trade import DBEntryTradeSchema
 from app.schemas.trade import RedisTradeSchema
@@ -51,6 +53,26 @@ forex_router = APIRouter(
     prefix=f"{trading_router.prefix}/cfd",
     tags=["forex"],
 )
+
+
+binance_router = APIRouter(
+    prefix=f"{trading_router.prefix}/binance",
+    tags=["binance"],
+)
+
+
+@binance_router.post("/futures", status_code=200)
+async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSchema):
+    api_key = "75d5c54b190c224d6527440534ffe2bfa2afb34c0ccae79beadf560b9d2c5c56"
+    api_secret = "db135fa6b2de30c06046891cc1eecfb50fddff0a560043dcd515fd9a57807a37"
+    bnce_async_client = BinanceAsyncClient(api_key=api_key, api_secret=api_secret, testnet=True)
+    await bnce_async_client.futures_create_order(
+        symbol=futures_payload_schema.symbol,
+        side=futures_payload_schema.side,
+        type=futures_payload_schema.type,
+        quantity=2,
+    )
+    return "successfully placed order"
 
 
 @forex_router.post("/", status_code=200)

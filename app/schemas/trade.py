@@ -141,3 +141,16 @@ class CFDPayloadSchema(BaseModel):
     size: int = Field(description="Quantity", example=1000)
     direction: DirectionEnum = Field(description="Position", example="BUY")
     instrument: str = Field(description="Instrument", example="EURUSD")
+
+
+class BinanceFuturesPayloadSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    symbol: str = Field(description="Symbol", example="BTCUSDT")
+    quantity: int = Field(description="Quantity", example=1)
+    side: DirectionEnum = Field(description="Position", example="buy")
+    type: str = Field(description="Type", example="MARKET")
+
+    @model_validator(mode="after")
+    def serialize_side(cls, values):
+        values.side = values.side.upper()
+        return values
