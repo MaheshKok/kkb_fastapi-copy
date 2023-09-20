@@ -11,6 +11,7 @@ logging.basicConfig(level=logging.INFO)
 base_urls = {
     "flaskstockpi": "https://flaskstockapi.herokuapp.com/api",
     "kokobrothers-be": "https://kokobrothers-be.herokuapp.com/api",
+    "kkbfastapi": "https://kkb-fastapi.herokuapp.com/api",
 }
 
 
@@ -111,6 +112,8 @@ async def task_update_till_yesterdays_profits():
             tasks.append(get_api(f"{base_urls[app]}/update_till_yesterdays_profits"))
         elif app == "kokobrothers-be":
             tasks.append(get_api(f"{base_urls[app]}/cron/update/daily_profit"))
+        elif app == "kkbfastapi":
+            tasks.append(get_api(f"{base_urls[app]}/cron/update/daily_profit"))
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
 
@@ -124,7 +127,8 @@ async def task_rollover_to_next_expiry():
             tasks.append(get_api(f"{base_urls[app]}/rollover_to_next_expiry"))
         elif app == "kokobrothers-be":
             tasks.append(get_api(f"{base_urls[app]}/cron/rollover_to_next_expiry"))
-
+        elif app == "kkbfastapi":
+            tasks.append(get_api(f"{base_urls[app]}/cron/rollover_to_next_expiry"))
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
 
