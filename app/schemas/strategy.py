@@ -6,6 +6,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 
 from app.schemas.enums import InstrumentTypeEnum
+from app.schemas.enums import PositionEnum
 
 
 class StrategyCreateSchema(BaseModel):
@@ -16,6 +17,7 @@ class StrategyCreateSchema(BaseModel):
     )
     symbol: str = Field(description="Symbol", example="BANKNIFTY")
     name: str = Field(description="Name", example="BANKNIFTY1! TF:2 Brick_Size:35 Pyramiding:100")
+    position: PositionEnum = Field(description="Position", example="LONG")
     broker_id: Optional[uuid.UUID] = Field(
         description="Broker on which strategy will be executed",
         example="6b38655e-0e28-471d-aefb-dd7ce2f6a825",

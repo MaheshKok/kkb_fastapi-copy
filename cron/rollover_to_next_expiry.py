@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from app.api.utils import get_current_and_next_expiry
 from app.core.config import get_config
+from app.database.base import get_db_url
 from app.database.base import get_redis_client
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
@@ -25,14 +26,19 @@ from app.utils.constants import OptionType
 
 # TODO: test this
 async def rollover_to_next_expiry():
+    config = get_config()
+    Database.init(get_db_url(config))
+
     # use different strategy to make it faster and efficient
     config = get_config()
     async_redis_client = get_redis_client(config)
     async_httpx_client = AsyncClient()
 
+    future_price_cache = {}
     async with Database() as async_session:
         # get all strategy from database
-        strategy_models = await async_session.execute(select(StrategyModel)).all()
+        strategy_models_query = await async_session.execute(select(StrategyModel))
+        strategy_models = strategy_models_query.scalars().all()
 
         tasks = []
         for strategy_model in strategy_models:
@@ -42,7 +48,7 @@ async def rollover_to_next_expiry():
                 current_expiry,
                 next_expiry,
                 todays_expiry,
-            ) = get_current_and_next_expiry(async_redis_client, strategy_schema)
+            ) = await get_current_and_next_expiry(async_redis_client, strategy_schema)
 
             if not todays_expiry:
                 continue
@@ -58,18 +64,30 @@ async def rollover_to_next_expiry():
                 live_trade_option_type = live_trade_option_type_list[0]
 
             redis_hash = f"{current_expiry} {live_trade_option_type}"
+            if redis_hash not in redis_strategy_data:
+                logging.info(
+                    f"No trades found for {strategy_schema.id} {strategy_schema.symbol} on {redis_hash}"
+                )
+                continue
+
             exiting_trades_json_list = json.loads(redis_strategy_data[redis_hash])
             logging.info(f"Existing total: {len(exiting_trades_json_list)} trades to be closed")
             redis_trade_schema_list = TypeAdapter(List[RedisTradeSchema]).validate_python(
                 [json.loads(trade) for trade in exiting_trades_json_list]
             )
 
+            if strategy_schema.symbol in future_price_cache:
+                future_entry_price_received = future_price_cache[strategy_schema.symbol]
+            else:
+                future_entry_price_received = await get_future_price(
+                    async_redis_client, strategy_schema
+                )
+                future_price_cache[strategy_schema.symbol] = future_entry_price_received
+
             # payload should be like closing live trades so option_type should be opposite to that of redis trades
             payload = {
                 "quantity": sum([trade.quantity for trade in redis_trade_schema_list]),
-                "future_entry_price_received": get_future_price(
-                    async_redis_client, strategy_schema
-                ),
+                "future_entry_price_received": future_entry_price_received,
                 "strategy_id": strategy_schema.id,
                 "option_type": OptionType.CE
                 if live_trade_option_type == OptionType.CE

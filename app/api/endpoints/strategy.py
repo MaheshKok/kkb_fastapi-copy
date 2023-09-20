@@ -38,7 +38,8 @@ async def post_strategy(
         await async_session.refresh(strategy_model)
 
         redis_set_result = await async_redis_client.set(
-            str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
+            str(strategy_model.id),
+            StrategySchema.model_validate(strategy_model).model_dump_json(),
         )
         if not redis_set_result:
             raise Exception(f"Redis set strategy: {strategy_model.id} failed")
