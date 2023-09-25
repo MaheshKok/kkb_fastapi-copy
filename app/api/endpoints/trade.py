@@ -19,6 +19,8 @@ from app.api.dependency import get_strategy_schema
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
+from app.schemas.enums import OptionTypeEnum
+from app.schemas.enums import PositionEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import BinanceFuturesPayloadSchema
 from app.schemas.trade import CFDPayloadSchema
@@ -131,6 +133,13 @@ async def post_nfo(
     logging.info(
         f"Received signal payload to buy: [ {signal_payload_schema.option_type} ] for strategy: {strategy_schema.name}"
     )
+
+    if signal_payload_schema.position == PositionEnum.SHORT:
+        # swap option_type i.e for buy signal we will short PE and for sell signal we will short CE
+        if signal_payload_schema.option_type == OptionTypeEnum.PE:
+            signal_payload_schema.option_type = OptionTypeEnum.CE
+        else:
+            signal_payload_schema.option_type = OptionTypeEnum.PE
 
     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
         async_redis_client, strategy_schema
