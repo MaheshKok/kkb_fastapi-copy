@@ -164,12 +164,24 @@ async def buy_alice_blue_trades(
                 logging.error(
                     f"buy order rejected for order_id: {order_id} , order_status: {order_status}"
                 )
-                # capture_exception(
-                #     Exception(
-                #         f"buy order not placed for: {instrument.name} , place_order_response: {place_order_response}"
-                #     )
-                # )
-                raise HTTPException(status_code=403, detail=order_status["RejReason"])
+                if "Reason:Exchange issue" in order_status["RejReason"]:
+                    strike, order_id = await place_ablue_order(
+                        pya3_obj=pya3_obj,
+                        strategy_schema=strategy_schema,
+                        async_redis_client=async_redis_client,
+                        strike=strike,
+                        quantity=signal_payload_schema.quantity,
+                        expiry=signal_payload_schema.expiry,
+                        is_CE=signal_payload_schema.option_type == OptionType.CE,
+                        is_buy=True,
+                    )
+                else:
+                    # capture_exception(
+                    #     Exception(
+                    #         f"buy order not placed for: {instrument.name} , place_order_response: {place_order_response}"
+                    #     )
+                    # )
+                    raise HTTPException(status_code=403, detail=order_status["RejReason"])
             else:
                 logging.warning(
                     f"buy order not placed for order_id: {order_id} , order_status: {order_status['Status']}, order_status_reason: {order_status['RejReason']}"
