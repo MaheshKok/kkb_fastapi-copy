@@ -37,8 +37,9 @@ async def post_strategy(
         await async_session.flush()
         await async_session.refresh(strategy_model)
 
-        redis_set_result = await async_redis_client.set(
+        redis_set_result = await async_redis_client.hset(
             str(strategy_model.id),
+            "strategy",
             StrategySchema.model_validate(strategy_model).model_dump_json(),
         )
         if not redis_set_result:
