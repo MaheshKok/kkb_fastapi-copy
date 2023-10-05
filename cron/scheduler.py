@@ -60,17 +60,17 @@ async def task_update_session_token():
     await asyncio.gather(*tasks)
 
 
-async def task_up_scale_dynos():
-    logging.info(f"Job up_scale_dynos executed at: {datetime.now()}")
+async def task_scale_up_dynos():
+    logging.info(f"Job scale_up_dynos executed at: {datetime.now()}")
 
     action = "upscale"
-    dyno_type = "Standard-1x"
+    dyno_type = "basic"
 
     tasks = []
     for app in base_urls:
         if app == "flaskstockpi":
-            web = 2
-            worker = 2
+            web = 1
+            worker = 1
         else:
             web = 1
             worker = 1
@@ -85,8 +85,8 @@ async def task_up_scale_dynos():
     await asyncio.gather(*tasks)
 
 
-async def task_down_scale_dynos():
-    logging.info(f"Job down_scale_dynos executed at: {datetime.now()}")
+async def task_scale_down_dynos():
+    logging.info(f"Job scale_down_dynos executed at: {datetime.now()}")
     action = "downscale"
     dyno_type = "Eco"
     web = 1
@@ -152,9 +152,9 @@ aiocron.crontab("0 1 * * 1", func=task_clean_redis)  # Every Friday at 03:00
 aiocron.crontab("0 3 * * *", func=task_update_expiry_list)  # Every day at 03:00
 aiocron.crontab("10 3 * * *", func=task_update_session_token)  # Every day at 03:10
 aiocron.crontab("30 3 * * *", func=task_update_session_token)  # Every day at 03:30
-aiocron.crontab("30 3 * * *", func=task_up_scale_dynos)  # Every day at 03:30
+aiocron.crontab("30 3 * * *", func=task_scale_up_dynos)  # Every day at 03:30
 aiocron.crontab("0 9 * * *", func=task_rollover_to_next_expiry)  # Every day at 9:00
-aiocron.crontab("0 10 * * *", func=task_down_scale_dynos)  # Every day at 10:00
+aiocron.crontab("0 10 * * *", func=task_scale_down_dynos)  # Every day at 10:00
 aiocron.crontab("5 10 * * *", func=task_update_till_yesterdays_profits)  # Every day at 10:05
 
 
