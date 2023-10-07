@@ -149,6 +149,7 @@ class BinanceFuturesPayloadSchema(BaseModel):
     quantity: int = Field(description="Quantity", example=1)
     side: DirectionEnum = Field(description="Position", example="buy")
     type: str = Field(description="Type", example="MARKET")
+    ltp: float = Field(description="LTP", example="27913")
 
     @model_validator(mode="after")
     def serialize_side(cls, values):

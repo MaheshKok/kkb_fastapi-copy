@@ -19,6 +19,7 @@ from app.api.dependency import get_strategy_schema
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
+from app.schemas.enums import DirectionEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.strategy import StrategySchema
@@ -68,12 +69,31 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
     api_key = "75d5c54b190c224d6527440534ffe2bfa2afb34c0ccae79beadf560b9d2c5c56"
     api_secret = "db135fa6b2de30c06046891cc1eecfb50fddff0a560043dcd515fd9a57807a37"
     bnce_async_client = BinanceAsyncClient(api_key=api_key, api_secret=api_secret, testnet=True)
-    await bnce_async_client.futures_create_order(
-        symbol=futures_payload_schema.symbol,
-        side=futures_payload_schema.side,
-        type=futures_payload_schema.type,
-        quantity=2,
-    )
+    if futures_payload_schema.side == DirectionEnum.BUY.value.upper():
+        price = futures_payload_schema.ltp + 20
+    else:
+        price = futures_payload_schema.ltp - 20
+
+    open_orders = await bnce_async_client.futures_get_open_orders()
+    if open_orders:
+        # TODO: handle it later
+        pass
+
+    try:
+        result = await bnce_async_client.futures_create_order(
+            symbol=futures_payload_schema.symbol,
+            side=futures_payload_schema.side,
+            type=futures_payload_schema.type,
+            # TODO: make it 1 later
+            quantity=2,
+            timeinforce="GTC",
+            price=price,
+        )
+        return result
+    except Exception as e:
+        msg = f"Error occured while placing binance order, Error: {e}"
+        logging.error(msg)
+        return msg
     return "successfully placed order"
 
 
