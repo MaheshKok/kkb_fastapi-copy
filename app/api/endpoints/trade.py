@@ -70,9 +70,9 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
     api_secret = "db135fa6b2de30c06046891cc1eecfb50fddff0a560043dcd515fd9a57807a37"
     bnce_async_client = BinanceAsyncClient(api_key=api_key, api_secret=api_secret, testnet=True)
     if futures_payload_schema.side == DirectionEnum.BUY.value.upper():
-        price = futures_payload_schema.ltp + 20
+        price = futures_payload_schema.ltp + 10
     else:
-        price = futures_payload_schema.ltp - 20
+        price = futures_payload_schema.ltp - 10
 
     open_orders = await bnce_async_client.futures_get_open_orders()
     if open_orders:
@@ -94,7 +94,6 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
         msg = f"Error occured while placing binance order, Error: {e}"
         logging.error(msg)
         return msg
-    return "successfully placed order"
 
 
 @forex_router.post("/", status_code=200)
