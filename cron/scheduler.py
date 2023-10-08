@@ -64,14 +64,15 @@ async def task_scale_up_dynos():
     logging.info(f"Job scale_up_dynos executed at: {datetime.now()}")
 
     action = "upscale"
-    dyno_type = "basic"
 
     tasks = []
     for app in base_urls:
         if app == "flaskstockpi":
+            dyno_type = "basic"
             web = 1
             worker = 1
         else:
+            dyno_type = "Standard-1x"
             web = 1
             worker = 1
 
