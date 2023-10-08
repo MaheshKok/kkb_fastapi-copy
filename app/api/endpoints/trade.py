@@ -69,10 +69,11 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
     api_key = "75d5c54b190c224d6527440534ffe2bfa2afb34c0ccae79beadf560b9d2c5c56"
     api_secret = "db135fa6b2de30c06046891cc1eecfb50fddff0a560043dcd515fd9a57807a37"
     bnce_async_client = BinanceAsyncClient(api_key=api_key, api_secret=api_secret, testnet=True)
+    ltp = int(float(futures_payload_schema.ltp))
     if futures_payload_schema.side == DirectionEnum.BUY.value.upper():
-        price = futures_payload_schema.ltp + 10
+        price = ltp + 10
     else:
-        price = futures_payload_schema.ltp - 10
+        price = ltp - 10
 
     open_orders = await bnce_async_client.futures_get_open_orders()
     if open_orders:
