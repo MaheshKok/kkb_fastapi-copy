@@ -2,6 +2,7 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
@@ -36,6 +37,17 @@ def register_routers(app: FastAPI):
     app.include_router(forex_router)
     app.include_router(binance_router)
     app.include_router(cron_api)
+
+
+def register_sentry():
+    sentry_sdk.init(
+        dsn="https://ce37badd7d894b97a19dc645745e0730@o1202314.ingest.sentry.io/6327385",
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for performance monitoring.
+        # We recommend adjusting this value in production.
+        traces_sample_rate=1.0,
+        environment="kkb-fastapi",
+    )
 
 
 def get_app(config_file) -> FastAPI:

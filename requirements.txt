@@ -85,3 +85,4 @@ aiocron==1.8
 line_profiler
 pycryptodome
 python-binance
+sentry-sdk==1.31.0
