@@ -105,20 +105,28 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
         api_key="qshPG64m0RCWQ3fe",
         demo=True,
     )
-    # size would be twice of payload,
-    # reason: we have to close the existing position first and enter a new one
-    lot_to_trade = 0
-    if positions := client.all_positions():
-        for position in positions["positions"]:
-            if position["market"]["epic"] == cfd_payload_schema.instrument:
-                existing_direction = position["position"]["direction"]
-                if existing_direction != cfd_payload_schema.direction.upper():
-                    # to close exisitng position add those many positions to new trade
-                    lot_to_trade = int(position["position"]["size"])
+    attempt = 1
+    while attempt < 5:
+        try:
+            # size would be twice of payload,
+            # reason: we have to close the existing position first and enter a new one
+            lot_to_trade = 0
+            # retrieving all positions throws 403 i.e. too many requests
+            if positions := client.all_positions():
+                for position in positions["positions"]:
+                    if position["market"]["epic"] == cfd_payload_schema.instrument:
+                        existing_direction = position["position"]["direction"]
+                        if existing_direction != cfd_payload_schema.direction.upper():
+                            # to close exisitng position add those many positions to new trade
+                            lot_to_trade = int(position["position"]["size"])
+            break
+        except Exception as e:
+            logging.error(f"Error occured while getting all positions : {e}")
+            attempt += 1
 
     attempt = 1
     while attempt < 5:
-        # it doesnt give exact size of open position, i have to have a local position in db
+        # it doesn't give exact size of open position, i have to have a local position in db
         response = client.create_position(
             epic=cfd_payload_schema.instrument,
             direction=cfd_payload_schema.direction,
