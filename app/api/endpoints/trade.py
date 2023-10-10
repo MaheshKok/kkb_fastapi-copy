@@ -83,16 +83,15 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
     else:
         price = ltp - offset
 
-    existing_position = await bnc_async_client.futures_position_information(
-        symbol=futures_payload_schema.symbol
-    )
-
-    existing_quantity = 0
-    if existing_position:
-        # TODO: handle it later
-        existing_quantity = float(existing_position["positionAmt"])
-
     try:
+        existing_position = await bnc_async_client.futures_position_information(
+            symbol=futures_payload_schema.symbol
+        )
+
+        existing_quantity = 0
+        if existing_position:
+            existing_quantity = float(existing_position["positionAmt"])
+
         result = await bnc_async_client.futures_create_order(
             symbol=futures_payload_schema.symbol,
             side=futures_payload_schema.side,
