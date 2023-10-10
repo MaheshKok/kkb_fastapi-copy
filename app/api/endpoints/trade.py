@@ -90,7 +90,7 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
 
         existing_quantity = 0
         if existing_position:
-            existing_quantity = float(existing_position["positionAmt"])
+            existing_quantity = float(existing_position[0]["positionAmt"])
 
         result = await bnc_async_client.futures_create_order(
             symbol=futures_payload_schema.symbol,
