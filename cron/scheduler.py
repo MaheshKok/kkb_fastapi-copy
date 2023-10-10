@@ -71,10 +71,12 @@ async def task_scale_up_dynos():
             dyno_type = "basic"
             web = 1
             worker = 1
+        # elif app == "kokobrothers-be":
+        #     dyno_type = "Standard-1x"
+        #     web = 1
+        #     worker = 1
         else:
-            dyno_type = "Standard-1x"
-            web = 1
-            worker = 1
+            continue
 
         tasks.append(
             get_api(
