@@ -68,25 +68,36 @@ binance_router = APIRouter(
 async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSchema):
     api_key = "75d5c54b190c224d6527440534ffe2bfa2afb34c0ccae79beadf560b9d2c5c56"
     api_secret = "db135fa6b2de30c06046891cc1eecfb50fddff0a560043dcd515fd9a57807a37"
-    bnce_async_client = BinanceAsyncClient(api_key=api_key, api_secret=api_secret, testnet=True)
+    bnc_async_client = BinanceAsyncClient(api_key=api_key, api_secret=api_secret, testnet=True)
+
+    if futures_payload_schema.symbol == "BTCUSDT":
+        offset = 5
+    elif futures_payload_schema.symbol == "ETHUSDT":
+        offset = 1
+    else:
+        return f"Invalid Symbol: {futures_payload_schema.symbol}"
+
     ltp = int(float(futures_payload_schema.ltp))
     if futures_payload_schema.side == DirectionEnum.BUY.value.upper():
-        price = ltp + 10
+        price = ltp + offset
     else:
-        price = ltp - 10
+        price = ltp - offset
 
-    open_orders = await bnce_async_client.futures_get_open_orders()
-    if open_orders:
+    existing_position = await bnc_async_client.futures_position_information(
+        symbol=futures_payload_schema.symbol
+    )
+
+    existing_quantity = 0
+    if existing_position:
         # TODO: handle it later
-        pass
+        existing_quantity = float(existing_position["positionAmt"])
 
     try:
-        result = await bnce_async_client.futures_create_order(
+        result = await bnc_async_client.futures_create_order(
             symbol=futures_payload_schema.symbol,
             side=futures_payload_schema.side,
             type=futures_payload_schema.type,
-            # TODO: make it 1 later
-            quantity=2,
+            quantity=futures_payload_schema.quantity + existing_quantity,
             timeinforce="GTC",
             price=price,
         )
