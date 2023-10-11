@@ -77,12 +77,6 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
     else:
         return f"Invalid Symbol: {futures_payload_schema.symbol}"
 
-    ltp = int(float(futures_payload_schema.ltp))
-    if futures_payload_schema.side == DirectionEnum.BUY.value.upper():
-        price = ltp + offset
-    else:
-        price = ltp - offset
-
     try:
         existing_position = await bnc_async_client.futures_position_information(
             symbol=futures_payload_schema.symbol
@@ -91,6 +85,12 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
         existing_quantity = 0
         if existing_position:
             existing_quantity = float(existing_position[0]["positionAmt"])
+
+        ltp = int(float(futures_payload_schema.ltp))
+        if futures_payload_schema.side == DirectionEnum.BUY.value.upper():
+            price = ltp + offset
+        else:
+            price = ltp - offset
 
         result = await bnc_async_client.futures_create_order(
             symbol=futures_payload_schema.symbol,
