@@ -116,11 +116,11 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
         demo=True,
     )
     attempt = 1
+    lot_to_trade = 0
     while attempt < 5:
         try:
             # size would be twice of payload,
             # reason: we have to close the existing position first and enter a new one
-            lot_to_trade = 0
             # retrieving all positions throws 403 i.e. too many requests
             if positions := client.all_positions():
                 for position in positions["positions"]:
@@ -128,7 +128,7 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
                         existing_direction = position["position"]["direction"]
                         if existing_direction != cfd_payload_schema.direction.upper():
                             # to close exisitng position add those many positions to new trade
-                            lot_to_trade = int(position["position"]["size"])
+                            lot_to_trade += int(position["position"]["size"])
             break
         except Exception as e:
             logging.error(f"Error occured while getting all positions : {e}")
