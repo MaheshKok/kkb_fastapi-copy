@@ -109,6 +109,9 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
 
 @forex_router.post("/", status_code=200)
 async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
+    logging.info(
+        f"{cfd_payload_schema.direction} signal received for: {cfd_payload_schema.instrument}"
+    )
     client = CapitalClient(
         username="maheshkokare100@gmail.com",
         password="SUua9Ydc83G.i!d",
@@ -134,6 +137,9 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
             logging.error(f"Error occured while getting all positions : {e}")
             attempt += 1
 
+    if lot_to_trade:
+        logging.info(f"Existing {lot_to_trade} found for {cfd_payload_schema.instrument}")
+
     attempt = 1
     while attempt < 5:
         # it doesn't give exact size of open position, i have to have a local position in db
@@ -142,7 +148,7 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
             direction=cfd_payload_schema.direction,
             size=cfd_payload_schema.size + lot_to_trade,
         )
-        msg = f"deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+        msg = f"{cfd_payload_schema.instrument} deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
         logging.info(msg)
         if response["dealStatus"] == "REJECTED":
             attempt += 1
