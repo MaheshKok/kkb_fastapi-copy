@@ -110,7 +110,7 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
 @forex_router.post("/", status_code=200)
 async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
     logging.info(
-        f"{cfd_payload_schema.direction} signal received for: {cfd_payload_schema.instrument}"
+        f"[ {cfd_payload_schema.instrument} ] : signal: [ {cfd_payload_schema.direction} ] received"
     )
     client = CapitalClient(
         username="maheshkokare100@gmail.com",
@@ -120,7 +120,7 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
     )
     attempt = 1
     lot_to_trade = 0
-    while attempt < 5:
+    while attempt < 10:
         try:
             # size would be twice of payload,
             # reason: we have to close the existing position first and enter a new one
@@ -134,11 +134,15 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
                             lot_to_trade += int(position["position"]["size"])
             break
         except Exception as e:
-            logging.error(f"Error occured while getting all positions : {e}")
+            logging.error(
+                f"[ {cfd_payload_schema.instrument} ]: Error occured while getting all positions : {e}"
+            )
             attempt += 1
 
     if lot_to_trade:
-        logging.info(f"Existing {lot_to_trade} found for {cfd_payload_schema.instrument}")
+        logging.info(
+            f"[ {cfd_payload_schema.instrument} ]: Existing {lot_to_trade} found for {cfd_payload_schema.instrument}"
+        )
 
     attempt = 1
     while attempt < 5:
@@ -148,11 +152,14 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
             direction=cfd_payload_schema.direction,
             size=cfd_payload_schema.size + lot_to_trade,
         )
-        msg = f"{cfd_payload_schema.instrument} deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
-        logging.info(msg)
+        msg = f"[ {cfd_payload_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
         if response["dealStatus"] == "REJECTED":
+            logging.error(
+                f"[ {cfd_payload_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+            )
             attempt += 1
             continue
+        logging.info(msg)
         return msg
 
 
