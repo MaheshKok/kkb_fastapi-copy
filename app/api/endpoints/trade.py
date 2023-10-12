@@ -84,7 +84,7 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
 
         existing_quantity = 0
         if existing_position:
-            existing_quantity = float(existing_position[0]["positionAmt"])
+            existing_quantity = abs(float(existing_position[0]["positionAmt"]))
 
         ltp = int(float(futures_payload_schema.ltp))
         if futures_payload_schema.side == DirectionEnum.BUY.value.upper():
@@ -104,7 +104,7 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
     except Exception as e:
         msg = f"Error occured while placing binance order, Error: {e}"
         logging.error(msg)
-        return msg
+        raise e
 
 
 @forex_router.post("/", status_code=200)
