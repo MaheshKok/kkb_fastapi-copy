@@ -146,21 +146,36 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
 
     attempt = 1
     while attempt < 5:
-        # it doesn't give exact size of open position, i have to have a local position in db
-        response = client.create_position(
-            epic=cfd_payload_schema.instrument,
-            direction=cfd_payload_schema.direction,
-            size=cfd_payload_schema.size + lot_to_trade,
-        )
-        msg = f"[ {cfd_payload_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
-        if response["dealStatus"] == "REJECTED":
-            logging.error(
-                f"[ {cfd_payload_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+        try:
+            response = client.create_position(
+                epic=cfd_payload_schema.instrument,
+                direction=cfd_payload_schema.direction,
+                size=cfd_payload_schema.size + lot_to_trade,
             )
-            attempt += 1
-            continue
-        logging.info(msg)
-        return msg
+            msg = f"[ {cfd_payload_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+            if response["dealStatus"] == "REJECTED":
+                logging.error(
+                    f"[ {cfd_payload_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+                )
+                attempt += 1
+                continue
+            logging.info(msg)
+            return msg
+        except Exception:
+            # if it throws 404 exception saying dealreference not found then try to fetch all positions
+            # and see if order is placed and if not then try it again and if it is placed then skip it
+            if positions := client.all_positions():
+                for position in positions["positions"]:
+                    if position["market"]["epic"] == cfd_payload_schema.instrument:
+                        existing_direction = position["position"]["direction"]
+                        if existing_direction == cfd_payload_schema.direction.upper():
+                            logging.info(
+                                f"[ {cfd_payload_schema.instrument} ]: successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
+                            )
+                            break
+                        else:
+                            attempt += 1
+                            continue
 
 
 @trading_router.get("/", status_code=200, response_model=List[DBEntryTradeSchema])
