@@ -70,12 +70,21 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
     api_secret = "db135fa6b2de30c06046891cc1eecfb50fddff0a560043dcd515fd9a57807a37"
     bnc_async_client = BinanceAsyncClient(api_key=api_key, api_secret=api_secret, testnet=True)
 
+    ltp = float(futures_payload_schema.ltp)
     if futures_payload_schema.symbol == "BTCUSDT":
         offset = 5
+        ltp = int(ltp)
     elif futures_payload_schema.symbol == "ETHUSDT":
         offset = 1
+    elif futures_payload_schema.symbol == "LTCUSDT":
+        offset = 0.05
     else:
         return f"Invalid Symbol: {futures_payload_schema.symbol}"
+
+    if futures_payload_schema.side == DirectionEnum.BUY.value.upper():
+        price = ltp + offset
+    else:
+        price = ltp - offset
 
     try:
         existing_position = await bnc_async_client.futures_position_information(
@@ -85,12 +94,6 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
         existing_quantity = 0
         if existing_position:
             existing_quantity = abs(float(existing_position[0]["positionAmt"]))
-
-        ltp = int(float(futures_payload_schema.ltp))
-        if futures_payload_schema.side == DirectionEnum.BUY.value.upper():
-            price = ltp + offset
-        else:
-            price = ltp - offset
 
         result = await bnc_async_client.futures_create_order(
             symbol=futures_payload_schema.symbol,
