@@ -70,7 +70,7 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
     api_secret = "db135fa6b2de30c06046891cc1eecfb50fddff0a560043dcd515fd9a57807a37"
     bnc_async_client = BinanceAsyncClient(api_key=api_key, api_secret=api_secret, testnet=True)
 
-    ltp = float(futures_payload_schema.ltp)
+    ltp = round(float(futures_payload_schema.ltp), 2)
     if futures_payload_schema.symbol == "BTCUSDT":
         offset = 5
         ltp = int(ltp)
