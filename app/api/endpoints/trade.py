@@ -86,28 +86,30 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
     else:
         price = ltp - offset
 
-    try:
-        existing_position = await bnc_async_client.futures_position_information(
-            symbol=futures_payload_schema.symbol
-        )
+    attempt = 1
+    while attempt <= 5:
+        try:
+            existing_position = await bnc_async_client.futures_position_information(
+                symbol=futures_payload_schema.symbol
+            )
 
-        existing_quantity = 0
-        if existing_position:
-            existing_quantity = abs(float(existing_position[0]["positionAmt"]))
+            existing_quantity = 0
+            if existing_position:
+                existing_quantity = abs(float(existing_position[0]["positionAmt"]))
 
-        result = await bnc_async_client.futures_create_order(
-            symbol=futures_payload_schema.symbol,
-            side=futures_payload_schema.side,
-            type=futures_payload_schema.type,
-            quantity=futures_payload_schema.quantity + existing_quantity,
-            timeinforce="GTC",
-            price=price,
-        )
-        return result
-    except Exception as e:
-        msg = f"Error occured while placing binance order, Error: {e}"
-        logging.error(msg)
-        raise e
+            result = await bnc_async_client.futures_create_order(
+                symbol=futures_payload_schema.symbol,
+                side=futures_payload_schema.side,
+                type=futures_payload_schema.type,
+                quantity=futures_payload_schema.quantity + existing_quantity,
+                timeinforce="GTC",
+                price=price,
+            )
+            return result
+        except Exception as e:
+            msg = f"Error occured while placing binance order, Error: {e}"
+            logging.error(msg)
+            attempt += 1
 
 
 @forex_router.post("/", status_code=200)
