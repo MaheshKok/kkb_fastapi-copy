@@ -75,7 +75,7 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
         offset = 5
         ltp = int(ltp)
     elif futures_payload_schema.symbol == "ETHUSDT":
-        offset = 1
+        offset = 0.5
     elif futures_payload_schema.symbol == "LTCUSDT":
         offset = 0.05
     elif futures_payload_schema.symbol == "ETCUSDT":
