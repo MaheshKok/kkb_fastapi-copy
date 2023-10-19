@@ -84,9 +84,9 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
         return f"Invalid Symbol: {futures_payload_schema.symbol}"
 
     if futures_payload_schema.side == DirectionEnum.BUY.value.upper():
-        price = ltp + offset
+        price = round(ltp + offset, 2)
     else:
-        price = ltp - offset
+        price = round(ltp - offset, 2)
 
     attempt = 1
     while attempt <= 5:
