@@ -89,7 +89,7 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
         price = round(ltp - offset, 2)
 
     attempt = 1
-    while attempt <= 5:
+    while attempt <= 10:
         try:
             existing_position = await bnc_async_client.futures_position_information(
                 symbol=futures_payload_schema.symbol
@@ -112,6 +112,7 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
             msg = f"Error occured while placing binance order, Error: {e}"
             logging.error(msg)
             attempt += 1
+            await asyncio.sleep(1)
 
 
 @forex_router.post("/", status_code=200)
@@ -145,6 +146,7 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
                 f"[ {cfd_payload_schema.instrument} ]: Error occured while getting all positions : {e}"
             )
             attempt += 1
+            await asyncio.sleep(1)
 
     if lot_to_trade:
         logging.info(
@@ -152,7 +154,7 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
         )
 
     attempt = 1
-    while attempt < 5:
+    while attempt < 10:
         try:
             response = client.create_position(
                 epic=cfd_payload_schema.instrument,
@@ -165,6 +167,7 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
                     f"[ {cfd_payload_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
                 )
                 attempt += 1
+                await asyncio.sleep(1)
                 continue
             logging.info(msg)
             return msg
@@ -182,6 +185,7 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
                             break
                         else:
                             attempt += 1
+                            await asyncio.sleep(1)
                             continue
 
 
