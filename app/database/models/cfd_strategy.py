@@ -26,6 +26,7 @@ class CFDStrategyModel(Base):
     min_quantity = Column(Float, nullable=False)
     margin_for_min_quantity = Column(Float, nullable=False)
     incremental_step_size = Column(Float, nullable=False)
+    max_drawdown = Column(Float, nullable=False)
 
     is_active = Column(Boolean, default=True)
     # strategy details
