@@ -29,6 +29,8 @@ class CFDStrategyModel(Base):
     max_drawdown = Column(Float, nullable=False)
 
     is_active = Column(Boolean, default=True)
+    is_demo = Column(Boolean, default=True, nullable=False)
+
     # strategy details
     name = Column(String, nullable=False, default="Renko Strategy Every Candle")
 
