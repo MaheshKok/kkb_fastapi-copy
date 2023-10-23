@@ -112,6 +112,22 @@ class CapitalClient:
         self.__log_out__()
         return data
 
+    # get all order details
+    def get_account_activity(self):
+        self.__create_session__()
+        url = f"{self.server}/api/v1/history/activity?lastPeriod=86400"
+        data = self.__make_request__("get", url, payload="")
+        self.__log_out__()
+        return data
+
+    # get all profit, loss and overnight fees details
+    def get_transactions(self):
+        self.__create_session__()
+        url = f"{self.server}/api/v1/history/transactions?lastPeriod=86400"
+        data = self.__make_request__("get", url, payload="")
+        self.__log_out__()
+        return data
+
     # Switch active account
     def change_active_account(self, account_id):
         self.__create_session__()
