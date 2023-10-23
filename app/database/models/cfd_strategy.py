@@ -30,6 +30,7 @@ class CFDStrategyModel(Base):
 
     is_active = Column(Boolean, default=True)
     is_demo = Column(Boolean, default=True, nullable=False)
+    funds = Column(Float, nullable=True)
 
     # strategy details
     name = Column(String, nullable=False, default="Renko Strategy Every Candle")

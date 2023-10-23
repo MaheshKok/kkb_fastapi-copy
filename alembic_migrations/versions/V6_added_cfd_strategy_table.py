@@ -1,8 +1,8 @@
 """added cfd_strategy table
 
-Revision ID: 41faa58b8ed4
+Revision ID: 2d391b35abe8
 Revises: 98d005381e5f
-Create Date: 2023-10-24 00:37:57.226512
+Create Date: 2023-10-24 00:41:18.384657
 
 """
 import sqlalchemy as sa
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision = "41faa58b8ed4"
+revision = "2d391b35abe8"
 down_revision = "98d005381e5f"
 branch_labels = None
 depends_on = None
@@ -31,6 +31,7 @@ def upgrade() -> None:
         sa.Column("max_drawdown", sa.Float(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=True),
         sa.Column("is_demo", sa.Boolean(), nullable=False),
+        sa.Column("funds", sa.Float(), nullable=True),
         sa.Column("name", sa.String(), nullable=False),
         sa.Column("broker_id", sa.UUID(), nullable=True),
         sa.Column("user_id", sa.UUID(), nullable=False),
