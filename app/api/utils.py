@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import math
 from datetime import datetime
 
 from aioredis import Redis
@@ -87,14 +88,23 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
             1 + drawdown_percentage
         )
 
-        # Round down to the nearest multiple of the step size
-        trade_quantity = round(
-            funds_to_trade
-            / (cfd_strategy_schema.min_quantity * cfd_strategy_schema.margin_for_min_quantity),
-            2,
+        # Calculate the quantity that can be traded in the current period
+        approx_quantity_to_trade = funds_to_trade / (
+            cfd_strategy_schema.min_quantity * cfd_strategy_schema.margin_for_min_quantity
         )
 
-        return trade_quantity
+        # Round down to the nearest multiple of
+        # cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size
+        quantity_to_trade = (
+            math.floor(
+                approx_quantity_to_trade
+                / (cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size)
+            )
+            * cfd_strategy_schema.min_quantity
+            + cfd_strategy_schema.incremental_step_size
+        )
+
+        return quantity_to_trade
     except ZeroDivisionError:
         raise HTTPException(
             status_code=400, detail="Division by zero error in trade quantity calculation"
