@@ -15,13 +15,17 @@ from sqlalchemy import select
 
 from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
+from app.api.dependency import get_cfd_strategy_schema
 from app.api.dependency import get_strategy_schema
+from app.api.utils import get_capital_cfd_existing_profit_or_loss
+from app.api.utils import get_capital_cfd_lot_to_trades
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import DirectionEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
+from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import BinanceFuturesPayloadSchema
 from app.schemas.trade import CFDPayloadSchema
@@ -116,7 +120,10 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
 
 
 @forex_router.post("/", status_code=200)
-async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
+async def post_cfd(
+    cfd_payload_schema: CFDPayloadSchema,
+    cfd_strategy_schema: CFDStrategySchema = Depends(get_cfd_strategy_schema),
+):
     logging.info(
         f"[ {cfd_payload_schema.instrument} ] : signal: [ {cfd_payload_schema.direction} ] received"
     )
@@ -124,49 +131,26 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
         username="maheshkokare100@gmail.com",
         password="SUua9Ydc83G.i!d",
         api_key="qshPG64m0RCWQ3fe",
-        demo=True,
+        demo=cfd_strategy_schema.is_demo,
     )
-    attempt = 1
-    lot_to_trade = 0
-    while attempt < 10:
-        try:
-            # size would be twice of payload,
-            # reason: we have to close the existing position first and enter a new one
-            # retrieving all positions throws 403 i.e. too many requests
-            if positions := client.all_positions():
-                for position in positions["positions"]:
-                    if position["market"]["epic"] == cfd_payload_schema.instrument:
-                        existing_direction = position["position"]["direction"]
-                        if existing_direction != cfd_payload_schema.direction.upper():
-                            # to close exisitng position add those many positions to new trade
-                            lot_to_trade += int(position["position"]["size"])
-            break
-        except Exception as e:
-            logging.error(
-                f"[ {cfd_payload_schema.instrument} ]: Error occured while getting all positions : {e}"
-            )
-            attempt += 1
-            await asyncio.sleep(1)
 
-    if lot_to_trade:
-        logging.info(
-            f"[ {cfd_payload_schema.instrument} ]: Existing {lot_to_trade} found for {cfd_payload_schema.instrument}"
-        )
+    profit_or_loss = await get_capital_cfd_existing_profit_or_loss(client, cfd_strategy_schema)
 
-    attempt = 1
-    while attempt < 10:
+    lot_to_trade = get_capital_cfd_lot_to_trades(cfd_strategy_schema, profit_or_loss)
+    place_order_attempt = 1
+    while place_order_attempt < 10:
         try:
             response = client.create_position(
                 epic=cfd_payload_schema.instrument,
                 direction=cfd_payload_schema.direction,
-                size=cfd_payload_schema.size + lot_to_trade,
+                size=lot_to_trade,
             )
             msg = f"[ {cfd_payload_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
             if response["dealStatus"] == "REJECTED":
                 logging.error(
                     f"[ {cfd_payload_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
                 )
-                attempt += 1
+                place_order_attempt += 1
                 await asyncio.sleep(1)
                 continue
             logging.info(msg)
@@ -184,7 +168,7 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
                             )
                             break
                         else:
-                            attempt += 1
+                            place_order_attempt += 1
                             await asyncio.sleep(1)
                             continue
 

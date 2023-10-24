@@ -138,7 +138,7 @@ class DBEntryTradeSchema(BaseModel):
 
 class CFDPayloadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    size: int = Field(description="Quantity", example=1000)
+    strategy_id: uuid.UUID = Field(description="strategy id")
     direction: DirectionEnum = Field(description="Position", example="BUY")
     instrument: str = Field(description="Instrument", example="EURUSD")
 
