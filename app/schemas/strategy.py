@@ -43,8 +43,12 @@ class CFDStrategySchema(BaseModel):
     id: uuid.UUID = Field(
         description="Strategy ID", example="ff80cf6b-3c4a-4d28-82b0-631eafb4cdd1"
     )
+    instrument: str = Field(description="Instrument", example="NATURALGAS")
+
     created_at: datetime = Field(description="Created At", example="2023-10-23:00:00.000000")
-    updated_at: datetime = Field(description="Updated At", example="2023-10-23:00:00.000000")
+    updated_at: Optional[datetime] = Field(
+        description="Updated At", example="2023-10-23:00:00.000000"
+    )
 
     min_quantity: float = Field(description="Min Quantity", example=10)
     margin_for_min_quantity: float = Field(description="Margin for Min Quantity", example=2.65)

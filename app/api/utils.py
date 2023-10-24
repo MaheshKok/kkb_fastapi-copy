@@ -76,40 +76,22 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
         return session_id
 
 
-def get_capital_cfd_lot_to_trades(cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss):
+def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss):
     try:
-        # Initialize trade_quantity to min_quantity
-        trade_quantity = cfd_strategy_schema.min_quantity
+        drawdown_percentage = cfd_strategy_schema.max_drawdown / (
+            cfd_strategy_schema.min_quantity * cfd_strategy_schema.margin_for_min_quantity
+        )
 
-        # Loop to incrementally increase trade_quantity while ensuring enough funds are set aside for drawdown
-        while True:
-            # Calculate the drawdown amount for the current trade_quantity
-            drawdown_amount = (
-                cfd_strategy_schema.max_drawdown
-                * trade_quantity
-                * cfd_strategy_schema.margin_for_min_quantity
-            )
+        # Calculate the funds that can be traded in the current period
+        tradable_funds = (cfd_strategy_schema.funds - ongoing_profit_or_loss) / (
+            1 + drawdown_percentage
+        )
 
-            # Calculate the adjusted funds after setting aside the drawdown amount
-            adjusted_funds = (
-                cfd_strategy_schema.funds - ongoing_profit_or_loss
-            ) - drawdown_amount
-
-            # Check if adjusted_funds is non-negative and sufficient to open the position
-            if adjusted_funds < trade_quantity * cfd_strategy_schema.margin_for_min_quantity:
-                break  # Exit loop if not enough funds to open position
-
-            # Calculate the potential next trade_quantity
-            next_trade_quantity = trade_quantity + cfd_strategy_schema.incremental_step_size
-
-            # Check if next_trade_quantity is still within the adjusted_funds limit
-            if (
-                adjusted_funds
-                >= next_trade_quantity * cfd_strategy_schema.margin_for_min_quantity
-            ):
-                trade_quantity = next_trade_quantity  # Update trade_quantity if within limit
-            else:
-                break  # Exit loop if next_trade_quantity exceeds the adjusted_funds limit
+        # Round down to the nearest multiple of the step size
+        trade_quantity = (
+            int(tradable_funds / cfd_strategy_schema.incremental_step_size)
+            * cfd_strategy_schema.incremental_step_size
+        )
 
         return trade_quantity
     except ZeroDivisionError:

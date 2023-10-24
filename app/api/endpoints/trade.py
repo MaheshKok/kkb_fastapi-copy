@@ -18,7 +18,7 @@ from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_cfd_strategy_schema
 from app.api.dependency import get_strategy_schema
 from app.api.utils import get_capital_cfd_existing_profit_or_loss
-from app.api.utils import get_capital_cfd_lot_to_trades
+from app.api.utils import get_capital_cfd_lot_to_trade
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
@@ -125,7 +125,7 @@ async def post_cfd(
     cfd_strategy_schema: CFDStrategySchema = Depends(get_cfd_strategy_schema),
 ):
     logging.info(
-        f"[ {cfd_payload_schema.instrument} ] : signal: [ {cfd_payload_schema.direction} ] received"
+        f"[ {cfd_strategy_schema.instrument} ] : signal: [ {cfd_payload_schema.direction} ] received"
     )
     client = CapitalClient(
         username="maheshkokare100@gmail.com",
@@ -136,19 +136,19 @@ async def post_cfd(
 
     profit_or_loss = await get_capital_cfd_existing_profit_or_loss(client, cfd_strategy_schema)
 
-    lot_to_trade = get_capital_cfd_lot_to_trades(cfd_strategy_schema, profit_or_loss)
+    lot_to_trade = get_capital_cfd_lot_to_trade(cfd_strategy_schema, profit_or_loss)
     place_order_attempt = 1
     while place_order_attempt < 10:
         try:
             response = client.create_position(
-                epic=cfd_payload_schema.instrument,
+                epic=cfd_strategy_schema.instrument,
                 direction=cfd_payload_schema.direction,
                 size=lot_to_trade,
             )
-            msg = f"[ {cfd_payload_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+            msg = f"[ {cfd_strategy_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
             if response["dealStatus"] == "REJECTED":
                 logging.error(
-                    f"[ {cfd_payload_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+                    f"[ {cfd_strategy_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
                 )
                 place_order_attempt += 1
                 await asyncio.sleep(1)
@@ -160,11 +160,11 @@ async def post_cfd(
             # and see if order is placed and if not then try it again and if it is placed then skip it
             if positions := client.all_positions():
                 for position in positions["positions"]:
-                    if position["market"]["epic"] == cfd_payload_schema.instrument:
+                    if position["market"]["epic"] == cfd_strategy_schema.instrument:
                         existing_direction = position["position"]["direction"]
                         if existing_direction == cfd_payload_schema.direction.upper():
                             logging.info(
-                                f"[ {cfd_payload_schema.instrument} ]: successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
+                                f"[ {cfd_strategy_schema.instrument} ]: successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
                             )
                             break
                         else:
