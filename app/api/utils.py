@@ -95,14 +95,11 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
 
         # Round down to the nearest multiple of
         # cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size
-        quantity_to_trade = (
-            math.floor(
-                approx_quantity_to_trade
-                / (cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size)
-            )
-            * cfd_strategy_schema.min_quantity
-            + cfd_strategy_schema.incremental_step_size
+
+        to_round_down = (
+            cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size
         )
+        quantity_to_trade = math.floor(approx_quantity_to_trade / to_round_down) * to_round_down
 
         return quantity_to_trade
     except ZeroDivisionError:
