@@ -1,8 +1,9 @@
 import asyncio
 import logging
-import math
 from datetime import datetime
 
+from _decimal import Decimal
+from _decimal import getcontext
 from aioredis import Redis
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -79,29 +80,34 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
 
 def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss):
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
+
+    getcontext().prec = 28  # Set a high precision
     try:
-        drawdown_percentage = cfd_strategy_schema.max_drawdown / (
-            cfd_strategy_schema.min_quantity * cfd_strategy_schema.margin_for_min_quantity
+        drawdown_percentage = Decimal(cfd_strategy_schema.max_drawdown) / (
+            Decimal(cfd_strategy_schema.min_quantity)
+            * Decimal(cfd_strategy_schema.margin_for_min_quantity)
         )
 
         # Calculate the funds that can be traded in the current period
-        funds_to_trade = (cfd_strategy_schema.funds - ongoing_profit_or_loss) / (
-            1 + drawdown_percentage
-        )
+        funds_to_trade = (
+            Decimal(cfd_strategy_schema.funds) - Decimal(ongoing_profit_or_loss)
+        ) / (1 + drawdown_percentage)
 
         # Calculate the quantity that can be traded in the current period
         approx_quantity_to_trade = funds_to_trade / (
-            cfd_strategy_schema.min_quantity * cfd_strategy_schema.margin_for_min_quantity
+            Decimal(cfd_strategy_schema.min_quantity)
+            * Decimal(cfd_strategy_schema.margin_for_min_quantity)
         )
 
         # Round down to the nearest multiple of
         # cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size
-        to_round_down = (
-            cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size
+        to_round_down = Decimal(cfd_strategy_schema.min_quantity) + Decimal(
+            cfd_strategy_schema.incremental_step_size
         )
-        quantity_to_trade = math.floor(approx_quantity_to_trade / to_round_down) * to_round_down
+        quantity_to_trade = (approx_quantity_to_trade // to_round_down) * to_round_down
 
-        return quantity_to_trade
+        # Convert the result back to a float for consistency with your existing code
+        return float(quantity_to_trade)
     except ZeroDivisionError:
         raise HTTPException(
             status_code=400, detail="Division by zero error in trade quantity calculation"
