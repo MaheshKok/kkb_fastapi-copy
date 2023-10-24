@@ -78,6 +78,7 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
 
 
 def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss):
+    # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
     try:
         drawdown_percentage = cfd_strategy_schema.max_drawdown / (
             cfd_strategy_schema.min_quantity * cfd_strategy_schema.margin_for_min_quantity
