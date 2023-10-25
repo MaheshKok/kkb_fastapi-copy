@@ -146,7 +146,7 @@ class CFDPayloadSchema(BaseModel):
 class BinanceFuturesPayloadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     symbol: str = Field(description="Symbol", example="BTCUSDT")
-    quantity: int = Field(description="Quantity", example=1)
+    quantity: float = Field(description="Quantity", example=1)
     side: DirectionEnum = Field(description="Position", example="buy")
     type: str = Field(description="Type", example="MARKET")
     ltp: float = Field(description="LTP", example="27913")
