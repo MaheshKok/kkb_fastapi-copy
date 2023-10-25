@@ -66,11 +66,18 @@ binance_router = APIRouter(
 
 @binance_router.post("/futures", status_code=200)
 async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSchema):
-    api_key = "75d5c54b190c224d6527440534ffe2bfa2afb34c0ccae79beadf560b9d2c5c56"
-    api_secret = "db135fa6b2de30c06046891cc1eecfb50fddff0a560043dcd515fd9a57807a37"
-    bnc_async_client = BinanceAsyncClient(
-        api_key=api_key, api_secret=api_secret, testnet=not futures_payload_schema.is_live
-    )
+    if futures_payload_schema.is_live:
+        api_key = "8eV439YeuT1JM5mYF0mX34jKSOakRukolfGayaF9Sj6FMBC4FV1qTHKUqycrpQ4T"
+        api_secret = "gFdKzcNXMvDoNfy1YbLNuS0hifnpE5gphs9iTkkyECv6TuYz5pRM4U4vwoNPQy6Q"
+        bnc_async_client = BinanceAsyncClient(
+            api_key=api_key, api_secret=api_secret, testnet=False
+        )
+    else:
+        api_key = "75d5c54b190c224d6527440534ffe2bfa2afb34c0ccae79beadf560b9d2c5c56"
+        api_secret = "db135fa6b2de30c06046891cc1eecfb50fddff0a560043dcd515fd9a57807a37"
+        bnc_async_client = BinanceAsyncClient(
+            api_key=api_key, api_secret=api_secret, testnet=True
+        )
 
     ltp = round(float(futures_payload_schema.ltp), 2)
     if futures_payload_schema.symbol == "BTCUSDT":
