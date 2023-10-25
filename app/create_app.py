@@ -46,7 +46,7 @@ def register_sentry():
         # of transactions for performance monitoring.
         # We recommend adjusting this value in production.
         traces_sample_rate=1.0,
-        environment="kkb-fastapi",
+        environment="kokobrothers-fastapi-864126af779b",
     )
 
 
