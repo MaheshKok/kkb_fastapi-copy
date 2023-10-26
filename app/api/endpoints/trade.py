@@ -12,6 +12,7 @@ from fastapi import Depends
 from httpx import AsyncClient
 from pydantic import TypeAdapter
 from sqlalchemy import select
+from sqlalchemy import update
 
 from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
@@ -20,6 +21,7 @@ from app.api.dependency import get_strategy_schema
 from app.api.utils import get_capital_cfd_existing_profit_or_loss
 from app.api.utils import get_capital_cfd_lot_to_trade
 from app.api.utils import get_current_and_next_expiry
+from app.database.models import CFDStrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import DirectionEnum
@@ -145,7 +147,7 @@ async def post_cfd(
                 direction=cfd_payload_schema.direction,
                 size=lot_to_trade,
             )
-            msg = f"[ {cfd_strategy_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+
             if response["dealStatus"] == "REJECTED":
                 logging.error(
                     f"[ {cfd_strategy_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
@@ -153,7 +155,22 @@ async def post_cfd(
                 place_order_attempt += 1
                 await asyncio.sleep(1)
                 continue
+
+            msg = f"[ {cfd_strategy_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
             logging.info(msg)
+
+            # update funds balance
+            async with Database() as async_session:
+                updated_funds = cfd_strategy_schema.funds + profit_or_loss
+                async_session.execute(
+                    update(CFDStrategyModel)
+                    .where(CFDStrategyModel.id == cfd_strategy_schema.id)
+                    .values(funds=updated_funds)
+                )
+                await async_session.commit()
+                logging.info(
+                    f"[ {cfd_strategy_schema.instrument} ]: profit: [ {profit_or_loss} ], updated funds balance to {updated_funds}"
+                )
             return msg
         except Exception:
             # if it throws 404 exception saying dealreference not found then try to fetch all positions
