@@ -164,7 +164,7 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
         demo=True,
     )
 
-    if existing_lot := await get_existing_capital_cfd_lot(cfd_payload_schema):
+    if existing_lot := await get_existing_capital_cfd_lot(client, cfd_payload_schema):
         logging.info(
             f"[ {cfd_payload_schema.instrument} ]: Existing {existing_lot} found for {cfd_payload_schema.instrument}"
         )
