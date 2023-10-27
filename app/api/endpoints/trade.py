@@ -126,19 +126,9 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
             await asyncio.sleep(1)
 
 
-@forex_router.post("/", status_code=200)
-async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
-    logging.info(
-        f"[ {cfd_payload_schema.instrument} ] : signal: [ {cfd_payload_schema.direction} ] received"
-    )
-    client = CapitalClient(
-        username="maheshkokare100@gmail.com",
-        password="SUua9Ydc83G.i!d",
-        api_key="qshPG64m0RCWQ3fe",
-        demo=True,
-    )
+async def get_existing_capital_cfd_lot(client, cfd_payload_schema) -> float:
     attempt = 1
-    lot_to_trade = 0
+    existing_lot = 0
     while attempt < 10:
         try:
             # size would be twice of payload,
@@ -150,7 +140,7 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
                         existing_direction = position["position"]["direction"]
                         if existing_direction != cfd_payload_schema.direction.upper():
                             # to close exisitng position add those many positions to new trade
-                            lot_to_trade += int(position["position"]["size"])
+                            existing_lot += int(position["position"]["size"])
             break
         except HTTPException as e:
             logging.error(
@@ -159,9 +149,24 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
             attempt += 1
             await asyncio.sleep(1)
 
-    if lot_to_trade:
+    return existing_lot
+
+
+@forex_router.post("/", status_code=200)
+async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
+    logging.info(
+        f"[ {cfd_payload_schema.instrument} ] : signal: [ {cfd_payload_schema.direction} ] received"
+    )
+    client = CapitalClient(
+        username="maheshkokare100@gmail.com",
+        password="SUua9Ydc83G.i!d",
+        api_key="qshPG64m0RCWQ3fe",
+        demo=True,
+    )
+
+    if existing_lot := await get_existing_capital_cfd_lot(cfd_payload_schema):
         logging.info(
-            f"[ {cfd_payload_schema.instrument} ]: Existing {lot_to_trade} found for {cfd_payload_schema.instrument}"
+            f"[ {cfd_payload_schema.instrument} ]: Existing {existing_lot} found for {cfd_payload_schema.instrument}"
         )
 
     attempt = 1
@@ -170,9 +175,9 @@ async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
             response = client.create_position(
                 epic=cfd_payload_schema.instrument,
                 direction=cfd_payload_schema.direction,
-                size=cfd_payload_schema.size + lot_to_trade,
+                size=cfd_payload_schema.size + existing_lot,
             )
-            msg = f"[ {cfd_payload_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+            msg = f"[ {cfd_payload_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response.get('reason', f'no reason found: response: {response}')}, status: {response.get('status')}"
             if response["dealStatus"] == "REJECTED":
                 logging.error(
                     f"[ {cfd_payload_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
