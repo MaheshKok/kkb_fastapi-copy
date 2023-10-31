@@ -1,12 +1,17 @@
+import asyncio
 import logging
 from datetime import datetime
 
+from _decimal import Decimal
+from _decimal import getcontext
 from aioredis import Redis
+from fastapi import HTTPException
 from sqlalchemy import select
 
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema
+from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
 from app.services.broker.alice_blue import Pya3Aliceblue
 from app.utils.constants import REDIS_DATE_FORMAT
@@ -70,3 +75,68 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
         logging.info(f"Redis set result: {redis_set_result}")
         logging.info(f"session updated for user: {pya3_obj.user_id} in db and redis")
         return session_id
+
+
+def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss):
+    # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
+
+    getcontext().prec = 28  # Set a high precision
+    try:
+        drawdown_percentage = Decimal(cfd_strategy_schema.max_drawdown) / (
+            Decimal(cfd_strategy_schema.min_quantity)
+            * Decimal(cfd_strategy_schema.margin_for_min_quantity)
+        )
+
+        # Calculate the funds that can be traded in the current period
+        funds_to_trade = (
+            Decimal(cfd_strategy_schema.funds) - Decimal(ongoing_profit_or_loss)
+        ) / (1 + drawdown_percentage)
+
+        # Calculate the quantity that can be traded in the current period
+        approx_quantity_to_trade = funds_to_trade / (
+            Decimal(cfd_strategy_schema.min_quantity)
+            * Decimal(cfd_strategy_schema.margin_for_min_quantity)
+        )
+
+        # Round down to the nearest multiple of
+        # cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size
+        to_round_down = Decimal(cfd_strategy_schema.min_quantity) + Decimal(
+            cfd_strategy_schema.incremental_step_size
+        )
+        quantity_to_trade = (approx_quantity_to_trade // to_round_down) * to_round_down
+
+        # Convert the result back to a float for consistency with your existing code
+        result = float(quantity_to_trade)
+        logging.info(f"[ {cfd_strategy_schema.instrument} ] : lot to trade: [ {result} ]")
+        return result
+
+    except ZeroDivisionError:
+        raise HTTPException(
+            status_code=400, detail="Division by zero error in trade quantity calculation"
+        )
+
+
+async def get_capital_cfd_existing_profit_or_loss(
+    client, cfd_strategy_schema: CFDStrategySchema
+) -> tuple[float, float]:
+    get_all_positions_attempt = 1
+    profit_or_loss = 0
+    existing_lot = 0
+    while get_all_positions_attempt < 10:
+        try:
+            # retrieving all positions throws 403 i.e. too many requests
+            if positions := client.all_positions():
+                for position in positions["positions"]:
+                    if position["market"]["epic"] == cfd_strategy_schema.instrument:
+                        profit_or_loss += position["position"]["upl"]
+                        existing_lot += position["position"]["size"]
+            break
+        except Exception as e:
+            logging.error(
+                f"[ {cfd_strategy_schema.instrument} ]: Error occured while getting all positions : {e}"
+            )
+            get_all_positions_attempt += 1
+            await asyncio.sleep(1)
+
+    logging.info(f"[ {cfd_strategy_schema.instrument} ] : existing profit: [ {profit_or_loss} ]")
+    return round(profit_or_loss, 2), existing_lot

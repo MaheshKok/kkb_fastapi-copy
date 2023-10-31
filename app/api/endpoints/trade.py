@@ -3,7 +3,6 @@ import json
 import logging
 import time
 import traceback
-from http.client import HTTPException
 from typing import List
 
 from aioredis import Redis
@@ -13,16 +12,22 @@ from fastapi import Depends
 from httpx import AsyncClient
 from pydantic import TypeAdapter
 from sqlalchemy import select
+from sqlalchemy import update
 
 from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
+from app.api.dependency import get_cfd_strategy_schema
 from app.api.dependency import get_strategy_schema
+from app.api.utils import get_capital_cfd_existing_profit_or_loss
+from app.api.utils import get_capital_cfd_lot_to_trade
 from app.api.utils import get_current_and_next_expiry
+from app.database.models import CFDStrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import DirectionEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
+from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import BinanceFuturesPayloadSchema
 from app.schemas.trade import CFDPayloadSchema
@@ -126,91 +131,81 @@ async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSche
             await asyncio.sleep(1)
 
 
-async def get_existing_capital_cfd_lot(client, cfd_payload_schema) -> float:
-    attempt = 1
-    existing_lot = 0
-    while attempt < 10:
-        try:
-            # size would be twice of payload,
-            # reason: we have to close the existing position first and enter a new one
-            # retrieving all positions throws 403 i.e. too many requests
-            if positions := client.all_positions():
-                for position in positions["positions"]:
-                    if position["market"]["epic"] == cfd_payload_schema.instrument:
-                        existing_direction = position["position"]["direction"]
-                        if existing_direction != cfd_payload_schema.direction.upper():
-                            # to close exisitng position add those many positions to new trade
-                            existing_lot += int(position["position"]["size"])
-            break
-        except HTTPException as e:
-            logging.error(
-                f"[ {cfd_payload_schema.instrument} ]: Error occured while getting all positions : {e}"
-            )
-            attempt += 1
-            await asyncio.sleep(1)
-
-    return existing_lot
-
-
 @forex_router.post("/", status_code=200)
-async def post_cfd(cfd_payload_schema: CFDPayloadSchema):
+async def post_cfd(
+    cfd_payload_schema: CFDPayloadSchema,
+    cfd_strategy_schema: CFDStrategySchema = Depends(get_cfd_strategy_schema),
+):
     logging.info(
-        f"[ {cfd_payload_schema.instrument} ] : signal: [ {cfd_payload_schema.direction} ] received"
+        f"[ {cfd_strategy_schema.instrument} ] : signal: [ {cfd_payload_schema.direction} ] received"
     )
     client = CapitalClient(
         username="maheshkokare100@gmail.com",
         password="SUua9Ydc83G.i!d",
         api_key="qshPG64m0RCWQ3fe",
-        demo=True,
+        demo=cfd_strategy_schema.is_demo,
     )
 
-    if existing_lot := await get_existing_capital_cfd_lot(client, cfd_payload_schema):
-        logging.info(
-            f"[ {cfd_payload_schema.instrument} ]: Existing {existing_lot} found for {cfd_payload_schema.instrument}"
-        )
+    profit_or_loss, lots_to_close = await get_capital_cfd_existing_profit_or_loss(
+        client, cfd_strategy_schema
+    )
 
-    attempt = 1
-    while attempt < 10:
+    lots_to_open = get_capital_cfd_lot_to_trade(cfd_strategy_schema, profit_or_loss)
+
+    place_order_attempt = 1
+    total_lots_to_trade = lots_to_close + lots_to_open
+    while place_order_attempt < 10:
         try:
             response = client.create_position(
-                epic=cfd_payload_schema.instrument,
+                epic=cfd_strategy_schema.instrument,
                 direction=cfd_payload_schema.direction,
-                size=cfd_payload_schema.size + existing_lot,
+                size=total_lots_to_trade,
             )
-            msg = f"[ {cfd_payload_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response.get('reason', f'no reason found: response: {response}')}, status: {response.get('status')}"
+
             if response["dealStatus"] == "REJECTED":
                 logging.error(
-                    f"[ {cfd_payload_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+                    f"[ {cfd_strategy_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
                 )
-                attempt += 1
+                place_order_attempt += 1
                 await asyncio.sleep(1)
                 continue
+            elif response["dealStatus"] == "ACCEPTED":
+                msg = f"[ {cfd_strategy_schema.instrument} ]: successfully placed [ {cfd_payload_schema.direction} ] for {total_lots_to_trade} trades"
+            else:
+                msg = f"[ {cfd_strategy_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+
             logging.info(msg)
+
+            # update funds balance
+            async with Database() as async_session:
+                updated_funds = cfd_strategy_schema.funds + profit_or_loss
+                await async_session.execute(
+                    update(CFDStrategyModel)
+                    .where(CFDStrategyModel.id == cfd_strategy_schema.id)
+                    .values(funds=updated_funds)
+                )
+                await async_session.commit()
+                logging.info(
+                    f"[ {cfd_strategy_schema.instrument} ]: profit: [ {profit_or_loss} ], updated funds balance to {updated_funds}"
+                )
             return msg
-        except HTTPException as e:
-            logging.error(
-                f"[ {cfd_payload_schema.instrument} ]: attempt: [ {attempt} ], Error occured while creating position : {e}"
-            )
-            try:
-                await asyncio.sleep(3)
-                # if it throws 404 exception saying dealreference not found then try to fetch all positions
-                # and see if order is placed and if not then try it again and if it is placed then skip it
-                if positions := client.all_positions():
-                    for position in positions["positions"]:
-                        if position["market"]["epic"] == cfd_payload_schema.instrument:
-                            existing_direction = position["position"]["direction"]
-                            if existing_direction == cfd_payload_schema.direction.upper():
-                                logging.info(
-                                    f"[ {cfd_payload_schema.instrument} ]: successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
-                                )
-                                break
-                            else:
-                                attempt += 1
-                                continue
-            except HTTPException:
-                attempt += 1
-                await asyncio.sleep(1)
-                continue
+        except Exception as e:
+            logging.error(f"[ {cfd_strategy_schema.instrument} ]: error occured {e}")
+            # if it throws 404 exception saying dealreference not found then try to fetch all positions
+            # and see if order is placed and if not then try it again and if it is placed then skip it
+            if positions := client.all_positions():
+                for position in positions["positions"]:
+                    if position["market"]["epic"] == cfd_strategy_schema.instrument:
+                        existing_direction = position["position"]["direction"]
+                        if existing_direction == cfd_payload_schema.direction.upper():
+                            logging.info(
+                                f"[ {cfd_strategy_schema.instrument} ]: successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
+                            )
+                            break
+                        else:
+                            place_order_attempt += 1
+                            await asyncio.sleep(1)
+                            continue
 
 
 @trading_router.get("/", status_code=200, response_model=List[DBEntryTradeSchema])

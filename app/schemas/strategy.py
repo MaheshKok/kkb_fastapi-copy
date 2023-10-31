@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
@@ -34,3 +35,32 @@ class StrategySchema(StrategyCreateSchema):
     )
 
     model_config = ConfigDict(from_attributes=True, json_encoders={uuid.UUID: str})
+
+
+class CFDStrategySchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID = Field(
+        description="Strategy ID", example="ff80cf6b-3c4a-4d28-82b0-631eafb4cdd1"
+    )
+    instrument: str = Field(description="Instrument", example="NATURALGAS")
+
+    created_at: datetime = Field(description="Created At", example="2023-10-23:00:00.000000")
+    updated_at: Optional[datetime] = Field(
+        description="Updated At", example="2023-10-23:00:00.000000"
+    )
+
+    min_quantity: float = Field(description="Min Quantity", example=10)
+    margin_for_min_quantity: float = Field(description="Margin for Min Quantity", example=2.65)
+    incremental_step_size: float = Field(description="Incremental Step Size", example=0.1)
+    max_drawdown: float = Field(description="Max Drawdown", example=0.25)
+
+    is_active: bool = Field(description="Is Active", example=True)
+    is_demo: bool = Field(description="Is Demo", example=True)
+    funds: float = Field(description="Funds", example=100.0)
+    name: str = Field(description="Name", example="Renko Strategy Every Candle")
+
+    user_id: uuid.UUID = Field(
+        description="User to which strategy belongs",
+        example="fb90dd9c-9e16-4043-b5a5-18aacb42f726",
+    )
