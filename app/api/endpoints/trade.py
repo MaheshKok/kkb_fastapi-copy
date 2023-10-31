@@ -191,14 +191,14 @@ async def post_cfd(
                     f"[ {cfd_strategy_schema.instrument} ]: profit: [ {profit_or_loss} ], updated funds balance to {updated_funds}"
                 )
             return msg
-        except HTTPException as e:
+        except Exception as e:
             response, status_code, text = e.args
             if status_code == 429:
+                # too many requests
                 place_order_attempt += 1
                 await asyncio.sleep(3)
                 continue
-            else:
-                # it means order was placed now retrieve it
+            elif status_code in [400, 404]:
                 # if it throws 404 exception saying dealreference not found then try to fetch all positions
                 # and see if order is placed and if not then try it again and if it is placed then skip it
                 positions = await get_all_positions(client, cfd_strategy_schema)
@@ -212,6 +212,9 @@ async def post_cfd(
                 else:
                     place_order_attempt += 1
                     await asyncio.sleep(3)
+            else:
+                msg = f"[ {cfd_strategy_schema.instrument} ]: Error occured while placing order, Error: {e}"
+                logging.error(msg)
 
 
 @trading_router.get("/", status_code=200, response_model=List[DBEntryTradeSchema])

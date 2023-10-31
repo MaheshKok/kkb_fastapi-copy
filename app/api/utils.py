@@ -14,6 +14,7 @@ from app.schemas.broker import BrokerSchema
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
 from app.services.broker.alice_blue import Pya3Aliceblue
+from app.services.broker.Capital import CapitalClient
 from app.utils.constants import REDIS_DATE_FORMAT
 from app.utils.in_memory_cache import current_and_next_expiry_cache
 
@@ -115,13 +116,13 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
         )
 
 
-async def get_all_positions(client, cfd_strategy_schema):
+async def get_all_positions(client: CapitalClient, cfd_strategy_schema):
     get_all_positions_attempt = 1
     while get_all_positions_attempt < 10:
         try:
             # retrieving all positions throws 403 i.e. too many requests
             return client.all_positions()
-        except HTTPException as e:
+        except Exception as e:
             response, status_code, text = e.args
             if status_code == 429:
                 get_all_positions_attempt += 1
