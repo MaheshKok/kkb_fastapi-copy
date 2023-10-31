@@ -89,7 +89,7 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
 
         # Calculate the funds that can be traded in the current period
         funds_to_trade = (
-            Decimal(cfd_strategy_schema.funds) - Decimal(ongoing_profit_or_loss)
+            Decimal(cfd_strategy_schema.funds) + Decimal(ongoing_profit_or_loss)
         ) / (1 + drawdown_percentage)
 
         # Calculate the quantity that can be traded in the current period
