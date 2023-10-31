@@ -172,9 +172,10 @@ async def post_cfd(
                 await asyncio.sleep(3)
                 continue
             elif response["dealStatus"] == "ACCEPTED":
-                msg = f"[ {cfd_strategy_schema.instrument} ]: successfully placed [ {cfd_payload_schema.direction} ] for {total_lots_to_trade} trades"
+                long_or_short = "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
+                msg = f"[ {cfd_strategy_schema.instrument} ]: successfully [ {long_or_short}  {lots_to_open} ] trades."
             else:
-                msg = f"[ {cfd_strategy_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+                msg = f"[ {cfd_strategy_schema.instrument} ]: deal status: {response}"
 
             logging.info(msg)
 

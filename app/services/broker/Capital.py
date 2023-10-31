@@ -145,6 +145,13 @@ class CapitalClient:
         self.__log_out__()
         return data
 
+    def get_position(self, dealId):
+        self.__create_session__()
+        url = f"{self.server}/api/v1/positions/{dealId}"
+        data = self.__make_request__("get", url, payload="")[0]
+        self.__log_out__()
+        return data
+
     # Opens a new position
     def create_position(
         self,
