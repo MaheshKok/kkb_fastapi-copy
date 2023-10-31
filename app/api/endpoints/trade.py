@@ -3,6 +3,7 @@ import json
 import logging
 import time
 import traceback
+from http.client import HTTPException  # noqa
 from typing import List
 
 from aioredis import Redis
@@ -18,6 +19,7 @@ from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_cfd_strategy_schema
 from app.api.dependency import get_strategy_schema
+from app.api.utils import get_all_positions
 from app.api.utils import get_capital_cfd_existing_profit_or_loss
 from app.api.utils import get_capital_cfd_lot_to_trade
 from app.api.utils import get_current_and_next_expiry
@@ -164,10 +166,10 @@ async def post_cfd(
 
             if response["dealStatus"] == "REJECTED":
                 logging.error(
-                    f"[ {cfd_strategy_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
+                    f"[ {cfd_strategy_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['rejectReason']}, status: {response['status']}"
                 )
                 place_order_attempt += 1
-                await asyncio.sleep(1)
+                await asyncio.sleep(3)
                 continue
             elif response["dealStatus"] == "ACCEPTED":
                 msg = f"[ {cfd_strategy_schema.instrument} ]: successfully placed [ {cfd_payload_schema.direction} ] for {total_lots_to_trade} trades"
@@ -189,23 +191,27 @@ async def post_cfd(
                     f"[ {cfd_strategy_schema.instrument} ]: profit: [ {profit_or_loss} ], updated funds balance to {updated_funds}"
                 )
             return msg
-        except Exception as e:
-            logging.error(f"[ {cfd_strategy_schema.instrument} ]: error occured {e}")
-            # if it throws 404 exception saying dealreference not found then try to fetch all positions
-            # and see if order is placed and if not then try it again and if it is placed then skip it
-            if positions := client.all_positions():
+        except HTTPException as e:
+            response, status_code, text = e.args
+            if status_code == 429:
+                place_order_attempt += 1
+                await asyncio.sleep(3)
+                continue
+            else:
+                # it means order was placed now retrieve it
+                # if it throws 404 exception saying dealreference not found then try to fetch all positions
+                # and see if order is placed and if not then try it again and if it is placed then skip it
+                positions = await get_all_positions(client, cfd_strategy_schema)
                 for position in positions["positions"]:
                     if position["market"]["epic"] == cfd_strategy_schema.instrument:
                         existing_direction = position["position"]["direction"]
                         if existing_direction == cfd_payload_schema.direction.upper():
-                            logging.info(
-                                f"[ {cfd_strategy_schema.instrument} ]: successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
-                            )
-                            break
-                        else:
-                            place_order_attempt += 1
-                            await asyncio.sleep(1)
-                            continue
+                            msg = f"[ {cfd_strategy_schema.instrument} ]: successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
+                            logging.info(msg)
+                            return msg
+                else:
+                    place_order_attempt += 1
+                    await asyncio.sleep(3)
 
 
 @trading_router.get("/", status_code=200, response_model=List[DBEntryTradeSchema])
