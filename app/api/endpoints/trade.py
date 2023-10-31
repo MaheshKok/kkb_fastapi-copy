@@ -136,16 +136,20 @@ async def post_cfd(
         demo=cfd_strategy_schema.is_demo,
     )
 
-    profit_or_loss = await get_capital_cfd_existing_profit_or_loss(client, cfd_strategy_schema)
+    profit_or_loss, lots_to_close = await get_capital_cfd_existing_profit_or_loss(
+        client, cfd_strategy_schema
+    )
 
-    lot_to_trade = get_capital_cfd_lot_to_trade(cfd_strategy_schema, profit_or_loss)
+    lots_to_open = get_capital_cfd_lot_to_trade(cfd_strategy_schema, profit_or_loss)
+
     place_order_attempt = 1
+    total_lots_to_trade = lots_to_close + lots_to_open
     while place_order_attempt < 10:
         try:
             response = client.create_position(
                 epic=cfd_strategy_schema.instrument,
                 direction=cfd_payload_schema.direction,
-                size=lot_to_trade,
+                size=total_lots_to_trade,
             )
 
             if response["dealStatus"] == "REJECTED":
@@ -155,14 +159,17 @@ async def post_cfd(
                 place_order_attempt += 1
                 await asyncio.sleep(1)
                 continue
+            elif response["dealStatus"] == "ACCEPTED":
+                msg = f"[ {cfd_strategy_schema.instrument} ]: successfully placed [ {cfd_payload_schema.direction} ] for {total_lots_to_trade} trades"
+            else:
+                msg = f"[ {cfd_strategy_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
 
-            msg = f"[ {cfd_strategy_schema.instrument} ]: deal status: {response['dealStatus']}, reason: {response['reason']}, status: {response['status']}"
             logging.info(msg)
 
             # update funds balance
             async with Database() as async_session:
                 updated_funds = cfd_strategy_schema.funds + profit_or_loss
-                async_session.execute(
+                await async_session.execute(
                     update(CFDStrategyModel)
                     .where(CFDStrategyModel.id == cfd_strategy_schema.id)
                     .values(funds=updated_funds)
@@ -172,7 +179,8 @@ async def post_cfd(
                     f"[ {cfd_strategy_schema.instrument} ]: profit: [ {profit_or_loss} ], updated funds balance to {updated_funds}"
                 )
             return msg
-        except Exception:
+        except Exception as e:
+            logging.error(f"[ {cfd_strategy_schema.instrument} ]: error occured {e}")
             # if it throws 404 exception saying dealreference not found then try to fetch all positions
             # and see if order is placed and if not then try it again and if it is placed then skip it
             if positions := client.all_positions():

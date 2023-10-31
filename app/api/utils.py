@@ -13,7 +13,6 @@ from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
-from app.schemas.trade import CFDPayloadSchema
 from app.services.broker.alice_blue import Pya3Aliceblue
 from app.utils.constants import REDIS_DATE_FORMAT
 from app.utils.in_memory_cache import current_and_next_expiry_cache
@@ -107,7 +106,10 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
         quantity_to_trade = (approx_quantity_to_trade // to_round_down) * to_round_down
 
         # Convert the result back to a float for consistency with your existing code
-        return float(quantity_to_trade)
+        result = float(quantity_to_trade)
+        logging.info(f"[ {cfd_strategy_schema.instrument} ] : lot to trade: [ {result} ]")
+        return result
+
     except ZeroDivisionError:
         raise HTTPException(
             status_code=400, detail="Division by zero error in trade quantity calculation"
@@ -115,23 +117,26 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
 
 
 async def get_capital_cfd_existing_profit_or_loss(
-    client, cfd_payload_schema: CFDPayloadSchema
-) -> float:
+    client, cfd_strategy_schema: CFDStrategySchema
+) -> tuple[float, float]:
     get_all_positions_attempt = 1
     profit_or_loss = 0
+    existing_lot = 0
     while get_all_positions_attempt < 10:
         try:
             # retrieving all positions throws 403 i.e. too many requests
             if positions := client.all_positions():
                 for position in positions["positions"]:
-                    if position["market"]["epic"] == cfd_payload_schema.instrument:
+                    if position["market"]["epic"] == cfd_strategy_schema.instrument:
                         profit_or_loss += position["position"]["upl"]
+                        existing_lot += position["position"]["size"]
             break
         except Exception as e:
             logging.error(
-                f"[ {cfd_payload_schema.instrument} ]: Error occured while getting all positions : {e}"
+                f"[ {cfd_strategy_schema.instrument} ]: Error occured while getting all positions : {e}"
             )
             get_all_positions_attempt += 1
             await asyncio.sleep(1)
 
-    return profit_or_loss
+    logging.info(f"[ {cfd_strategy_schema.instrument} ] : existing profit: [ {profit_or_loss} ]")
+    return round(profit_or_loss, 2), existing_lot
