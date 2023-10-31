@@ -83,14 +83,18 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
 
     getcontext().prec = 28  # Set a high precision
     try:
-        drawdown_percentage = Decimal(cfd_strategy_schema.max_drawdown) / (
-            Decimal(cfd_strategy_schema.margin_for_min_quantity)
-        )
+        # below code is to save funds as per drawdown percentage
+        # drawdown_percentage = Decimal(cfd_strategy_schema.max_drawdown) / (
+        #     Decimal(cfd_strategy_schema.margin_for_min_quantity)
+        # )
+        #
+        # # Calculate the funds that can be traded in the current period
+        # funds_to_trade = (
+        #     Decimal(cfd_strategy_schema.funds) + Decimal(ongoing_profit_or_loss)
+        # ) / (1 + drawdown_percentage)
+        #
 
-        # Calculate the funds that can be traded in the current period
-        funds_to_trade = (
-            Decimal(cfd_strategy_schema.funds) + Decimal(ongoing_profit_or_loss)
-        ) / (1 + drawdown_percentage)
+        funds_to_trade = Decimal(cfd_strategy_schema.funds) + Decimal(ongoing_profit_or_loss)
 
         # Calculate the quantity that can be traded in the current period
         approx_quantity_to_trade = funds_to_trade / (
