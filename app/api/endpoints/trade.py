@@ -22,6 +22,7 @@ from app.api.dependency import get_strategy_schema
 from app.api.utils import get_all_positions
 from app.api.utils import get_capital_cfd_existing_profit_or_loss
 from app.api.utils import get_capital_cfd_lot_to_trade
+from app.api.utils import get_capital_dot_com_available_funds
 from app.api.utils import get_current_and_next_expiry
 from app.database.models import CFDStrategyModel
 from app.database.models import TradeModel
@@ -149,14 +150,23 @@ async def post_cfd(
         demo=cfd_strategy_schema.is_demo,
     )
 
+    available_funds = await get_capital_dot_com_available_funds(client, cfd_strategy_schema)
+
     profit_or_loss, lots_to_close = await get_capital_cfd_existing_profit_or_loss(
         client, cfd_strategy_schema
     )
 
-    lots_to_open = get_capital_cfd_lot_to_trade(cfd_strategy_schema, profit_or_loss)
+    lots_to_open = get_capital_cfd_lot_to_trade(
+        cfd_strategy_schema, profit_or_loss, available_funds
+    )
 
     place_order_attempt = 1
     total_lots_to_trade = lots_to_close + lots_to_open
+
+    logging.info(
+        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : total lots to trade: {total_lots_to_trade}"
+    )
+
     while place_order_attempt < 10:
         try:
             response = client.create_position(

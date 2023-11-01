@@ -78,7 +78,9 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
         return session_id
 
 
-def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss):
+def get_capital_cfd_lot_to_trade(
+    cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss, available_funds
+):
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
 
@@ -95,11 +97,17 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
         # ) / (1 + drawdown_percentage)
         #
 
-        # TODO: may be the current instrument is in profit but other instrument is in loss
-        # calculate the margin required to open trades is less than available funds and then adjust it
-
-        # open position with 95% of the funds available to avoid getting rejected due insufficient funds
-        funds_to_trade = Decimal((cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.95)
+        # Assume available funds are also positive
+        if ongoing_profit_or_loss < 0:
+            # open position with 95% of the funds available to avoid getting rejected due insufficient funds
+            funds_to_trade = Decimal((cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.90)
+        else:
+            if available_funds < ongoing_profit_or_loss:
+                funds_to_trade = Decimal((cfd_strategy_schema.funds + available_funds) * 0.90)
+            else:
+                funds_to_trade = Decimal(
+                    (cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.90
+                )
 
         # Calculate the quantity that can be traded in the current period
         approx_quantity_to_trade = funds_to_trade / (
@@ -172,4 +180,36 @@ async def get_capital_cfd_existing_profit_or_loss(
     logging.info(
         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : existing profit: [ {profit_or_loss} ]"
     )
+    logging.info(
+        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : existing lot: [ {existing_lot} ]"
+    )
     return round(profit_or_loss, 2), existing_lot
+
+
+async def get_capital_dot_com_available_funds(
+    client, cfd_strategy_schema: CFDStrategySchema
+) -> float:
+    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
+
+    get_all_positions_attempt = 1
+    while get_all_positions_attempt < 10:
+        try:
+            # retrieving all positions throws 403 i.e. too many requests
+            return client.all_accounts()[0]["balance"]["available"]
+        except Exception as e:
+            response, status_code, text = e.args
+            if status_code == 429:
+                get_all_positions_attempt += 1
+                await asyncio.sleep(2)
+            elif status_code == 400:
+                get_all_positions_attempt += 1
+                await asyncio.sleep(2)
+            else:
+                logging.error(
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all positions {status_code} {text}"
+                )
+                break
+    else:
+        logging.error(
+            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all positions {text}"
+        )
