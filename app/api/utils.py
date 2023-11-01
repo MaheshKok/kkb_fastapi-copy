@@ -95,6 +95,9 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
         # ) / (1 + drawdown_percentage)
         #
 
+        # TODO: may be the current instrument is in profit but other instrument is in loss
+        # calculate the margin required to open trades is less than available funds and then adjust it
+
         # open position with 95% of the funds available to avoid getting rejected due insufficient funds
         funds_to_trade = Decimal((cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.95)
 
