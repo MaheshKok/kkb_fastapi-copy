@@ -97,13 +97,8 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
 
         # TODO: fetch available funds to trade and then add up to calculayte funds_to_trade
         # open position with 95% of the funds available to avoid getting rejected due insufficient funds
-        if ongoing_profit_or_loss > 0:
-            # don't add profit to open lots otherwise it will be rejected due to insufficient funds
-            # because profit isn't available to open lots
-            funds_to_trade = Decimal(cfd_strategy_schema.funds * 0.95)
-        else:
-            funds_to_trade = Decimal((cfd_strategy_schema.funds - ongoing_profit_or_loss) * 1.05)
 
+        funds_to_trade = Decimal((cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.95)
         # Calculate the quantity that can be traded in the current period
         approx_quantity_to_trade = funds_to_trade / (
             Decimal(cfd_strategy_schema.margin_for_min_quantity)
