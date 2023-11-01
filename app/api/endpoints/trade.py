@@ -156,7 +156,7 @@ async def post_cfd(
         client, cfd_strategy_schema
     )
 
-    lots_to_open = get_capital_cfd_lot_to_trade(
+    lots_to_open, update_profit_or_loss_in_db = get_capital_cfd_lot_to_trade(
         cfd_strategy_schema, profit_or_loss, available_funds
     )
 
@@ -192,7 +192,7 @@ async def post_cfd(
 
             # update funds balance
             async with Database() as async_session:
-                updated_funds = cfd_strategy_schema.funds + profit_or_loss
+                updated_funds = cfd_strategy_schema.funds + update_profit_or_loss_in_db
                 await async_session.execute(
                     update(CFDStrategyModel)
                     .where(CFDStrategyModel.id == cfd_strategy_schema.id)

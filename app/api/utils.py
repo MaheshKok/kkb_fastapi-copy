@@ -81,6 +81,7 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
 def get_capital_cfd_lot_to_trade(
     cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss, available_funds
 ):
+    to_update_profit_or_loss_in_db = 0
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
 
@@ -101,13 +102,16 @@ def get_capital_cfd_lot_to_trade(
         if ongoing_profit_or_loss < 0:
             # open position with 95% of the funds available to avoid getting rejected due insufficient funds
             funds_to_trade = Decimal((cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.90)
+            to_update_profit_or_loss_in_db = ongoing_profit_or_loss
         else:
             if available_funds < ongoing_profit_or_loss:
                 funds_to_trade = Decimal((cfd_strategy_schema.funds + available_funds) * 0.90)
+                to_update_profit_or_loss_in_db = available_funds
             else:
                 funds_to_trade = Decimal(
                     (cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.90
                 )
+                to_update_profit_or_loss_in_db = ongoing_profit_or_loss
 
         # Calculate the quantity that can be traded in the current period
         approx_quantity_to_trade = funds_to_trade / (
@@ -127,7 +131,10 @@ def get_capital_cfd_lot_to_trade(
         logging.info(
             f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots to open [ {result} ]"
         )
-        return result
+        logging.info(
+            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ]: to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db}]"
+        )
+        return result, to_update_profit_or_loss_in_db
 
     except ZeroDivisionError:
         raise HTTPException(
