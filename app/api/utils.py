@@ -94,7 +94,8 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
         # ) / (1 + drawdown_percentage)
         #
 
-        funds_to_trade = Decimal(cfd_strategy_schema.funds) + Decimal(ongoing_profit_or_loss)
+        # open position with 95% of the funds available to avoid getting rejected due insufficient funds
+        funds_to_trade = Decimal((cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.95)
 
         # Calculate the quantity that can be traded in the current period
         approx_quantity_to_trade = funds_to_trade / (
