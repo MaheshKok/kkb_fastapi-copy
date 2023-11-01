@@ -202,7 +202,7 @@ async def get_capital_dot_com_available_funds(
     while get_all_positions_attempt < 10:
         try:
             # retrieving all positions throws 403 i.e. too many requests
-            return client.all_accounts()[0]["balance"]["available"]
+            return client.all_accounts()["accounts"][0]["balance"]["available"]
         except Exception as e:
             response, status_code, text = e.args
             if status_code == 429:
