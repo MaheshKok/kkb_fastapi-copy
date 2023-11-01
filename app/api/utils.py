@@ -150,8 +150,9 @@ async def get_all_positions(
                 await asyncio.sleep(2)
             else:
                 logging.error(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all positions {text}"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all positions {status_code} { text}"
                 )
+                break
     else:
         logging.error(
             f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all positions {text}"
