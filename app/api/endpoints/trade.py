@@ -138,8 +138,9 @@ async def post_cfd(
     cfd_payload_schema: CFDPayloadSchema,
     cfd_strategy_schema: CFDStrategySchema = Depends(get_cfd_strategy_schema),
 ):
+    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
     logging.info(
-        f"[ {cfd_strategy_schema.instrument} ] : signal: [ {cfd_payload_schema.direction} ] received"
+        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] received"
     )
     client = CapitalClient(
         username="maheshkokare100@gmail.com",
@@ -166,16 +167,16 @@ async def post_cfd(
 
             if response["dealStatus"] == "REJECTED":
                 logging.error(
-                    f"[ {cfd_strategy_schema.instrument} ]: rejected, deal status: {response['dealStatus']}, reason: {response['rejectReason']}, status: {response['status']}"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : rejected, deal status: {response['dealStatus']}, reason: {response['rejectReason']}, status: {response['status']}"
                 )
                 place_order_attempt += 1
                 await asyncio.sleep(3)
                 continue
             elif response["dealStatus"] == "ACCEPTED":
                 long_or_short = "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
-                msg = f"[ {cfd_strategy_schema.instrument} ]: successfully [ {long_or_short}  {lots_to_open} ] trades."
+                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
             else:
-                msg = f"[ {cfd_strategy_schema.instrument} ]: deal status: {response}"
+                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : deal status: {response}"
 
             logging.info(msg)
 
@@ -189,7 +190,7 @@ async def post_cfd(
                 )
                 await async_session.commit()
                 logging.info(
-                    f"[ {cfd_strategy_schema.instrument} ]: profit: [ {profit_or_loss} ], updated funds balance to {updated_funds}"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : profit: [ {profit_or_loss} ], updated funds balance to {updated_funds}"
                 )
             return msg
         except Exception as e:
@@ -207,14 +208,14 @@ async def post_cfd(
                     if position["market"]["epic"] == cfd_strategy_schema.instrument:
                         existing_direction = position["position"]["direction"]
                         if existing_direction == cfd_payload_schema.direction.upper():
-                            msg = f"[ {cfd_strategy_schema.instrument} ]: successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
+                            msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
                             logging.info(msg)
                             return msg
                 else:
                     place_order_attempt += 1
                     await asyncio.sleep(3)
             else:
-                msg = f"[ {cfd_strategy_schema.instrument} ]: Error occured while placing order, Error: {e}"
+                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while placing order, Error: {e}"
                 logging.error(msg)
 
 

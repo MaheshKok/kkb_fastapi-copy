@@ -80,10 +80,11 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
 
 def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss):
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
+    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
 
     getcontext().prec = 28  # Set a high precision
     try:
-        # below code is to save funds as per drawdown percentage
+        # below code is to secure funds as per drawdown percentage
         # drawdown_percentage = Decimal(cfd_strategy_schema.max_drawdown) / (
         #     Decimal(cfd_strategy_schema.margin_for_min_quantity)
         # )
@@ -94,8 +95,14 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
         # ) / (1 + drawdown_percentage)
         #
 
+        # TODO: fetch available funds to trade and then add up to calculayte funds_to_trade
         # open position with 95% of the funds available to avoid getting rejected due insufficient funds
-        funds_to_trade = Decimal((cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.95)
+        if ongoing_profit_or_loss > 0:
+            # don't add profit to open lots otherwise it will be rejected due to insufficient funds
+            # because profit isn't available to open lots
+            funds_to_trade = Decimal(cfd_strategy_schema.funds * 0.95)
+        else:
+            funds_to_trade = Decimal((cfd_strategy_schema.funds - ongoing_profit_or_loss) * 1.05)
 
         # Calculate the quantity that can be traded in the current period
         approx_quantity_to_trade = funds_to_trade / (
@@ -112,7 +119,9 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
 
         # Convert the result back to a float for consistency with your existing code
         result = float(quantity_to_trade)
-        logging.info(f"[ {cfd_strategy_schema.instrument} ] : lots to open: [ {result} ]")
+        logging.info(
+            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots to open [ {result} ]"
+        )
         return result
 
     except ZeroDivisionError:
@@ -121,7 +130,11 @@ def get_capital_cfd_lot_to_trade(cfd_strategy_schema: CFDStrategySchema, ongoing
         )
 
 
-async def get_all_positions(client: CapitalClient, cfd_strategy_schema):
+async def get_all_positions(
+    client: CapitalClient, cfd_strategy_schema: CFDStrategySchema
+) -> dict:
+    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
+
     get_all_positions_attempt = 1
     while get_all_positions_attempt < 10:
         try:
@@ -131,20 +144,25 @@ async def get_all_positions(client: CapitalClient, cfd_strategy_schema):
             response, status_code, text = e.args
             if status_code == 429:
                 get_all_positions_attempt += 1
-                await asyncio.sleep(3)
+                await asyncio.sleep(2)
+            elif status_code == 400:
+                get_all_positions_attempt += 1
+                await asyncio.sleep(2)
             else:
                 logging.error(
-                    f"[ {cfd_strategy_schema.instrument} ]: Error occured while getting all positions : {text}"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all positions {text}"
                 )
     else:
         logging.error(
-            f"[ {cfd_strategy_schema.instrument} ]: Error occured while getting all positions : {text}"
+            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all positions {text}"
         )
 
 
 async def get_capital_cfd_existing_profit_or_loss(
     client, cfd_strategy_schema: CFDStrategySchema
 ) -> tuple[float, float]:
+    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
+
     profit_or_loss = 0
     existing_lot = 0
     positions = await get_all_positions(client, cfd_strategy_schema)
@@ -153,5 +171,7 @@ async def get_capital_cfd_existing_profit_or_loss(
             profit_or_loss += position["position"]["upl"]
             existing_lot += position["position"]["size"]
 
-    logging.info(f"[ {cfd_strategy_schema.instrument} ] : existing profit: [ {profit_or_loss} ]")
+    logging.info(
+        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : existing profit: [ {profit_or_loss} ]"
+    )
     return round(profit_or_loss, 2), existing_lot
