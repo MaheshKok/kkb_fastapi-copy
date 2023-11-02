@@ -101,15 +101,15 @@ def get_capital_cfd_lot_to_trade(
         # Assume available funds are also positive
         if ongoing_profit_or_loss < 0:
             # open position with 95% of the funds available to avoid getting rejected due insufficient funds
-            funds_to_trade = Decimal((cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.90)
+            funds_to_trade = Decimal((cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.95)
             to_update_profit_or_loss_in_db = ongoing_profit_or_loss
         else:
             if available_funds < ongoing_profit_or_loss:
-                funds_to_trade = Decimal((cfd_strategy_schema.funds + available_funds) * 0.90)
+                funds_to_trade = Decimal(cfd_strategy_schema.funds + (available_funds * 0.95))
                 to_update_profit_or_loss_in_db = available_funds
             else:
                 funds_to_trade = Decimal(
-                    (cfd_strategy_schema.funds + ongoing_profit_or_loss) * 0.90
+                    cfd_strategy_schema.funds + (ongoing_profit_or_loss * 0.95)
                 )
                 to_update_profit_or_loss_in_db = ongoing_profit_or_loss
 
