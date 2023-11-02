@@ -152,7 +152,7 @@ async def post_cfd(
 
     available_funds = await get_capital_dot_com_available_funds(client, cfd_strategy_schema)
 
-    profit_or_loss, lots_to_close = await get_capital_cfd_existing_profit_or_loss(
+    profit_or_loss, current_open_lots = await get_capital_cfd_existing_profit_or_loss(
         client, cfd_strategy_schema
     )
 
@@ -161,34 +161,64 @@ async def post_cfd(
     )
 
     place_order_attempt = 1
-    total_lots_to_trade = lots_to_close + lots_to_open
-
-    logging.info(
-        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : total lots to trade: {total_lots_to_trade}"
-    )
-
     while place_order_attempt < 10:
         try:
-            response = client.create_position(
-                epic=cfd_strategy_schema.instrument,
-                direction=cfd_payload_schema.direction,
-                size=total_lots_to_trade,
-            )
-
-            if response["dealStatus"] == "REJECTED":
-                logging.error(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : rejected, deal status: {response['dealStatus']}, reason: {response['rejectReason']}, status: {response['status']}"
+            if cfd_strategy_schema.is_demo:
+                response = client.create_position(
+                    epic=cfd_strategy_schema.instrument,
+                    direction=cfd_payload_schema.direction,
+                    size=current_open_lots + lots_to_open,
                 )
-                place_order_attempt += 1
-                await asyncio.sleep(3)
-                continue
-            elif response["dealStatus"] == "ACCEPTED":
-                long_or_short = "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
-            else:
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : deal status: {response}"
 
-            logging.info(msg)
+                if response["dealStatus"] == "REJECTED":
+                    logging.error(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : rejected, deal status: {response['dealStatus']}, reason: {response['rejectReason']}, status: {response['status']}"
+                    )
+                    place_order_attempt += 1
+                    await asyncio.sleep(3)
+                    continue
+                elif response["dealStatus"] == "ACCEPTED":
+                    long_or_short = "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
+                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
+                else:
+                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : deal status: {response}"
+
+                logging.info(msg)
+            else:
+                # in live account somehow when reversing position its throwing insufficient funds
+                # so close the existing position and open a new one
+                response = client.create_position(
+                    epic=cfd_strategy_schema.instrument,
+                    direction=cfd_payload_schema.direction,
+                    size=current_open_lots,
+                )
+
+                if response["dealStatus"] == "ACCEPTED":
+                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully closed [  {lots_to_open} ] trades."
+                else:
+                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : deal status: {response}"
+                logging.info(msg)
+
+                response = client.create_position(
+                    epic=cfd_strategy_schema.instrument,
+                    direction=cfd_payload_schema.direction,
+                    size=lots_to_open,
+                )
+
+                if response["dealStatus"] == "REJECTED":
+                    logging.error(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : rejected, deal status: {response['dealStatus']}, reason: {response['rejectReason']}, status: {response['status']}"
+                    )
+                    place_order_attempt += 1
+                    await asyncio.sleep(3)
+                    continue
+                elif response["dealStatus"] == "ACCEPTED":
+                    long_or_short = "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
+                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
+                else:
+                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : deal status: {response}"
+
+                logging.info(msg)
 
             # update funds balance
             async with Database() as async_session:
