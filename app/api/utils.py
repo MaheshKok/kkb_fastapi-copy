@@ -7,12 +7,15 @@ from _decimal import getcontext
 from aioredis import Redis
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy import update
 
 from app.database.models import BrokerModel
+from app.database.models import CFDStrategyModel
 from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
+from app.schemas.trade import CFDPayloadSchema
 from app.services.broker.alice_blue import Pya3Aliceblue
 from app.services.broker.Capital import CapitalClient
 from app.utils.constants import REDIS_DATE_FORMAT
@@ -78,9 +81,11 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
         return session_id
 
 
-def get_capital_cfd_lot_to_trade(
-    cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss, available_funds
+async def get_capital_cfd_lot_to_trade(
+    client, cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss
 ):
+    available_funds = await get_capital_dot_com_available_funds(client, cfd_strategy_schema)
+
     to_update_profit_or_loss_in_db = 0
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
@@ -165,9 +170,9 @@ async def get_all_positions(
 
 async def get_capital_cfd_existing_profit_or_loss(
     client, cfd_strategy_schema: CFDStrategySchema
-) -> tuple[float, float]:
+) -> tuple[int, int, str | None]:
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
-
+    direction = None
     profit_or_loss = 0
     existing_lot = 0
     positions = await get_all_positions(client, cfd_strategy_schema)
@@ -175,6 +180,7 @@ async def get_capital_cfd_existing_profit_or_loss(
         if position["market"]["epic"] == cfd_strategy_schema.instrument:
             profit_or_loss += position["position"]["upl"]
             existing_lot += position["position"]["size"]
+            direction = position["position"]["direction"].lower()
 
     logging.info(
         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : existing profit: [ {profit_or_loss} ]"
@@ -182,7 +188,7 @@ async def get_capital_cfd_existing_profit_or_loss(
     logging.info(
         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : existing lot: [ {existing_lot} ]"
     )
-    return round(profit_or_loss, 2), existing_lot
+    return round(profit_or_loss, 2), existing_lot, direction
 
 
 async def get_capital_dot_com_available_funds(
@@ -212,3 +218,137 @@ async def get_capital_dot_com_available_funds(
         logging.error(
             f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all positions {text}"
         )
+
+
+async def open_capital_position(
+    *,
+    client: CapitalClient,
+    cfd_strategy_schema: CFDStrategySchema,
+    cfd_payload_schema: CFDPayloadSchema,
+    demo_or_live: str,
+    profit_or_loss: float,
+):
+    lots_to_open, update_profit_or_loss_in_db = await get_capital_cfd_lot_to_trade(
+        client, cfd_strategy_schema, profit_or_loss
+    )
+
+    place_order_attempt = 1
+    while place_order_attempt < 10:
+        try:
+            response = client.create_position(
+                epic=cfd_strategy_schema.instrument,
+                direction=cfd_payload_schema.direction,
+                size=lots_to_open,
+            )
+
+            if response["dealStatus"] == "REJECTED":
+                if response["rejectReason"] == "THROTTLING":
+                    # handled rejectReason: 'THROTTLING' i.e. try again
+                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : throttled while opening lots [ {lots_to_open} ] response:  {response}"
+                    logging.info(msg)
+                    place_order_attempt += 1
+                    await asyncio.sleep(2)
+                    continue
+                elif response["rejectReason"] == "RISK_CHECK":
+                    # handle rejectReason: RISK_CHECK i.e. calculate lots to open again as available funds are updated
+                    # calculate lots to open again as available funds are updated
+                    lots_to_open, update_profit_or_loss_in_db = get_capital_cfd_lot_to_trade(
+                        client, cfd_strategy_schema, profit_or_loss
+                    )
+                    place_order_attempt += 1
+                    await asyncio.sleep(1)
+                    continue
+                else:
+                    logging.error(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : rejected, deal status: {response['dealStatus']}, reason: {response['rejectReason']}, status: {response['status']}"
+                    )
+                    return response
+            elif response["dealStatus"] == "ACCEPTED":
+                long_or_short = "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
+                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
+            else:
+                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : deal status: {response}"
+
+            logging.info(msg)
+
+            # update funds balance
+            async with Database() as async_session:
+                updated_funds = cfd_strategy_schema.funds + update_profit_or_loss_in_db
+                await async_session.execute(
+                    update(CFDStrategyModel)
+                    .where(CFDStrategyModel.id == cfd_strategy_schema.id)
+                    .values(funds=updated_funds)
+                )
+                await async_session.commit()
+                logging.info(
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : profit or loss: [ {update_profit_or_loss_in_db} ], updated funds balance to {updated_funds}"
+                )
+            return msg
+        except Exception as e:
+            response, status_code, text = e.args
+            if status_code == 429:
+                # too many requests
+                place_order_attempt += 1
+                await asyncio.sleep(2)
+                continue
+            elif status_code in [400, 404]:
+                # if it throws 404 exception saying dealreference not found then try to fetch all positions
+                # and see if order is placed and if not then try it again and if it is placed then skip it
+                positions = await get_all_positions(client, cfd_strategy_schema)
+                for position in positions["positions"]:
+                    if position["market"]["epic"] == cfd_strategy_schema.instrument:
+                        existing_direction = position["position"]["direction"]
+                        if existing_direction == cfd_payload_schema.direction.upper():
+                            msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
+                            logging.info(msg)
+                            return msg
+                else:
+                    place_order_attempt += 1
+                    await asyncio.sleep(3)
+            else:
+                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while placing order, Error: {e}"
+                logging.error(msg)
+                return msg
+
+
+async def close_capital_position(
+    *,
+    client: CapitalClient,
+    current_open_lots: float,
+    cfd_strategy_schema: CFDStrategySchema,
+    cfd_payload_schema: CFDPayloadSchema,
+    demo_or_live: str,
+):
+    close_lots_attempt = 1
+    while close_lots_attempt <= 10:
+        try:
+            response = client.create_position(
+                epic=cfd_strategy_schema.instrument,
+                direction=cfd_payload_schema.direction,
+                size=current_open_lots,
+            )
+
+            if response["dealStatus"] == "ACCEPTED":
+                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully closed [  {current_open_lots} ] trades."
+            elif response["dealStatus"] == "REJECTED":
+                if response["rejectReason"] == "THROTTLING":
+                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : throttled while closing open lots [ {current_open_lots} ] response:  {response}"
+                    logging.info(msg)
+                    close_lots_attempt += 1
+                    await asyncio.sleep(2)
+                    continue
+            else:
+                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : deal status: {response}"
+            logging.info(msg)
+            return msg
+        except Exception as e:
+            response, status_code, text = e.args
+            if status_code in [400, 404, 429]:
+                # too many requests
+                close_lots_attempt += 1
+                await asyncio.sleep(2)
+                continue
+            else:
+                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while closing open lots, Error: {e}"
+                logging.error(msg)
+                return None

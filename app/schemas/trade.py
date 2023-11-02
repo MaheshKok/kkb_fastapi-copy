@@ -139,7 +139,7 @@ class DBEntryTradeSchema(BaseModel):
 class CFDPayloadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     strategy_id: uuid.UUID = Field(description="strategy id")
-    direction: DirectionEnum = Field(description="Position", example="BUY")
+    direction: DirectionEnum = Field(description="Position", example="buy")
 
 
 class BinanceFuturesPayloadSchema(BaseModel):
