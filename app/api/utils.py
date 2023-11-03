@@ -172,6 +172,45 @@ async def get_all_positions(
         )
 
 
+async def get_all_open_orders(
+    client: CapitalClient, cfd_strategy_schema: CFDStrategySchema
+) -> list:
+    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
+
+    get_all_orders_attempt = 1
+    while get_all_orders_attempt < 10:
+        try:
+            working_orders = client.all_working_orders()
+            if working_orders:
+                return working_orders["workingOrders"]
+            return []
+        except Exception as e:
+            response, status_code, text = e.args
+            if status_code == 429:
+                logging.warning(
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
+                )
+                client.__log_out__()
+                get_all_orders_attempt += 1
+                await asyncio.sleep(2)
+            elif status_code == 400:
+                logging.warning(
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
+                )
+                client.__log_out__()
+                get_all_orders_attempt += 1
+                await asyncio.sleep(2)
+            else:
+                logging.error(
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
+                )
+                break
+    else:
+        logging.error(
+            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : All attemps exhausted in getting all orders, Error {status_code} {text}"
+        )
+
+
 async def get_capital_cfd_existing_profit_or_loss(
     client, cfd_strategy_schema: CFDStrategySchema
 ) -> tuple[int, int, str | None]:
@@ -187,7 +226,7 @@ async def get_capital_cfd_existing_profit_or_loss(
             direction = position["position"]["direction"].lower()
 
     logging.info(
-        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : existing profit: [ {profit_or_loss} ] existing lot: [ {existing_lot} ] direction: [ {direction} ]"
+        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : existing position - profit: [ {profit_or_loss} ], lot: [ {existing_lot} ], direction: [ {direction} ]"
     )
     return round(profit_or_loss, 2), existing_lot, direction
 
@@ -200,7 +239,6 @@ async def get_capital_dot_com_available_funds(
     get_all_positions_attempt = 1
     while get_all_positions_attempt < 10:
         try:
-            # retrieving all positions throws 403 i.e. too many requests
             return client.all_accounts()["accounts"][0]["balance"]["available"]
         except Exception as e:
             response, status_code, text = e.args
@@ -322,6 +360,35 @@ async def open_capital_lots(
                 logging.info(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] may be lots are opened , so fetching all positions againa and verifying the same"
                 )
+
+                open_order_found = False
+                if open_orders := await get_all_open_orders(client, cfd_strategy_schema):
+                    for open_order in open_orders:
+                        instrument, direction = (
+                            open_order["workingOrderData"]["epic"],
+                            open_order["workingOrder"]["direction"],
+                        )
+                        if (
+                            instrument == cfd_strategy_schema.instrument
+                            and direction != cfd_payload_schema.direction
+                        ):
+                            logging.warning(
+                                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : open order has been created to open [ {lots_to_open} ] lots in [ {direction} ]  direction."
+                            )
+                            open_order_found = True
+                            break
+                    else:
+                        logging.warning(
+                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : no open order found for lots [ {lots_to_open} ] in [ {cfd_payload_schema.direction} ] direction."
+                        )
+                else:
+                    logging.warning(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : no open order found for lots [ {lots_to_open} ] in [ {cfd_payload_schema.direction} ] direction."
+                    )
+
+                if open_order_found:
+                    break
+
                 # if it throws 404 exception saying dealreference not found then try to fetch all positions
                 # and see if order is placed and if not then try it again and if it is placed then skip it
                 if positions := await get_all_positions(client, cfd_strategy_schema):
@@ -390,10 +457,38 @@ async def close_capital_lots(
                 logging.warning(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] while closing lots {status_code} {text}"
                 )
-                await asyncio.sleep(2)
+                await asyncio.sleep(3)
                 logging.info(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] may be lots are closed , so fetching all positions againa and verifying the same"
                 )
+
+                open_order_found = False
+                if open_orders := await get_all_open_orders(client, cfd_strategy_schema):
+                    for open_order in open_orders:
+                        instrument, direction = (
+                            open_order["workingOrderData"]["epic"],
+                            open_order["workingOrder"]["direction"],
+                        )
+                        if (
+                            instrument == cfd_strategy_schema.instrument
+                            and direction != cfd_payload_schema.direction
+                        ):
+                            logging.warning(
+                                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : open order has been created to close existing [ {current_open_lots} ] lots in [ {direction} ]  direction."
+                            )
+                            open_order_found = True
+                            break
+                    else:
+                        logging.warning(
+                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : no open order found for lots [ {current_open_lots} ] in [ {cfd_payload_schema.direction} ]  direction."
+                        )
+                else:
+                    logging.warning(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : no open order found for lots [ {current_open_lots} ] in [ {cfd_payload_schema.direction} ]  direction."
+                    )
+
+                if open_order_found:
+                    break
                 # if it throws 404 exception saying dealreference not found then try to fetch all positions
                 # and see if order is placed and if not then try it again and if it is placed then skip it
                 if positions := await get_all_positions(client, cfd_strategy_schema):
@@ -408,7 +503,7 @@ async def close_capital_lots(
                             break
                     else:
                         logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots are closed"
+                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots [ {current_open_lots} ] are closed as no existing position found."
                         )
                 else:
                     logging.warning(
