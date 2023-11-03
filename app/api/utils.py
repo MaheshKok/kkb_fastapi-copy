@@ -300,7 +300,7 @@ async def open_capital_lots(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument}] : Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open}] {status_code} {text}"
                 )
                 logging.info(
-                    f"[ {demo_or_live} {cfd_strategy_schema}] : attempting again to open lots"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument}] : attempting again to open lots"
                 )
                 # too many requests
                 place_order_attempt += 1
