@@ -18,10 +18,10 @@ from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_cfd_strategy_schema
 from app.api.dependency import get_strategy_schema
-from app.api.utils import close_capital_position
+from app.api.utils import close_capital_lots
 from app.api.utils import get_capital_cfd_existing_profit_or_loss
 from app.api.utils import get_current_and_next_expiry
-from app.api.utils import open_capital_position
+from app.api.utils import open_capital_lots
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import DirectionEnum
@@ -153,7 +153,7 @@ async def post_cfd(
     )
 
     if current_open_lots:
-        await close_capital_position(
+        await close_capital_lots(
             client=client,
             cfd_strategy_schema=cfd_strategy_schema,
             cfd_payload_schema=cfd_payload_schema,
@@ -162,7 +162,7 @@ async def post_cfd(
         )
 
     if direction != cfd_payload_schema.direction:
-        return await open_capital_position(
+        return await open_capital_lots(
             client=client,
             cfd_strategy_schema=cfd_strategy_schema,
             cfd_payload_schema=cfd_payload_schema,
