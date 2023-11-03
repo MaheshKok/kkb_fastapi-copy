@@ -282,17 +282,22 @@ async def open_capital_lots(
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] Error in placing open lots, deal status: {response}"
                 logging.error(msg)
 
-            # update funds balance
-            async with Database() as async_session:
-                updated_funds = cfd_strategy_schema.funds + update_profit_or_loss_in_db
-                await async_session.execute(
-                    update(CFDStrategyModel)
-                    .where(CFDStrategyModel.id == cfd_strategy_schema.id)
-                    .values(funds=updated_funds)
-                )
-                await async_session.commit()
+            if update_profit_or_loss_in_db:
+                # update funds balance
+                async with Database() as async_session:
+                    updated_funds = cfd_strategy_schema.funds + update_profit_or_loss_in_db
+                    await async_session.execute(
+                        update(CFDStrategyModel)
+                        .where(CFDStrategyModel.id == cfd_strategy_schema.id)
+                        .values(funds=updated_funds)
+                    )
+                    await async_session.commit()
+                    logging.info(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : profit or loss: [ {update_profit_or_loss_in_db} ], updated funds balance to {updated_funds}"
+                    )
+            else:
                 logging.info(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : profit or loss: [ {update_profit_or_loss_in_db} ], updated funds balance to {updated_funds}"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : No profit or loss to update in db"
                 )
             return msg
         except Exception as e:
