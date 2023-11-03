@@ -125,7 +125,7 @@ async def get_capital_cfd_lot_to_trade(
         # Convert the result back to a float for consistency with your existing code
         result = float(quantity_to_trade)
         logging.info(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots to open [ {result} ], to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db}]"
+            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots to open [ {result} ], to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db} ]"
         )
         return result, to_update_profit_or_loss_in_db
 
@@ -248,7 +248,7 @@ async def open_capital_lots(
                     msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] response:  {response}"
                     logging.warning(msg)
                     logging.info(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument}] attempting again to open lots"
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] attempting again to open lots"
                     )
                     place_order_attempt += 1
                     client.__log_out__()
@@ -260,7 +260,7 @@ async def open_capital_lots(
                     msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] RISK_CHECK while opening lots [ {lots_to_open} ] response:  {response}"
                     logging.warning(msg)
                     logging.info(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument}] calculating lots to open again as available funds are updated"
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] calculating lots to open again as available funds are updated"
                     )
                     lots_to_open, update_profit_or_loss_in_db = get_capital_cfd_lot_to_trade(
                         client, cfd_strategy_schema, profit_or_loss
@@ -299,10 +299,10 @@ async def open_capital_lots(
             response, status_code, text = e.args
             if status_code == 429:
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument}] : Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open}] {status_code} {text}"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] {status_code} {text}"
                 )
                 logging.info(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument}] : attempting again to open lots"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : attempting again to open lots"
                 )
                 # too many requests
                 place_order_attempt += 1
@@ -315,7 +315,7 @@ async def open_capital_lots(
                 )
                 await asyncio.sleep(2)
                 logging.info(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument}] may be lots are opened , so fetching all positions againa and verifying the same"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] may be lots are opened , so fetching all positions againa and verifying the same"
                 )
                 # if it throws 404 exception saying dealreference not found then try to fetch all positions
                 # and see if order is placed and if not then try it again and if it is placed then skip it
@@ -329,15 +329,16 @@ async def open_capital_lots(
                                 return msg
                     else:
                         logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument}] : lots are not opened, hence trying to open lots [ {lots_to_open} ] again"
+                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots are not opened, hence trying to open lots [ {lots_to_open} ] again"
                         )
                         client.__log_out__()
                         place_order_attempt += 1
                         await asyncio.sleep(3)
                 else:
-                    client.__log_out__()
-                    place_order_attempt += 1
-                    await asyncio.sleep(3)
+                    logging.warning(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Assuming lots [ {lots_to_open} ] are opened"
+                    )
+                    break
             else:
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while opening lots, Error: {e}"
                 logging.error(msg)
@@ -386,7 +387,7 @@ async def close_capital_lots(
                 )
                 await asyncio.sleep(2)
                 logging.info(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument}] may be lots are closed , so fetching all positions againa and verifying the same"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] may be lots are closed , so fetching all positions againa and verifying the same"
                 )
                 # if it throws 404 exception saying dealreference not found then try to fetch all positions
                 # and see if order is placed and if not then try it again and if it is placed then skip it
@@ -394,7 +395,7 @@ async def close_capital_lots(
                     for position in positions["positions"]:
                         if position["market"]["epic"] == cfd_strategy_schema.instrument:
                             logging.warning(
-                                f"[ {demo_or_live} {cfd_strategy_schema.instrument}] : lots are not closed, hence trying to close lots [ {current_open_lots} ] again"
+                                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots are not closed, hence trying to close lots [ {current_open_lots} ] again"
                             )
                             client.__log_out__()
                             close_lots_attempt += 1
@@ -402,13 +403,13 @@ async def close_capital_lots(
                             break
                     else:
                         logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument}] : lots are closed"
+                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots are closed"
                         )
                 else:
-                    client.__log_out__()
-                    close_lots_attempt += 1
-                    await asyncio.sleep(3)
-
+                    logging.warning(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Assuming lots are closed"
+                    )
+                    break
             else:
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] Error occured while closing open lots, Error: {e}"
                 logging.error(msg)
