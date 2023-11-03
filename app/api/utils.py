@@ -438,7 +438,7 @@ async def close_capital_lots(
             if response["dealStatus"] == "ACCEPTED":
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully closed [  {current_open_lots} ] trades."
                 logging.info(msg)
-                return msg
+                return False
             elif response["dealStatus"] == "REJECTED":
                 if response["rejectReason"] == "THROTTLING":
                     msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] throttled while closing open lots [ {current_open_lots} ] response:  {response}"
