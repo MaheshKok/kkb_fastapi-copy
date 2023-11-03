@@ -153,15 +153,21 @@ async def post_cfd(
     )
 
     if current_open_lots:
-        await close_capital_lots(
+        position_reversed = await close_capital_lots(
             client=client,
             cfd_strategy_schema=cfd_strategy_schema,
             cfd_payload_schema=cfd_payload_schema,
             demo_or_live=demo_or_live,
             current_open_lots=current_open_lots,
+            profit_or_loss=profit_or_loss,
         )
 
-    if direction != cfd_payload_schema.direction:
+        if position_reversed:
+            msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots [ {current_open_lots} ] are reversed in [ {direction} ] direction,  hence skipping opening new positions"
+            logging.info(msg)
+            return msg
+
+    if direction != cfd_payload_schema.direction.upper():
         return await open_capital_lots(
             client=client,
             cfd_strategy_schema=cfd_strategy_schema,
