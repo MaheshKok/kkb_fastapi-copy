@@ -277,6 +277,69 @@ async def update_capital_funds(
         )
 
 
+async def open_order_found(
+    *,
+    client: CapitalClient,
+    demo_or_live: str,
+    cfd_strategy_schema: CFDStrategySchema,
+    cfd_payload_schema: CFDPayloadSchema,
+    lots_size: float,
+):
+    if open_orders := await get_all_open_orders(client, cfd_strategy_schema):
+        for open_order in open_orders:
+            instrument, direction = (
+                open_order["workingOrderData"]["epic"],
+                open_order["workingOrder"]["direction"],
+            )
+            if (
+                instrument == cfd_strategy_schema.instrument
+                and direction != cfd_payload_schema.direction
+            ):
+                logging.warning(
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Open order detected for [ {lots_size} ] Lots in [ {direction} ] direction"
+                )
+                return True
+    return False
+
+
+async def find_position(
+    *,
+    client: CapitalClient,
+    demo_or_live: str,
+    cfd_strategy_schema: CFDStrategySchema,
+    cfd_payload_schema: CFDPayloadSchema,
+    current_open_lots: float,
+    action: str,
+):
+    if positions := await get_all_positions(client, cfd_strategy_schema):
+        for position in positions["positions"]:
+            response_position_instrument, response_position_direction = (
+                position["market"]["epic"],
+                position["position"]["direction"],
+            )
+            if response_position_instrument == cfd_strategy_schema.instrument:
+                if response_position_direction == cfd_payload_schema.direction.upper():
+                    logging.info(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : has [ {current_open_lots} ] in {response_position_direction} direction."
+                    )
+                    return position
+                else:
+                    logging.warning(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots [ {current_open_lots} ] are not {action}, hence trying again."
+                    )
+                    return False
+        else:
+            logging.warning(
+                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots [ {current_open_lots} ] are {action} as no existing position found."
+            )
+            return False
+    else:
+        logging.warning(
+            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Assuming lots are {action} as no existing position found."
+        )
+        return False
+
+
 async def open_capital_lots(
     *,
     client: CapitalClient,
@@ -365,6 +428,8 @@ async def open_capital_lots(
                 await asyncio.sleep(2)
                 continue
             elif status_code in [400, 404]:
+                # # if it throws 404 exception saying dealreference not found then try to fetch all positions
+                # # and see if order is placed and if not then try it again and if it is placed then skip it
                 logging.warning(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] while opening lots {status_code} {text}"
                 )
@@ -373,63 +438,37 @@ async def open_capital_lots(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] may be lots are opened , so fetching all positions againa and verifying the same"
                 )
 
-                open_order_found = False
-                if open_orders := await get_all_open_orders(client, cfd_strategy_schema):
-                    for open_order in open_orders:
-                        instrument, direction = (
-                            open_order["workingOrderData"]["epic"],
-                            open_order["workingOrder"]["direction"],
-                        )
-                        if (
-                            instrument == cfd_strategy_schema.instrument
-                            and direction != cfd_payload_schema.direction
-                        ):
-                            logging.warning(
-                                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : open order has been created to open [ {lots_to_open} ] lots in [ {direction} ]  direction."
-                            )
-                            open_order_found = True
-                            break
-                    else:
-                        logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : no open order found for lots [ {lots_to_open} ] in [ {cfd_payload_schema.direction} ] direction."
-                        )
-                else:
-                    logging.warning(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : no open order found for lots [ {lots_to_open} ] in [ {cfd_payload_schema.direction} ] direction."
-                    )
-
-                if open_order_found:
+                if open_order_found(
+                    client=client,
+                    demo_or_live=demo_or_live,
+                    cfd_strategy_schema=cfd_strategy_schema,
+                    cfd_payload_schema=cfd_payload_schema,
+                    lots_size=lots_to_open,
+                ):
                     break
 
-                # if it throws 404 exception saying dealreference not found then try to fetch all positions
-                # and see if order is placed and if not then try it again and if it is placed then skip it
-                if positions := await get_all_positions(client, cfd_strategy_schema):
-                    for position in positions["positions"]:
-                        if position["market"]["epic"] == cfd_strategy_schema.instrument:
-                            existing_direction = position["position"]["direction"]
-                            if existing_direction == cfd_payload_schema.direction.upper():
-                                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully placed [ {position['position']['direction']} ] for {position['position']['size']} trades"
-                                logging.info(msg)
-                                return msg
-                            else:
-                                # very rare case where lots are still in current direction. trying to close them by updating lots_to_open to the current opened lots
-                                logging.warning(
-                                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots are still in current [ {existing_direction} ] direction. trying to close [ {position['position']['size']} ] them"
-                                )
-                                lots_to_open = position["position"]["size"]
-                    else:
-                        logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots are not opened, hence trying to open lots [ {lots_to_open} ] again"
-                        )
-                        place_order_attempt += 1
-                        await asyncio.sleep(3)
-                else:
-                    logging.warning(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots [ {lots_to_open} ] are not opened as no position found for [ {cfd_strategy_schema.instrument} ] with [ {lots_to_open} ] lots in [ {cfd_payload_schema.direction} ] direction. Hence retrying"
-                    )
+                position_found = await find_position(
+                    client=client,
+                    demo_or_live=demo_or_live,
+                    cfd_payload_schema=cfd_payload_schema,
+                    cfd_strategy_schema=cfd_strategy_schema,
+                    current_open_lots=lots_to_open,
+                    action="open",
+                )
+
+                if not position_found:
                     place_order_attempt += 1
                     await asyncio.sleep(1)
-                    continue
+                else:
+                    earlier_direction = position_found["position"]["direction"]
+                    response_position_lots = position_found["position"]["size"]
+                    if earlier_direction != cfd_payload_schema.direction.upper():
+                        # very rare case where lots are still in current direction.
+                        # trying to close them by updating "lots_to_open" to the lots from position response
+                        logging.warning(
+                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots are still in current [ {earlier_direction} ] direction. trying to close [ {response_position_lots} ]"
+                        )
+                        lots_to_open = response_position_lots
             else:
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while opening lots, Error: {e}"
                 logging.error(msg)
@@ -439,7 +478,7 @@ async def open_capital_lots(
 async def close_capital_lots(
     *,
     client: CapitalClient,
-    current_open_lots: float,
+    lots_to_close: float,
     cfd_strategy_schema: CFDStrategySchema,
     cfd_payload_schema: CFDPayloadSchema,
     demo_or_live: str,
@@ -451,22 +490,22 @@ async def close_capital_lots(
             response = client.create_position(
                 epic=cfd_strategy_schema.instrument,
                 direction=cfd_payload_schema.direction,
-                size=current_open_lots,
+                size=lots_to_close,
             )
 
             if response["dealStatus"] == "ACCEPTED":
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully closed [  {current_open_lots} ] trades."
+                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully closed [  {lots_to_close} ] trades."
                 logging.info(msg)
                 return False
             elif response["dealStatus"] == "REJECTED":
                 if response["rejectReason"] == "THROTTLING":
-                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] throttled while closing open lots [ {current_open_lots} ] response:  {response}"
+                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] throttled while closing open lots [ {lots_to_close} ] response:  {response}"
                     logging.warning(msg)
                     close_lots_attempt += 1
                     await asyncio.sleep(2)
                     continue
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] rejected closing open lots [ {current_open_lots} ] response:  {response}"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] rejected closing open lots [ {lots_to_close} ] response:  {response}"
                 )
             else:
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] deal status: {response}"
@@ -482,70 +521,43 @@ async def close_capital_lots(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] may be lots are closed , so fetching all positions again and verifying the same"
                 )
 
-                open_order_found = False
-                if open_orders := await get_all_open_orders(client, cfd_strategy_schema):
-                    for open_order in open_orders:
-                        instrument, direction = (
-                            open_order["workingOrderData"]["epic"],
-                            open_order["workingOrder"]["direction"],
-                        )
-                        if (
-                            instrument == cfd_strategy_schema.instrument
-                            and direction != cfd_payload_schema.direction
-                        ):
-                            logging.warning(
-                                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : open order has been created to close existing [ {current_open_lots} ] lots in [ {direction} ]  direction."
-                            )
-                            open_order_found = True
-                            break
-                    else:
-                        logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : no open order found for lots [ {current_open_lots} ] in [ {cfd_payload_schema.direction} ]  direction."
-                        )
-                else:
-                    logging.warning(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : no open order found for lots [ {current_open_lots} ] in [ {cfd_payload_schema.direction} ]  direction."
-                    )
+                if open_order_found(
+                    client=client,
+                    demo_or_live=demo_or_live,
+                    cfd_strategy_schema=cfd_strategy_schema,
+                    cfd_payload_schema=cfd_payload_schema,
+                    lots_size=lots_to_close,
+                ):
+                    break
 
-                if open_order_found:
-                    return False
+                position_found = await find_position(
+                    client=client,
+                    demo_or_live=demo_or_live,
+                    cfd_payload_schema=cfd_payload_schema,
+                    cfd_strategy_schema=cfd_strategy_schema,
+                    current_open_lots=lots_to_close,
+                    action="open",
+                )
 
-                # if it throws 404 exception saying dealreference not found then try to fetch all positions
-                # and see if order is placed and if not then try it again and if it is placed then skip it
-                if positions := await get_all_positions(client, cfd_strategy_schema):
-                    for position in positions["positions"]:
-                        if position["market"]["epic"] == cfd_strategy_schema.instrument:
-                            if (
-                                position["position"]["direction"]
-                                == cfd_payload_schema.direction.upper()
-                            ):
-                                logging.warning(
-                                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Lots [ {current_open_lots} ] are reversed in [ {cfd_payload_schema.direction} ] direction. so no need to open lots again"
-                                )
-                                await update_capital_funds(
-                                    cfd_strategy_schema=cfd_strategy_schema,
-                                    demo_or_live=demo_or_live,
-                                    profit_or_loss=profit_or_loss,
-                                )
-                                return True
-                            else:
-                                logging.warning(
-                                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots are not closed, hence trying to close lots [ {current_open_lots} ] again"
-                                )
-                                client.__log_out__()
-                                close_lots_attempt += 1
-                                await asyncio.sleep(3)
-                                break
-                    else:
+                if position_found:
+                    if (
+                        position_found["position"]["direction"]
+                        == cfd_payload_schema.direction.upper()
+                    ):
                         logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots [ {current_open_lots} ] are closed as no existing position found."
+                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Lots [ {lots_to_close} ] are reversed in [ {cfd_payload_schema.direction} ] direction. so NO need to open lots again"
                         )
-                        return False
+                        await update_capital_funds(
+                            cfd_strategy_schema=cfd_strategy_schema,
+                            demo_or_live=demo_or_live,
+                            profit_or_loss=profit_or_loss,
+                        )
+                        break
+                    else:
+                        close_lots_attempt += 1
+                        await asyncio.sleep(3)
                 else:
-                    logging.warning(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Assuming lots are closed as no existing position found."
-                    )
-                    return False
+                    break
             else:
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] Error occured while closing open lots, Error: {e}"
                 logging.error(msg)

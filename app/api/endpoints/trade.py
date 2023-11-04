@@ -158,7 +158,7 @@ async def post_cfd(
             cfd_strategy_schema=cfd_strategy_schema,
             cfd_payload_schema=cfd_payload_schema,
             demo_or_live=demo_or_live,
-            current_open_lots=current_open_lots,
+            lots_to_close=current_open_lots,
             profit_or_loss=profit_or_loss,
         )
 
