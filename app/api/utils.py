@@ -259,6 +259,24 @@ async def get_capital_dot_com_available_funds(
         )
 
 
+async def update_capital_funds(
+    *, cfd_strategy_schema: CFDStrategySchema, profit_or_loss: float, demo_or_live: str
+):
+    log_profit_or_loss = "profit" if profit_or_loss > 0 else "loss"
+
+    updated_funds = round(cfd_strategy_schema.funds + profit_or_loss, 2)
+    async with Database() as async_session:
+        await async_session.execute(
+            update(CFDStrategyModel)
+            .where(CFDStrategyModel.id == cfd_strategy_schema.id)
+            .values(funds=updated_funds)
+        )
+        await async_session.commit()
+        logging.info(
+            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : updated funds balance to [ {updated_funds} ] after {log_profit_or_loss}: {profit_or_loss} "
+        )
+
+
 async def open_capital_lots(
     *,
     client: CapitalClient,
@@ -322,17 +340,11 @@ async def open_capital_lots(
 
             if update_profit_or_loss_in_db:
                 # update funds balance
-                async with Database() as async_session:
-                    updated_funds = cfd_strategy_schema.funds + update_profit_or_loss_in_db
-                    await async_session.execute(
-                        update(CFDStrategyModel)
-                        .where(CFDStrategyModel.id == cfd_strategy_schema.id)
-                        .values(funds=updated_funds)
-                    )
-                    await async_session.commit()
-                    logging.info(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : funds balance [ {updated_funds} ] after profit_or_loss [ {update_profit_or_loss_in_db} ]"
-                    )
+                await update_capital_funds(
+                    cfd_strategy_schema=cfd_strategy_schema,
+                    demo_or_live=demo_or_live,
+                    profit_or_loss=update_profit_or_loss_in_db,
+                )
             else:
                 logging.info(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : No profit or loss to update in db"
@@ -511,18 +523,11 @@ async def close_capital_lots(
                                 logging.warning(
                                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Lots [ {current_open_lots} ] are reversed in [ {cfd_payload_schema.direction} ] direction. so no need to open lots again"
                                 )
-
-                                async with Database() as async_session:
-                                    updated_funds = cfd_strategy_schema.funds + profit_or_loss
-                                    await async_session.execute(
-                                        update(CFDStrategyModel)
-                                        .where(CFDStrategyModel.id == cfd_strategy_schema.id)
-                                        .values(funds=updated_funds)
-                                    )
-                                    await async_session.commit()
-                                    logging.info(
-                                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : funds balance [ {updated_funds} ] after profit_or_loss [ {profit_or_loss} ]"
-                                    )
+                                await update_capital_funds(
+                                    cfd_strategy_schema=cfd_strategy_schema,
+                                    demo_or_live=demo_or_live,
+                                    profit_or_loss=profit_or_loss,
+                                )
                                 return True
                     else:
                         logging.warning(
