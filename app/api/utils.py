@@ -505,7 +505,7 @@ async def close_capital_lots(
                     await asyncio.sleep(2)
                     continue
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] rejected closing open lots [ {lots_to_close} ] response:  {response}"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ], rejected closing open lots [ {lots_to_close} ] response:  {response}. Attempting again to close"
                 )
             else:
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] deal status: {response}"
@@ -530,6 +530,7 @@ async def close_capital_lots(
                 ):
                     break
 
+                await asyncio.sleep(1)
                 position_found = await find_position(
                     client=client,
                     demo_or_live=demo_or_live,
@@ -552,11 +553,15 @@ async def close_capital_lots(
                             demo_or_live=demo_or_live,
                             profit_or_loss=profit_or_loss,
                         )
-                        break
+                        # TODO: try to open lots with the profit gained
+                        return True
                     else:
                         close_lots_attempt += 1
                         await asyncio.sleep(3)
                 else:
+                    logging.warning(
+                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Lots [ {lots_to_close} ] are closed as no position found."
+                    )
                     break
             else:
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] Error occured while closing open lots, Error: {e}"
