@@ -438,13 +438,15 @@ async def open_capital_lots(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] may be lots are opened , so fetching all positions againa and verifying the same"
                 )
 
-                if open_order_found(
+                _open_order_found = await open_order_found(
                     client=client,
                     demo_or_live=demo_or_live,
                     cfd_strategy_schema=cfd_strategy_schema,
                     cfd_payload_schema=cfd_payload_schema,
                     lots_size=lots_to_open,
-                ):
+                )
+
+                if _open_order_found:
                     break
 
                 position_found = await find_position(
@@ -521,13 +523,15 @@ async def close_capital_lots(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] may be lots are closed , so fetching all positions again and verifying the same"
                 )
 
-                if open_order_found(
+                _open_order_found = await open_order_found(
                     client=client,
                     demo_or_live=demo_or_live,
                     cfd_strategy_schema=cfd_strategy_schema,
                     cfd_payload_schema=cfd_payload_schema,
                     lots_size=lots_to_close,
-                ):
+                )
+
+                if _open_order_found:
                     break
 
                 await asyncio.sleep(1)
