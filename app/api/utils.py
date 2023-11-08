@@ -381,7 +381,10 @@ async def open_capital_lots(
                     logging.info(
                         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] calculating lots to open again as available funds are updated"
                     )
-                    lots_to_open, update_profit_or_loss_in_db = get_capital_cfd_lot_to_trade(
+                    (
+                        lots_to_open,
+                        update_profit_or_loss_in_db,
+                    ) = await get_capital_cfd_lot_to_trade(
                         client, cfd_strategy_schema, profit_or_loss
                     )
                     place_order_attempt += 1
