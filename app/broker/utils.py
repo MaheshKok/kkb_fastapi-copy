@@ -19,6 +19,8 @@ from pya3 import TransactionType
 from sqlalchemy import select
 
 from app.api.utils import update_session_token
+from app.broker.alice_blue import Pya3Aliceblue
+from app.broker.alice_blue import logging
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema
@@ -26,8 +28,6 @@ from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
-from app.services.broker.alice_blue import Pya3Aliceblue
-from app.services.broker.alice_blue import logging
 from app.utils.constants import OptionType
 from app.utils.constants import Status
 

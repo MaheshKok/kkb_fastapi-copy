@@ -8,12 +8,12 @@ from fastapi import HTTPException
 from httpx import AsyncClient
 
 from app.api.utils import get_expiry_list
+from app.broker.utils import buy_alice_blue_trades
+from app.broker.utils import close_alice_blue_trades
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
-from app.services.broker.utils import buy_alice_blue_trades
-from app.services.broker.utils import close_alice_blue_trades
 from app.utils.constants import OptionType
 from app.utils.option_chain import get_option_chain
 

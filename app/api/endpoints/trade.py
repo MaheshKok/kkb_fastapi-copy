@@ -22,6 +22,7 @@ from app.api.utils import close_capital_lots
 from app.api.utils import get_capital_cfd_existing_profit_or_loss
 from app.api.utils import get_current_and_next_expiry
 from app.api.utils import open_capital_lots
+from app.broker.Capital import CapitalClient
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import DirectionEnum
@@ -34,7 +35,6 @@ from app.schemas.trade import CFDPayloadSchema
 from app.schemas.trade import DBEntryTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
-from app.services.broker.Capital import CapitalClient
 from app.tasks.tasks import task_entry_trade
 from app.tasks.tasks import task_exit_trade
 

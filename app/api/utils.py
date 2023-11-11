@@ -9,6 +9,8 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy import update
 
+from app.broker.alice_blue import Pya3Aliceblue
+from app.broker.Capital import CapitalClient
 from app.database.models import BrokerModel
 from app.database.models import CFDStrategyModel
 from app.database.session_manager.db_session import Database
@@ -16,8 +18,6 @@ from app.schemas.broker import BrokerSchema
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import CFDPayloadSchema
-from app.services.broker.alice_blue import Pya3Aliceblue
-from app.services.broker.Capital import CapitalClient
 from app.utils.constants import REDIS_DATE_FORMAT
 from app.utils.in_memory_cache import current_and_next_expiry_cache
 
