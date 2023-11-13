@@ -20,9 +20,10 @@ from app.api.dependency import get_cfd_strategy_schema
 from app.api.dependency import get_strategy_schema
 from app.api.utils import close_capital_lots
 from app.api.utils import get_capital_cfd_existing_profit_or_loss
+from app.api.utils import get_capital_cfd_lot_to_trade
 from app.api.utils import get_current_and_next_expiry
 from app.api.utils import open_capital_lots
-from app.broker.Capital import CapitalClient
+from app.broker.AsyncCapital import AsyncCapitalClient
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import DirectionEnum
@@ -141,7 +142,7 @@ async def post_cfd(
         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] received"
     )
 
-    client = CapitalClient(
+    client = AsyncCapitalClient(
         username="maheshkokare100@gmail.com",
         password="SUua9Ydc83G.i!d",
         api_key="qshPG64m0RCWQ3fe",
@@ -168,12 +169,18 @@ async def post_cfd(
             return msg
 
     if direction != cfd_payload_schema.direction.upper():
+        lots_to_open, update_profit_or_loss_in_db = await get_capital_cfd_lot_to_trade(
+            client, cfd_strategy_schema, profit_or_loss
+        )
+
         return await open_capital_lots(
             client=client,
             cfd_strategy_schema=cfd_strategy_schema,
             cfd_payload_schema=cfd_payload_schema,
             demo_or_live=demo_or_live,
             profit_or_loss=profit_or_loss,
+            lots_to_open=lots_to_open,
+            update_profit_or_loss_in_db=update_profit_or_loss_in_db,
         )
     else:
         msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] is same as current direction, hence skipping opening new positions"

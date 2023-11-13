@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy import update
 
 from app.broker.alice_blue import Pya3Aliceblue
+from app.broker.AsyncCapital import AsyncCapitalClient
 from app.broker.Capital import CapitalClient
 from app.database.models import BrokerModel
 from app.database.models import CFDStrategyModel
@@ -136,7 +137,7 @@ async def get_capital_cfd_lot_to_trade(
 
 
 async def get_all_positions(
-    client: CapitalClient, cfd_strategy_schema: CFDStrategySchema
+    client: AsyncCapitalClient, cfd_strategy_schema: CFDStrategySchema
 ) -> dict:
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
 
@@ -144,21 +145,21 @@ async def get_all_positions(
     while get_all_positions_attempt < 10:
         try:
             # retrieving all positions throws 403 i.e. too many requests
-            return client.all_positions()
+            return await client.all_positions()
         except Exception as e:
             response, status_code, text = e.args
             if status_code == 429:
                 logging.warning(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] Error occured while getting all positions {status_code} {text}"
                 )
-                client.__log_out__()
+                await client.__log_out__()
                 get_all_positions_attempt += 1
                 await asyncio.sleep(2)
             elif status_code == 400:
                 logging.warning(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] Error occured while getting all positions {status_code} {text}"
                 )
-                client.__log_out__()
+                await client.__log_out__()
                 get_all_positions_attempt += 1
                 await asyncio.sleep(2)
             else:
@@ -180,7 +181,7 @@ async def get_all_open_orders(
     get_all_orders_attempt = 1
     while get_all_orders_attempt < 10:
         try:
-            working_orders = client.all_working_orders()
+            working_orders = await client.all_working_orders()
             if working_orders:
                 return working_orders["workingOrders"]
             return []
@@ -190,14 +191,14 @@ async def get_all_open_orders(
                 logging.warning(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
                 )
-                client.__log_out__()
+                await client.__log_out__()
                 get_all_orders_attempt += 1
                 await asyncio.sleep(2)
             elif status_code == 400:
                 logging.warning(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
                 )
-                client.__log_out__()
+                await client.__log_out__()
                 get_all_orders_attempt += 1
                 await asyncio.sleep(2)
             else:
@@ -212,7 +213,7 @@ async def get_all_open_orders(
 
 
 async def get_capital_cfd_existing_profit_or_loss(
-    client, cfd_strategy_schema: CFDStrategySchema
+    client: AsyncCapitalClient, cfd_strategy_schema: CFDStrategySchema
 ) -> tuple[int, int, str | None]:
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
     direction = None
@@ -239,7 +240,8 @@ async def get_capital_dot_com_available_funds(
     get_all_positions_attempt = 1
     while get_all_positions_attempt < 10:
         try:
-            return client.all_accounts()["accounts"][0]["balance"]["available"]
+            all_accounts = await client.all_accounts()
+            return all_accounts["accounts"][0]["balance"]["available"]
         except Exception as e:
             response, status_code, text = e.args
             if status_code == 429:
@@ -279,7 +281,7 @@ async def update_capital_funds(
 
 async def open_order_found(
     *,
-    client: CapitalClient,
+    client: AsyncCapitalClient,
     demo_or_live: str,
     cfd_strategy_schema: CFDStrategySchema,
     cfd_payload_schema: CFDPayloadSchema,
@@ -306,7 +308,7 @@ async def open_order_found(
 
 async def find_position(
     *,
-    client: CapitalClient,
+    client: AsyncCapitalClient,
     demo_or_live: str,
     cfd_strategy_schema: CFDStrategySchema,
     current_open_lots: float,
@@ -330,7 +332,7 @@ async def find_position(
 
 async def close_capital_lots(
     *,
-    client: CapitalClient,
+    client: AsyncCapitalClient,
     lots_to_close: float,
     cfd_strategy_schema: CFDStrategySchema,
     cfd_payload_schema: CFDPayloadSchema,
@@ -340,7 +342,7 @@ async def close_capital_lots(
     close_lots_attempt = 1
     while close_lots_attempt <= 10:
         try:
-            response = client.create_position(
+            response = await client.create_position(
                 epic=cfd_strategy_schema.instrument,
                 direction=cfd_payload_schema.direction,
                 size=lots_to_close,
@@ -428,20 +430,18 @@ async def close_capital_lots(
 
 async def open_capital_lots(
     *,
-    client: CapitalClient,
+    client: AsyncCapitalClient,
     cfd_strategy_schema: CFDStrategySchema,
     cfd_payload_schema: CFDPayloadSchema,
     demo_or_live: str,
     profit_or_loss: float,
+    lots_to_open: float,
+    update_profit_or_loss_in_db: float,
 ):
-    lots_to_open, update_profit_or_loss_in_db = await get_capital_cfd_lot_to_trade(
-        client, cfd_strategy_schema, profit_or_loss
-    )
-
     place_order_attempt = 1
     while place_order_attempt < 10:
         try:
-            response = client.create_position(
+            response = await client.create_position(
                 epic=cfd_strategy_schema.instrument,
                 direction=cfd_payload_schema.direction,
                 size=lots_to_open,
@@ -456,7 +456,7 @@ async def open_capital_lots(
                         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] attempting again to open lots"
                     )
                     place_order_attempt += 1
-                    client.__log_out__()
+                    await client.__log_out__()
                     await asyncio.sleep(2)
                     continue
                 elif response["rejectReason"] == "RISK_CHECK":
@@ -474,7 +474,7 @@ async def open_capital_lots(
                         client, cfd_strategy_schema, profit_or_loss
                     )
                     place_order_attempt += 1
-                    client.__log_out__()
+                    await client.__log_out__()
                     await asyncio.sleep(1)
                     continue
                 else:
@@ -513,7 +513,7 @@ async def open_capital_lots(
                 )
                 # too many requests
                 place_order_attempt += 1
-                client.__log_out__()
+                await client.__log_out__()
                 await asyncio.sleep(2)
                 continue
             elif status_code in [400, 404]:
@@ -604,7 +604,7 @@ async def manage_capital_lots(
     attempt = 1
     while attempt <= 10:
         try:
-            response = client.create_position(
+            response = await client.create_position(
                 epic=cfd_strategy_schema.instrument,
                 direction=cfd_payload_schema.direction,
                 size=lots_to_manage,
