@@ -6,6 +6,7 @@ from _decimal import Decimal
 from _decimal import getcontext
 from aioredis import Redis
 from fastapi import HTTPException
+from httpx import HTTPStatusError
 from sqlalchemy import select
 from sqlalchemy import update
 
@@ -146,7 +147,7 @@ async def get_all_positions(
         try:
             # retrieving all positions throws 403 i.e. too many requests
             return await client.all_positions()
-        except Exception as e:
+        except HTTPStatusError as e:
             response, status_code, text = e.args
             if status_code == 429:
                 logging.warning(
@@ -167,6 +168,8 @@ async def get_all_positions(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] Error occured while getting all positions {status_code} {text}"
                 )
                 break
+        except Exception as e:
+            raise e
     else:
         logging.error(
             f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : All attemps exhausted in getting all positions, Error {status_code} {text}"
@@ -502,7 +505,7 @@ async def open_capital_lots(
                     f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : No profit or loss to update in db"
                 )
             return msg
-        except Exception as e:
+        except HTTPStatusError as e:
             response, status_code, text = e.args
             if status_code == 429:
                 logging.warning(

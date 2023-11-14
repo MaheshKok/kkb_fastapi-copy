@@ -23,16 +23,17 @@ class AsyncCapitalClient:
 
     async def __get_encryption_key__(self):
         url = f"{self.server}/api/v1/session/encryptionKey"
-        data = await self.__make_request__("get", url)
+        response = await self.__make_request__("get", url)
+        data = response.json()
         self.enc_key = [data["encryptionKey"], data["timeStamp"]]
 
     async def __make_request__(self, type, url, payload=None):
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient() as async_client:
             if payload is None:
                 payload = {}
-            response = await client.request(type, url, headers=self.headers, json=payload)
+            response = await async_client.request(type, url, headers=self.headers, json=payload)
             response.raise_for_status()
-            return response.json()
+            return response
 
     async def __encrypt__(self, password, key):
         key = b64decode(key)
@@ -51,35 +52,34 @@ class AsyncCapitalClient:
             "password": encrypted_password,
             "encryptedPassword": True,
         }
-        data = await self.__make_request__("post", url, payload)
-        if "CST" in data:
-            self.CST = data["CST"]
-            self.X_TOKEN = data["X-SECURITY-TOKEN"]
-            self.headers.update(
-                {
-                    "X-SECURITY-TOKEN": self.X_TOKEN,
-                    "CST": self.CST,
-                }
-            )
+        response = await self.__make_request__("post", url, payload)
+        self.CST = response.headers["CST"]
+        self.X_TOKEN = response.headers["X-SECURITY-TOKEN"]
+        self.headers.update(
+            {
+                "X-SECURITY-TOKEN": self.X_TOKEN,
+                "CST": self.CST,
+            }
+        )
 
     async def __confirmation__(self, deal_reference):
         url = f"{self.server}/api/v1/confirms/{deal_reference}"
         response = await self.__make_request__("get", url, payload="")
-        return response[0]
+        return response.json()
 
     async def all_accounts(self):
         await self.__create_session__()
         url = f"{self.server}/api/v1/accounts"
-        data = await self.__make_request__("get", url)
+        response = await self.__make_request__("get", url)
         await self.__log_out__()
-        return data
+        return response.json()
 
     async def account_pref(self):
         await self.__create_session__()
         url = f"{self.server}/api/v1/accounts/preferences"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data[0]
+        return response.json()
 
     async def update_account_pref(
         self,
@@ -97,36 +97,35 @@ class AsyncCapitalClient:
             "leverages": leverages,
             "hedgingMode": hedging_mode,
         }
-        payload = json.dumps(data)
         url = f"{self.server}/api/v1/accounts/preferences"
-        data = await self.__make_request__("put", url, payload=payload)
+        response = await self.__make_request__("put", url, payload=data)
         await self.__log_out__()
-        return data[0]
+        return response.json()
 
     async def get_account_activity(self):
         await self.__create_session__()
         url = f"{self.server}/api/v1/history/activity?lastPeriod=86400"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return response.json()
 
         # get all profit, loss and overnight fees details
 
     async def get_transactions(self):
         await self.__create_session__()
         url = f"{self.server}/api/v1/history/transactions?lastPeriod=86400"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return response.json()
 
     # Switch active account
     async def change_active_account(self, account_id):
         await self.__create_session__()
         url = f"{self.server}/api/v1/session"
         payload = json.dumps({"accountId": account_id})
-        data = await self.__make_request__("put", url, payload=payload)
+        response = await self.__make_request__("put", url, payload=payload)
         await self.__log_out__()
-        return data[0]
+        return response.json()
 
     # gets you all current positions
     async def all_positions(self):
@@ -134,14 +133,14 @@ class AsyncCapitalClient:
         url = f"{self.server}/api/v1/positions"
         response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return response[0]
+        return response.json()
 
     async def get_position(self, dealId):
         await self.__create_session__()
         url = f"{self.server}/api/v1/positions/{dealId}"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data[0]
+        return response.json()
 
     # Opens a new position
     async def create_position(
@@ -179,9 +178,8 @@ class AsyncCapitalClient:
             data.update({"profitDistance": profit_distance})
         if profit_amount is not None:
             data.update({"profitAmount": profit_amount})
-        payload = json.dumps(data)
-        data = await self.__make_request__("post", url, payload=payload)
-        final_data = self.__confirmation__(data[0]["dealReference"])
+        response = await self.__make_request__("post", url, payload=data)
+        final_data = await self.__confirmation__(response.json()["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -189,8 +187,8 @@ class AsyncCapitalClient:
     async def close_position(self, deal_id):
         await self.__create_session__()
         url = f"{self.server}/api/v1/positions/{deal_id}"
-        data = await self.__make_request__("delete", url, payload="")
-        final_data = self.__confirmation__(data[0]["dealReference"])
+        response = await self.__make_request__("delete", url, payload="")
+        final_data = await self.__confirmation__(response.json()["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -220,11 +218,10 @@ class AsyncCapitalClient:
             data.update({"profitDistance": profit_distance})
         if profit_amount is not None:
             data.update({"profitAmount": profit_amount})
-        payload = json.dumps(data)
         await self.__create_session__()
         url = f"{self.server}/api/v1/positions/{deal_id}"
-        data = await self.__make_request__("put", url, payload=payload)
-        final_data = self.__confirmation__(data[0]["dealReference"])
+        response = await self.__make_request__("put", url, payload=data)
+        final_data = await self.__confirmation__(response.json()["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -232,9 +229,9 @@ class AsyncCapitalClient:
     async def all_working_orders(self):
         await self.__create_session__()
         url = f"{self.server}/api/v1/workingorders"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data[0]
+        return response.json()
 
     # Create a limit or stop order
     async def create_working_order(
@@ -276,9 +273,8 @@ class AsyncCapitalClient:
             data.update({"profitDistance": profit_distance})
         if profit_amount is not None:
             data.update({"profitAmount": profit_amount})
-        payload = json.dumps(data)
-        data = await self.__make_request__("post", url, payload=payload)
-        final_data = self.__confirmation__(data[0]["dealReference"])
+        response = await self.__make_request__("post", url, payload=data)
+        final_data = await self.__confirmation__(response.json()["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -313,11 +309,10 @@ class AsyncCapitalClient:
             data.update({"profitDistance": profit_distance})
         if profit_amount is not None:
             data.update({"profitAmount": profit_amount})
-        payload = json.dumps(data)
         await self.__create_session__()
         url = f"{self.server}/api/v1/workingorders/{deal_id}"
-        data = await self.__make_request__("put", url, payload=payload)
-        final_data = self.__confirmation__(data[0]["dealReference"])
+        response = await self.__make_request__("put", url, payload=data)
+        final_data = await self.__confirmation__(response.json()["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -325,8 +320,8 @@ class AsyncCapitalClient:
     async def delete_working_order(self, deal_id):
         await self.__create_session__()
         url = f"{self.server}/api/v1/workingorders/{deal_id}"
-        data = await self.__make_request__("delete", url, payload="")
-        final_data = self.__confirmation__(data[0]["dealReference"])
+        response = await self.__make_request__("delete", url, payload="")
+        final_data = await self.__confirmation__(response.json()["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -334,49 +329,49 @@ class AsyncCapitalClient:
     async def all_top(self):
         await self.__create_session__()
         url = f"{self.server}/api/v1/marketnavigation"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return response.json()
 
     # Returns all sub-nodes (markets) of the given node (market category) in the market navigation hierarchy
     async def all_top_sub(self, node_id):
         await self.__create_session__()
         url = f"{self.server}/api/v1/marketnavigation/{node_id}?limit=500"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return response.json()
 
     # Returns the details of the given markets
     async def market_details(self, market):
         await self.__create_session__()
         url = f"{self.server}/api/v1/markets?searchTerm={market}"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return response.json()
 
     # Returns the details of the given market
     async def single_market_details(self, epic):
         await self.__create_session__()
         url = f"{self.server}/api/v1/markets/{epic}"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return response.json()
 
     # Returns historical prices for a particular instrument
     async def prices(self, epic, resolution="MINUTE", max=10):
         await self.__create_session__()
         url = f"{self.server}/api/v1/prices/{epic}?resolution={resolution}&max={max}"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return response.json()
 
     # Client sentiment for market
     async def client_sentiment(self, market_id):
         await self.__create_session__()
         url = f"{self.server}/api/v1/clientsentiment/{market_id}"
-        data = await self.__make_request__("get", url, payload="")
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return response.json()
 
     async def __log_out__(self):
         await self.__make_request__("delete", f"{self.server}/api/v1/session")
