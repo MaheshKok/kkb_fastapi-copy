@@ -52,19 +52,20 @@ class AsyncCapitalClient:
             "encryptedPassword": True,
         }
         data = await self.__make_request__("post", url, payload)
-        self.CST = data["CST"]
-        self.X_TOKEN = data["X-SECURITY-TOKEN"]
-        self.headers.update(
-            {
-                "X-SECURITY-TOKEN": self.X_TOKEN,
-                "CST": self.CST,
-            }
-        )
+        if "CST" in data:
+            self.CST = data["CST"]
+            self.X_TOKEN = data["X-SECURITY-TOKEN"]
+            self.headers.update(
+                {
+                    "X-SECURITY-TOKEN": self.X_TOKEN,
+                    "CST": self.CST,
+                }
+            )
 
     async def __confirmation__(self, deal_reference):
         url = f"{self.server}/api/v1/confirms/{deal_reference}"
-        response = await self.__make_request__("get", url, payload="")[0]
-        return response
+        response = await self.__make_request__("get", url, payload="")
+        return response[0]
 
     async def all_accounts(self):
         await self.__create_session__()
@@ -76,9 +77,9 @@ class AsyncCapitalClient:
     async def account_pref(self):
         await self.__create_session__()
         url = f"{self.server}/api/v1/accounts/preferences"
-        data = await self.__make_request__("get", url, payload="")[0]
+        data = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return data[0]
 
     async def update_account_pref(
         self,
@@ -98,9 +99,9 @@ class AsyncCapitalClient:
         }
         payload = json.dumps(data)
         url = f"{self.server}/api/v1/accounts/preferences"
-        data = await self.__make_request__("put", url, payload=payload)[0]
+        data = await self.__make_request__("put", url, payload=payload)
         await self.__log_out__()
-        return data
+        return data[0]
 
     async def get_account_activity(self):
         await self.__create_session__()
@@ -123,24 +124,24 @@ class AsyncCapitalClient:
         await self.__create_session__()
         url = f"{self.server}/api/v1/session"
         payload = json.dumps({"accountId": account_id})
-        data = await self.__make_request__("put", url, payload=payload)[0]
+        data = await self.__make_request__("put", url, payload=payload)
         await self.__log_out__()
-        return data
+        return data[0]
 
     # gets you all current positions
     async def all_positions(self):
         await self.__create_session__()
         url = f"{self.server}/api/v1/positions"
-        data = await self.__make_request__("get", url, payload="")[0]
+        response = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return response[0]
 
     async def get_position(self, dealId):
         await self.__create_session__()
         url = f"{self.server}/api/v1/positions/{dealId}"
-        data = await self.__make_request__("get", url, payload="")[0]
+        data = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return data[0]
 
     # Opens a new position
     async def create_position(
@@ -179,8 +180,8 @@ class AsyncCapitalClient:
         if profit_amount is not None:
             data.update({"profitAmount": profit_amount})
         payload = json.dumps(data)
-        data = await self.__make_request__("post", url, payload=payload)[0]
-        final_data = self.__confirmation__(data["dealReference"])
+        data = await self.__make_request__("post", url, payload=payload)
+        final_data = self.__confirmation__(data[0]["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -188,8 +189,8 @@ class AsyncCapitalClient:
     async def close_position(self, deal_id):
         await self.__create_session__()
         url = f"{self.server}/api/v1/positions/{deal_id}"
-        data = await self.__make_request__("delete", url, payload="")[0]
-        final_data = self.__confirmation__(data["dealReference"])
+        data = await self.__make_request__("delete", url, payload="")
+        final_data = self.__confirmation__(data[0]["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -222,8 +223,8 @@ class AsyncCapitalClient:
         payload = json.dumps(data)
         await self.__create_session__()
         url = f"{self.server}/api/v1/positions/{deal_id}"
-        data = await self.__make_request__("put", url, payload=payload)[0]
-        final_data = self.__confirmation__(data["dealReference"])
+        data = await self.__make_request__("put", url, payload=payload)
+        final_data = self.__confirmation__(data[0]["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -231,9 +232,9 @@ class AsyncCapitalClient:
     async def all_working_orders(self):
         await self.__create_session__()
         url = f"{self.server}/api/v1/workingorders"
-        data = await self.__make_request__("get", url, payload="")[0]
+        data = await self.__make_request__("get", url, payload="")
         await self.__log_out__()
-        return data
+        return data[0]
 
     # Create a limit or stop order
     async def create_working_order(
@@ -276,8 +277,8 @@ class AsyncCapitalClient:
         if profit_amount is not None:
             data.update({"profitAmount": profit_amount})
         payload = json.dumps(data)
-        data = await self.__make_request__("post", url, payload=payload)[0]
-        final_data = self.__confirmation__(data["dealReference"])
+        data = await self.__make_request__("post", url, payload=payload)
+        final_data = self.__confirmation__(data[0]["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -315,8 +316,8 @@ class AsyncCapitalClient:
         payload = json.dumps(data)
         await self.__create_session__()
         url = f"{self.server}/api/v1/workingorders/{deal_id}"
-        data = await self.__make_request__("put", url, payload=payload)[0]
-        final_data = self.__confirmation__(data["dealReference"])
+        data = await self.__make_request__("put", url, payload=payload)
+        final_data = self.__confirmation__(data[0]["dealReference"])
         await self.__log_out__()
         return final_data
 
@@ -324,8 +325,8 @@ class AsyncCapitalClient:
     async def delete_working_order(self, deal_id):
         await self.__create_session__()
         url = f"{self.server}/api/v1/workingorders/{deal_id}"
-        data = await self.__make_request__("delete", url, payload="")[0]
-        final_data = self.__confirmation__(data["dealReference"])
+        data = await self.__make_request__("delete", url, payload="")
+        final_data = self.__confirmation__(data[0]["dealReference"])
         await self.__log_out__()
         return final_data
 
