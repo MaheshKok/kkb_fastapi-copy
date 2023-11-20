@@ -2,6 +2,7 @@ import asyncio
 import logging
 from datetime import datetime
 
+from _decimal import ROUND_DOWN
 from _decimal import Decimal
 from _decimal import getcontext
 from aioredis import Redis
@@ -121,6 +122,9 @@ async def get_capital_cfd_lot_to_trade(
             cfd_strategy_schema.incremental_step_size
         )
         quantity_to_trade = (approx_quantity_to_trade // to_round_down) * to_round_down
+
+        # Add rounding here
+        quantity_to_trade = quantity_to_trade.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
 
         # Convert the result back to a float for consistency with your existing code
         result = float(quantity_to_trade)
