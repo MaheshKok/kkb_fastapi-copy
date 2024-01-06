@@ -35,6 +35,10 @@ class CFDStrategyModel(Base):
     # strategy details
     name = Column(String, nullable=False, default="Renko Strategy Every Candle")
 
+    compounding = Column(Boolean, nullable=False, default=True)
+    contracts = Column(Float, nullable=True)
+    funds_usage_percent = Column(Float, nullable=False, default=1.0)
+
     broker_id = Column(
         UUID(as_uuid=True), ForeignKey("broker.id", ondelete="CASCADE"), nullable=True, index=True
     )
