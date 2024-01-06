@@ -87,7 +87,7 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
 async def get_capital_cfd_lot_to_trade(
     client, cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss
 ):
-    available_funds = await get_capital_dot_com_available_funds(client, cfd_strategy_schema)
+    funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
 
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
@@ -105,15 +105,18 @@ async def get_capital_cfd_lot_to_trade(
         # ) / (1 + drawdown_percentage)
         #
 
-        if available_funds < ongoing_profit_or_loss:
-            funds_to_trade = Decimal(cfd_strategy_schema.funds + (available_funds * 0.95))
-            to_update_profit_or_loss_in_db = available_funds
+        if funds_to_use < ongoing_profit_or_loss:
+            funds_to_trade = Decimal(cfd_strategy_schema.funds + (funds_to_use * 0.95))
+            to_update_profit_or_loss_in_db = funds_to_use
         else:
             funds_to_trade = Decimal(cfd_strategy_schema.funds + (ongoing_profit_or_loss * 0.95))
             to_update_profit_or_loss_in_db = ongoing_profit_or_loss
 
+        if not cfd_strategy_schema.compounding:
+            return cfd_strategy_schema.contracts, to_update_profit_or_loss_in_db
+
         # Calculate the quantity that can be traded in the current period
-        approx_quantity_to_trade = funds_to_trade / (
+        approx_lots_to_trade = funds_to_trade / (
             Decimal(cfd_strategy_schema.margin_for_min_quantity)
             / Decimal(cfd_strategy_schema.min_quantity)
         )
@@ -123,17 +126,17 @@ async def get_capital_cfd_lot_to_trade(
         to_round_down = Decimal(cfd_strategy_schema.min_quantity) + Decimal(
             cfd_strategy_schema.incremental_step_size
         )
-        quantity_to_trade = (approx_quantity_to_trade // to_round_down) * to_round_down
+        lots_to_trade = (approx_lots_to_trade // to_round_down) * to_round_down
 
         # Add rounding here
-        quantity_to_trade = quantity_to_trade.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+        lots_to_trade = lots_to_trade.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
 
         # Convert the result back to a float for consistency with your existing code
-        result = float(quantity_to_trade)
+        lots_to_trade = float(lots_to_trade)
         logging.info(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots to open [ {result} ], to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db} ]"
+            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots to open [ {lots_to_trade} ], to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db} ]"
         )
-        return result, to_update_profit_or_loss_in_db
+        return lots_to_trade, to_update_profit_or_loss_in_db
 
     except ZeroDivisionError:
         raise HTTPException(
@@ -239,16 +242,20 @@ async def get_capital_cfd_existing_profit_or_loss(
     return round(profit_or_loss, 2), existing_lot, direction
 
 
-async def get_capital_dot_com_available_funds(
-    client, cfd_strategy_schema: CFDStrategySchema
-) -> float:
+async def get_funds_to_use(client, cfd_strategy_schema: CFDStrategySchema) -> float:
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
 
     get_all_positions_attempt = 1
     while get_all_positions_attempt < 10:
         try:
             all_accounts = await client.all_accounts()
-            return all_accounts["accounts"][0]["balance"]["available"]
+            available_funds = all_accounts["accounts"][0]["balance"]["available"]
+            if cfd_strategy_schema.compounding:
+                available_funds = round(
+                    available_funds * cfd_strategy_schema.funds_usage_percent, 2
+                )
+            return available_funds
+
         except Exception as e:
             response, status_code, text = e.args
             if status_code == 429:

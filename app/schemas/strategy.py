@@ -60,6 +60,10 @@ class CFDStrategySchema(BaseModel):
     funds: float = Field(description="Funds", example=100.0)
     name: str = Field(description="Name", example="Renko Strategy Every Candle")
 
+    compounding: bool = Field(description="Compounding")
+    contracts: float = Field(description="Contracts", example=15)
+    funds_usage_percent: float = Field(description="Funds Usage Percent", example=0.25)
+
     user_id: uuid.UUID = Field(
         description="User to which strategy belongs",
         example="fb90dd9c-9e16-4043-b5a5-18aacb42f726",
