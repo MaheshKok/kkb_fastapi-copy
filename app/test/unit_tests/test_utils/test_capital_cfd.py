@@ -1,4 +1,6 @@
 from datetime import datetime
+from decimal import Decimal
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -7,7 +9,11 @@ from app.schemas.strategy import CFDStrategySchema
 
 
 @pytest.mark.asyncio
-async def test_get_capital_cfd_lot_to_trade():
+async def test_get_capital_cfd_lot_to_trade(monkeypatch):
+    monkeypatch.setattr(
+        "app.api.utils.get_capital_dot_com_available_funds",
+        AsyncMock(return_value=Decimal("10000")),
+    )
     cfd_strategy_schema = CFDStrategySchema(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
@@ -23,5 +29,9 @@ async def test_get_capital_cfd_lot_to_trade():
         name="test gold cfd",
         user_id="fb90dd9c-9e16-4043-b5a5-18aacb42f726",
     )
-    result = await get_capital_cfd_lot_to_trade(cfd_strategy_schema, 600)
+    result = await get_capital_cfd_lot_to_trade(
+        None,
+        cfd_strategy_schema,
+        600,
+    )
     assert result == 18.7

@@ -1,15 +1,18 @@
 import asyncio
-import io
-import json
+
+# import io
+# import json
 import logging
 from datetime import datetime
 
 import aioredis
-import httpx
-import pandas as pd
+
+# import httpx
+# import pandas as pd
 import pytest as pytest
 import pytest_asyncio
-from cron.update_fno_expiry import update_expiry_list
+
+# from cron.update_fno_expiry import update_expiry_list
 from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine
@@ -23,7 +26,8 @@ from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
-from app.tasks.utils import get_monthly_expiry_date
+
+# from app.tasks.utils import get_monthly_expiry_date
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_pre_db_data
 from app.utils.constants import ConfigFile
@@ -35,108 +39,108 @@ logging.basicConfig(
 )
 
 
-@pytest.fixture(scope="session", autouse=True)
-async def setup_redis():
-    test_config = get_config(ConfigFile.TEST)
-    _test_async_redis_client = await aioredis.StrictRedis.from_url(
-        test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
-    )
-    # update redis with necessary data i.e expiry list, option chain etc
-    await update_expiry_list(test_config, "INDX OPT")
-
-    logging.info(f"Updated redis with expiry list: {datetime.now()}")
-    current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-        _test_async_redis_client, datetime.now().date()
-    )
-
-    prod_config = get_config()
-    prod_async_redis_client = await aioredis.StrictRedis.from_url(
-        prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
-    )
-    # add keys for future price as well
-    keys = [
-        f"BANKNIFTY {current_expiry_date} CE",
-        f"BANKNIFTY {current_expiry_date} PE",
-        f"BANKNIFTY {next_expiry_date} CE",
-        f"BANKNIFTY {next_expiry_date} PE",
-        f"NIFTY {current_expiry_date} CE",
-        f"NIFTY {current_expiry_date} PE",
-        f"NIFTY {next_expiry_date} CE",
-        f"NIFTY {next_expiry_date} PE",
-    ]
-
-    monthly_expiry = await get_monthly_expiry_date(_test_async_redis_client)
-    if monthly_expiry:
-        keys.append(f"BANKNIFTY {monthly_expiry} FUT")
-        keys.append(f"NIFTY {monthly_expiry} FUT")
-
-    start_time = datetime.now()
-    logging.info("start updating redis with option_chain")
-    all_option_chain = {}
-
-    # Queue up hgetall commands
-    async with prod_async_redis_client.pipeline() as pipe:
-        for key in keys:
-            pipe.hgetall(key)
-        option_chains = await pipe.execute()
-
-    # Process results
-    for key, option_chain in zip(keys, option_chains):
-        if option_chain:
-            all_option_chain[key] = option_chain
-
-    logging.info(f"Pulled option chain from prod redis in [ {datetime.now() - start_time} ]")
-
-    start_time = datetime.now()
-    # Queue up hset commands
-    async with _test_async_redis_client.pipeline() as pipe:
-        for key, option_chain in all_option_chain.items():
-            if "FUT" in key:
-                # For future option chain first and second argument are same
-                pipe.delete(key)
-                pipe.hset(key, "FUT", option_chain["FUT"])
-            else:
-                for strike, premium in option_chain.items():
-                    pipe.hset(key, strike, premium)
-        await pipe.execute()
-
-    logging.info(
-        f"Time taken to update redis with option chain: [ {datetime.now() - start_time} ]"
-    )
-
-    # Choose the column to be used as the key
-    key_column = "Formatted Ins Name"
-
-    url = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
-    response = await httpx.AsyncClient().get(url)
-    data_stream = io.StringIO(response.text)
-    try:
-        df = pd.read_csv(data_stream)
-        full_name_row_dict = {}
-        for key, value in df.set_index(key_column).T.to_dict().items():
-            if "BANKNIFTY" in key or "NIFTY" in key:
-                full_name_row_dict[key] = json.dumps(value)
-    except Exception as e:
-        logging.error(f"Error while reading csv: {e}")
-
-    logging.info("Start setting master contract in Redis")
-    start_time = datetime.now()
-
-    # Split the dictionary into smaller chunks
-    chunk_size = 10000
-    dict_chunks = [
-        dict(list(full_name_row_dict.items())[i : i + chunk_size])
-        for i in range(0, len(full_name_row_dict), chunk_size)
-    ]
-
-    # Use a pipeline to set each chunk of key-value pairs in Redis
-    async with _test_async_redis_client.pipeline() as pipe:
-        for chunk in dict_chunks:
-            for key, value in chunk.items():
-                pipe.set(key, value)
-        await pipe.execute()
-
-    logging.info(f"Time taken to set master contract in redis: [ {datetime.now() - start_time} ]")
+# @pytest.fixture(scope="session", autouse=True)
+# async def setup_redis():
+#     test_config = get_config(ConfigFile.TEST)
+#     _test_async_redis_client = await aioredis.StrictRedis.from_url(
+#         test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+#     )
+#     # update redis with necessary data i.e expiry list, option chain etc
+#     await update_expiry_list(test_config, "INDX OPT")
+#
+#     logging.info(f"Updated redis with expiry list: {datetime.now()}")
+#     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
+#         _test_async_redis_client, datetime.now().date()
+#     )
+#
+#     prod_config = get_config()
+#     prod_async_redis_client = await aioredis.StrictRedis.from_url(
+#         prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+#     )
+#     # add keys for future price as well
+#     keys = [
+#         f"BANKNIFTY {current_expiry_date} CE",
+#         f"BANKNIFTY {current_expiry_date} PE",
+#         f"BANKNIFTY {next_expiry_date} CE",
+#         f"BANKNIFTY {next_expiry_date} PE",
+#         f"NIFTY {current_expiry_date} CE",
+#         f"NIFTY {current_expiry_date} PE",
+#         f"NIFTY {next_expiry_date} CE",
+#         f"NIFTY {next_expiry_date} PE",
+#     ]
+#
+#     monthly_expiry = await get_monthly_expiry_date(_test_async_redis_client)
+#     if monthly_expiry:
+#         keys.append(f"BANKNIFTY {monthly_expiry} FUT")
+#         keys.append(f"NIFTY {monthly_expiry} FUT")
+#
+#     start_time = datetime.now()
+#     logging.info("start updating redis with option_chain")
+#     all_option_chain = {}
+#
+#     # Queue up hgetall commands
+#     async with prod_async_redis_client.pipeline() as pipe:
+#         for key in keys:
+#             pipe.hgetall(key)
+#         option_chains = await pipe.execute()
+#
+#     # Process results
+#     for key, option_chain in zip(keys, option_chains):
+#         if option_chain:
+#             all_option_chain[key] = option_chain
+#
+#     logging.info(f"Pulled option chain from prod redis in [ {datetime.now() - start_time} ]")
+#
+#     start_time = datetime.now()
+#     # Queue up hset commands
+#     async with _test_async_redis_client.pipeline() as pipe:
+#         for key, option_chain in all_option_chain.items():
+#             if "FUT" in key:
+#                 # For future option chain first and second argument are same
+#                 pipe.delete(key)
+#                 pipe.hset(key, "FUT", option_chain["FUT"])
+#             else:
+#                 for strike, premium in option_chain.items():
+#                     pipe.hset(key, strike, premium)
+#         await pipe.execute()
+#
+#     logging.info(
+#         f"Time taken to update redis with option chain: [ {datetime.now() - start_time} ]"
+#     )
+#
+#     # Choose the column to be used as the key
+#     key_column = "Formatted Ins Name"
+#
+#     url = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
+#     response = await httpx.AsyncClient().get(url)
+#     data_stream = io.StringIO(response.text)
+#     try:
+#         df = pd.read_csv(data_stream)
+#         full_name_row_dict = {}
+#         for key, value in df.set_index(key_column).T.to_dict().items():
+#             if "BANKNIFTY" in key or "NIFTY" in key:
+#                 full_name_row_dict[key] = json.dumps(value)
+#     except Exception as e:
+#         logging.error(f"Error while reading csv: {e}")
+#
+#     logging.info("Start setting master contract in Redis")
+#     start_time = datetime.now()
+#
+#     # Split the dictionary into smaller chunks
+#     chunk_size = 10000
+#     dict_chunks = [
+#         dict(list(full_name_row_dict.items())[i : i + chunk_size])
+#         for i in range(0, len(full_name_row_dict), chunk_size)
+#     ]
+#
+#     # Use a pipeline to set each chunk of key-value pairs in Redis
+#     async with _test_async_redis_client.pipeline() as pipe:
+#         for chunk in dict_chunks:
+#             for key, value in chunk.items():
+#                 pipe.set(key, value)
+#         await pipe.execute()
+#
+#     logging.info(f"Time taken to set master contract in redis: [ {datetime.now() - start_time} ]")
 
 
 @pytest.fixture(scope="session", autouse=True)

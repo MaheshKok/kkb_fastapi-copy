@@ -47,13 +47,17 @@ async def update_daily_profit():
                 if options_key not in option_chain:
                     option_chain[options_key] = await async_redis_client.hgetall(options_key)
 
-                monthly_expiry_date = await get_monthly_expiry_date(
-                    async_redis_client,
-                    live_trade_db.strategy.instrument_type,
-                    live_trade_db.strategy.symbol,
+                (
+                    current_month_expiry,
+                    next_month_expiry,
+                    is_today_months_expiry,
+                ) = await get_monthly_expiry_date(
+                    async_redis_client=async_redis_client,
+                    instrument_type=live_trade_db.strategy.instrument_type,
+                    symbol=live_trade_db.strategy.symbol,
                 )
 
-                futures_key = f"{live_trade_db.strategy.symbol} {monthly_expiry_date} FUT"
+                futures_key = f"{live_trade_db.strategy.symbol} {current_month_expiry} FUT"
                 if futures_key not in option_chain:
                     option_chain[futures_key] = await async_redis_client.hgetall(futures_key)
 

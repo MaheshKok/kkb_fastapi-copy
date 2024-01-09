@@ -66,13 +66,13 @@ async def get_cfd_strategy_schema(cfd_payload_schema: CFDPayloadSchema):
         fetch_strategy_query = await async_session.execute(
             select(CFDStrategyModel).where(CFDStrategyModel.id == cfd_payload_schema.strategy_id)
         )
-        strategy_model = fetch_strategy_query.scalar()
-        if not strategy_model:
+        if strategy_model := fetch_strategy_query.scalar():
+            return CFDStrategySchema.model_validate(strategy_model)
+        else:
             raise HTTPException(
                 status_code=404,
                 detail=f"CFD Strategy: {cfd_payload_schema.strategy_id} not found in database",
             )
-        return CFDStrategySchema.model_validate(strategy_model)
 
 
 async def get_async_httpx_client() -> AsyncClient:

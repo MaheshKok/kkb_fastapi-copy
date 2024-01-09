@@ -142,6 +142,10 @@ class CFDPayloadSchema(BaseModel):
     direction: DirectionEnum = Field(description="Position", example="buy")
 
 
+class FuturesPayloadSchema(CFDPayloadSchema):
+    pass
+
+
 class BinanceFuturesPayloadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     symbol: str = Field(description="Symbol", example="BTCUSDT")
