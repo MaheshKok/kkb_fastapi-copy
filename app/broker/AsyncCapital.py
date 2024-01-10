@@ -1,4 +1,6 @@
+import asyncio
 import json
+import logging
 from base64 import b64decode
 from base64 import b64encode
 
@@ -379,8 +381,23 @@ class AsyncCapitalClient:
         return response.json()
 
     async def __log_out__(self):
-        await self.__make_request__("delete", f"{self.server}/api/v1/session")
-        self.headers = {
-            "X-CAP-API-KEY": self.api_key,
-            "content-type": "application/json",
-        }
+        if "X-SECURITY-TOKEN" in self.headers:
+            attempt_logout = 1
+            while attempt_logout < 10:
+                try:
+                    await self.__make_request__("delete", f"{self.server}/api/v1/session")
+                    self.headers = {
+                        "X-CAP-API-KEY": self.api_key,
+                        "content-type": "application/json",
+                    }
+                    break
+                except httpx.HTTPStatusError as error:
+                    await asyncio.sleep(1)
+                    attempt_logout += 1
+                    logging.warning(
+                        f"Attemp: {attempt_logout}, HTTP Status Error while logging out: {error.response.status_code} - {error.response.json()}"
+                    )
+        else:
+            logging.warning(
+                "X-SECURITY-TOKEN not found in headers, looks like it has been logged out already, skipping logout"
+            )

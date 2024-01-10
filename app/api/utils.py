@@ -547,7 +547,6 @@ async def open_capital_lots(
                 place_order_attempt += 1
                 await client.__log_out__()
                 await asyncio.sleep(2)
-                continue
             elif status_code in [400, 404]:
                 # # if it throws 404 exception saying dealreference not found then try to fetch all positions
                 # # and see if order is placed and if not then try it again and if it is placed then skip it
