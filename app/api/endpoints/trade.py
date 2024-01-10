@@ -22,7 +22,7 @@ from app.api.utils import close_capital_lots
 from app.api.utils import get_capital_cfd_existing_profit_or_loss
 from app.api.utils import get_current_and_next_expiry
 from app.api.utils import open_capital_lots
-from app.broker.Capital import CapitalClient
+from app.broker.AsyncCapital import AsyncCapitalClient
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import DirectionEnum
@@ -141,7 +141,7 @@ async def post_cfd(
         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] received"
     )
 
-    client = CapitalClient(
+    client = AsyncCapitalClient(
         username="maheshkokare100@gmail.com",
         password="SUua9Ydc83G.i!d",
         api_key="qshPG64m0RCWQ3fe",
