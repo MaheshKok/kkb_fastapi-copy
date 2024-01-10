@@ -86,7 +86,7 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
 async def get_capital_cfd_lot_to_trade(
     client, cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss
 ):
-    funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
+    funds_to_use = await get_available_funds(client, cfd_strategy_schema)
 
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
@@ -111,14 +111,25 @@ async def get_capital_cfd_lot_to_trade(
             funds_to_trade = Decimal(cfd_strategy_schema.funds + (ongoing_profit_or_loss * 0.95))
             to_update_profit_or_loss_in_db = ongoing_profit_or_loss
 
+        funds_for_1_contract = Decimal(cfd_strategy_schema.margin_for_min_quantity) / Decimal(
+            cfd_strategy_schema.min_quantity
+        )
+
         if not cfd_strategy_schema.compounding:
-            return cfd_strategy_schema.contracts, to_update_profit_or_loss_in_db
+            funds_required_for_contracts = cfd_strategy_schema.contracts * funds_for_1_contract
+            funds_available = cfd_strategy_schema.funds
+            if funds_required_for_contracts < funds_available:
+                return cfd_strategy_schema.contracts, to_update_profit_or_loss_in_db
+            else:
+                contracts_in_available_funds = funds_available / funds_for_1_contract
+                # Add rounding here
+                contracts_in_available_funds = contracts_in_available_funds.quantize(
+                    Decimal("0.01"), rounding=ROUND_DOWN
+                )
+                return contracts_in_available_funds, to_update_profit_or_loss_in_db
 
         # Calculate the quantity that can be traded in the current period
-        approx_lots_to_trade = funds_to_trade / (
-            Decimal(cfd_strategy_schema.margin_for_min_quantity)
-            / Decimal(cfd_strategy_schema.min_quantity)
-        )
+        approx_lots_to_trade = funds_to_trade / funds_for_1_contract
 
         # Round down to the nearest multiple of
         # cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size
@@ -242,7 +253,7 @@ async def get_capital_cfd_existing_profit_or_loss(
     return round(profit_or_loss, 2), existing_lot, direction
 
 
-async def get_funds_to_use(client, cfd_strategy_schema: CFDStrategySchema) -> float:
+async def get_available_funds(client, cfd_strategy_schema: CFDStrategySchema) -> float:
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
 
     get_all_positions_attempt = 1
@@ -601,89 +612,6 @@ async def open_capital_lots(
                     await asyncio.sleep(1)
             else:
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while opening lots, Error: {text}"
-                logging.error(msg)
-                return msg
-
-
-async def manage_capital_lots(
-    *,
-    client: AsyncCapitalClient,
-    cfd_strategy_schema: CFDStrategySchema,
-    cfd_payload_schema: CFDPayloadSchema,
-    demo_or_live: str,
-    profit_or_loss: float = None,
-    lots_to_manage: float = None,
-    is_opening: bool = True,
-):
-    if is_opening:
-        lots_to_manage, update_profit_or_loss_in_db = await get_capital_cfd_lot_to_trade(
-            client, cfd_strategy_schema, profit_or_loss
-        )
-    else:
-        update_profit_or_loss_in_db = profit_or_loss
-
-    attempt = 1
-    while attempt <= 10:
-        try:
-            response = await client.create_position(
-                epic=cfd_strategy_schema.instrument,
-                direction=cfd_payload_schema.direction,
-                size=lots_to_manage,
-            )
-            response_json = response.json()
-            if response_json["dealStatus"] == "ACCEPTED":
-                action = "opened" if is_opening else "closed"
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully {action} [ {lots_to_manage} ] trades."
-                logging.info(msg)
-                if update_profit_or_loss_in_db and is_opening:
-                    await update_capital_funds(
-                        cfd_strategy_schema=cfd_strategy_schema,
-                        demo_or_live=demo_or_live,
-                        profit_or_loss=update_profit_or_loss_in_db,
-                    )
-                return msg
-            elif response_json["dealStatus"] == "REJECTED":
-                if response_json["rejectReason"] in ["THROTTLING", "RISK_CHECK"]:
-                    logging.warning(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {attempt} ] {response_json['rejectReason']} while {( 'opening' if is_opening else 'closing' )} lots [ {lots_to_manage} ] response: {response_json}"
-                    )
-                    if is_opening and response_json["rejectReason"] == "RISK_CHECK":
-                        (
-                            lots_to_manage,
-                            update_profit_or_loss_in_db,
-                        ) = get_capital_cfd_lot_to_trade(
-                            client, cfd_strategy_schema, profit_or_loss
-                        )
-                    attempt += 1
-                    await asyncio.sleep(2 if response_json["rejectReason"] == "THROTTLING" else 1)
-                    continue
-                else:
-                    logging.error(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {attempt} ] rejected, reason: {response_json['rejectReason']}, status: {response_json['status']}"
-                    )
-                    return response_json
-            else:
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {attempt} ] Error, deal status: {response_json}"
-                logging.error(msg)
-                return msg
-        except httpx.HTTPStatusError as error:
-            response_json = error.response
-            status_code, text = response_json.status_code, response_json.text
-            if status_code in [400, 404, 429]:
-                await handle_exception(
-                    client,
-                    status_code,
-                    demo_or_live,
-                    cfd_strategy_schema,
-                    cfd_payload_schema,
-                    lots_to_manage,
-                    is_opening,
-                    profit_or_loss,
-                )
-                attempt += 1
-                await asyncio.sleep(3)
-            else:
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {attempt} ] Error, Error: {text}"
                 logging.error(msg)
                 return msg
 
