@@ -116,8 +116,10 @@ async def get_capital_cfd_lot_to_trade(
         )
 
         if not cfd_strategy_schema.compounding:
-            funds_required_for_contracts = cfd_strategy_schema.contracts * funds_for_1_contract
-            funds_available = cfd_strategy_schema.funds
+            funds_required_for_contracts = (
+                Decimal(cfd_strategy_schema.contracts) * funds_for_1_contract
+            )
+            funds_available = Decimal(cfd_strategy_schema.funds)
             if funds_required_for_contracts < funds_available:
                 return cfd_strategy_schema.contracts, to_update_profit_or_loss_in_db
             else:
@@ -126,7 +128,7 @@ async def get_capital_cfd_lot_to_trade(
                 contracts_in_available_funds = contracts_in_available_funds.quantize(
                     Decimal("0.01"), rounding=ROUND_DOWN
                 )
-                return contracts_in_available_funds, to_update_profit_or_loss_in_db
+                return float(contracts_in_available_funds), to_update_profit_or_loss_in_db
 
         # Calculate the quantity that can be traded in the current period
         approx_lots_to_trade = funds_to_trade / funds_for_1_contract
