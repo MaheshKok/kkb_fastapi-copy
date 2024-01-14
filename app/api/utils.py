@@ -119,7 +119,9 @@ async def get_capital_cfd_lot_to_trade(
             funds_required_for_contracts = (
                 Decimal(cfd_strategy_schema.contracts) * funds_for_1_contract
             )
-            funds_available = Decimal(cfd_strategy_schema.funds)
+            funds_available = Decimal(cfd_strategy_schema.funds) + Decimal(
+                to_update_profit_or_loss_in_db
+            )
             if funds_required_for_contracts < funds_available:
                 return cfd_strategy_schema.contracts, to_update_profit_or_loss_in_db
             else:
