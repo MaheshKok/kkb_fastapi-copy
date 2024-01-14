@@ -119,7 +119,7 @@ async def test_trading_nfo_options_buy_only(
         redis_trade_json_list = await test_async_redis_client.hget(
             f"{strategy_model.id}", f"{trade_models[0].expiry} {trade_models[0].option_type}"
         )
-        assert len(json.loads(redis_trade_json_list)) == 11
+        assert len(json.loads(redis_trade_json_list)) == 10
 
         redis_trade_list = [
             RedisTradeSchema.model_validate(json.loads(trade))
@@ -178,7 +178,7 @@ async def test_trading_nfo_options_sell_and_buy(
         response = await test_async_client.post(trading_options_url, json=payload)
 
         assert response.status_code == 200
-        assert response.json() == "successfully closed existing trades and bought a new trade"
+        assert response.json() == "successfully bought a new trade"
 
         # expunge all trade models from session
         async_session.expunge_all()

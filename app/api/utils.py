@@ -1,7 +1,10 @@
 import asyncio
+import io
 import logging
 from datetime import datetime
 
+import httpx
+import pandas as pd
 from _decimal import ROUND_DOWN
 from _decimal import Decimal
 from _decimal import getcontext
@@ -25,7 +28,23 @@ from app.utils.constants import REDIS_DATE_FORMAT
 from app.utils.in_memory_cache import current_and_next_expiry_cache
 
 
-async def get_expiry_list(async_redis_client, instrument_type, symbol):
+async def get_expiry_list_from_alice_blue():
+    api = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
+
+    response = await httpx.AsyncClient().get(api)
+    data_stream = io.StringIO(response.text)
+    df = pd.read_csv(data_stream)
+    result = {}
+    for (instrument_type, symbol), group in df.groupby(["Instrument Type", "Symbol"]):
+        if instrument_type not in result:
+            result[instrument_type] = {}
+        expiry_dates = sorted(set(group["Expiry Date"].tolist()))
+        result[instrument_type][symbol] = expiry_dates
+
+    return result
+
+
+async def get_expiry_list_from_redis(async_redis_client, instrument_type, symbol):
     instrument_expiry = await async_redis_client.get(instrument_type)
     expiry_list = eval(instrument_expiry)[symbol]
     return [datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list]
@@ -39,7 +58,7 @@ async def get_current_and_next_expiry(async_redis_client, strategy_schema: Strat
     is_today_expiry = False
     current_expiry_date = None
     next_expiry_date = None
-    expiry_list = await get_expiry_list(
+    expiry_list = await get_expiry_list_from_redis(
         async_redis_client, strategy_schema.instrument_type, strategy_schema.symbol
     )
     for index, expiry_date in enumerate(expiry_list):

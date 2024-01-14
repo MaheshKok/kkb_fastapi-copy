@@ -11,7 +11,7 @@ from app.schemas.strategy import CFDStrategySchema
 @pytest.mark.asyncio
 async def test_get_capital_cfd_lot_to_trade(monkeypatch):
     monkeypatch.setattr(
-        "app.api.utils.get_capital_dot_com_available_funds",
+        "app.api.utils.get_funds_to_use",
         AsyncMock(return_value=Decimal("10000")),
     )
     cfd_strategy_schema = CFDStrategySchema(

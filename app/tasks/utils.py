@@ -47,9 +47,10 @@ def strip_previous_expiry_dates(expiry_list_date_obj):
 
 
 async def get_monthly_expiry_date(*, async_redis_client, instrument_type, symbol):
-    instrument_type_expiry = await async_redis_client.get(instrument_type)
+    symbol_expiry_str = await async_redis_client.get(instrument_type)
+    symbol_expiry = json.loads(symbol_expiry_str)
     expiry_list_date_obj = [
-        datetime.strptime(expiry, "%Y-%m-%d").date() for expiry in instrument_type_expiry[symbol]
+        datetime.strptime(expiry, "%Y-%m-%d").date() for expiry in symbol_expiry[symbol]
     ]
     expiry_list_date_obj = strip_previous_expiry_dates(expiry_list_date_obj)
     current_month_expiry = expiry_list_date_obj[0]

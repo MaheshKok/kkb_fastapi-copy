@@ -19,6 +19,8 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import QueuePool
 
 from app.api.utils import get_current_and_next_expiry
+
+# from app.api.utils import get_expiry_list_from_alice_blue
 from app.core.config import get_config
 from app.create_app import get_app
 from app.database import Base
@@ -27,11 +29,16 @@ from app.database.base import get_db_url
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
 
+# from app.schemas.enums import InstrumentTypeEnum
 # from app.tasks.utils import get_monthly_expiry_date
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_pre_db_data
+
+# from app.utils.constants import REDIS_DATE_FORMAT
 from app.utils.constants import ConfigFile
 
+
+# from cron.update_fno_expiry import sync_expiry_dates_from_alice_blue_to_redis
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -42,51 +49,82 @@ logging.basicConfig(
 # @pytest.fixture(scope="session", autouse=True)
 # async def setup_redis():
 #     test_config = get_config(ConfigFile.TEST)
-#     _test_async_redis_client = await aioredis.StrictRedis.from_url(
-#         test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+#     _test_async_redis_client = aioredis.Redis(
+#         host=test_config.data["cache_redis"]["host"],
+#         port=test_config.data["cache_redis"]["port"],
+#         password=test_config.data["cache_redis"]["password"],
+#         encoding="utf-8",
+#         decode_responses=True,
 #     )
+#
 #     # update redis with necessary data i.e expiry list, option chain etc
-#     await update_expiry_list(test_config, "INDX OPT")
+#     expiry_list = await get_expiry_list_from_alice_blue()
+#     for instrument_type, expiry in expiry_list.items():
+#         await _test_async_redis_client.set(instrument_type, json.dumps(expiry))
 #
 #     logging.info(f"Updated redis with expiry list: {datetime.now()}")
-#     current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-#         _test_async_redis_client, datetime.now().date()
-#     )
+#     todays_date = datetime.now().date()
+#
+#     symbols = ["BANKNIFTY", "NIFTY"]
+#     keys = []
+#     current_expiry_date, next_expiry_date, is_today_expiry = None, None, False
+#     for symbol in symbols:
+#         for index, expiry_date_str in enumerate(expiry_list[InstrumentTypeEnum.OPTIDX][symbol]):
+#             expiry_date = datetime.strptime(expiry_date_str, REDIS_DATE_FORMAT).date()
+#             if todays_date > expiry_date:
+#                 continue
+#             elif expiry_date == todays_date:
+#                 next_expiry_date = expiry_list[index + 1]
+#                 current_expiry_date = expiry_date_str
+#                 is_today_expiry = True
+#                 break
+#             elif todays_date < expiry_date:
+#                 current_expiry_date = expiry_date_str
+#                 break
+#
+#         keys.extend(
+#             [
+#                 f"{symbol} {current_expiry_date} CE",
+#                 f"{symbol} {current_expiry_date} PE",
+#             ]
+#         )
+#         if is_today_expiry:
+#             keys.extend(
+#                 [
+#                     f"{symbol} {next_expiry_date} CE",
+#                     f"{symbol} {next_expiry_date} PE",
+#                 ]
+#             )
+#
+#         (
+#             current_month_expiry,
+#             next_month_expiry,
+#             is_today_months_expiry,
+#         ) = await get_monthly_expiry_date(
+#             async_redis_client=_test_async_redis_client,
+#             instrument_type=InstrumentTypeEnum.FUTIDX,
+#             symbol=symbol,
+#         )
+#
+#         keys.append(f"{symbol} {current_month_expiry} FUT")
+#         if is_today_months_expiry:
+#             keys.append(f"{symbol} {next_month_expiry} FUT")
+#
+#     start_time = datetime.now()
+#     logging.info("start updating redis with option_chain")
 #
 #     prod_config = get_config()
 #     prod_async_redis_client = await aioredis.StrictRedis.from_url(
 #         prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
 #     )
-#     # add keys for future price as well
-#     keys = [
-#         f"BANKNIFTY {current_expiry_date} CE",
-#         f"BANKNIFTY {current_expiry_date} PE",
-#         f"BANKNIFTY {next_expiry_date} CE",
-#         f"BANKNIFTY {next_expiry_date} PE",
-#         f"NIFTY {current_expiry_date} CE",
-#         f"NIFTY {current_expiry_date} PE",
-#         f"NIFTY {next_expiry_date} CE",
-#         f"NIFTY {next_expiry_date} PE",
-#     ]
 #
-#     monthly_expiry = await get_monthly_expiry_date(_test_async_redis_client)
-#     if monthly_expiry:
-#         keys.append(f"BANKNIFTY {monthly_expiry} FUT")
-#         keys.append(f"NIFTY {monthly_expiry} FUT")
-#
-#     start_time = datetime.now()
-#     logging.info("start updating redis with option_chain")
 #     all_option_chain = {}
-#
 #     # Queue up hgetall commands
 #     async with prod_async_redis_client.pipeline() as pipe:
 #         for key in keys:
 #             pipe.hgetall(key)
-#         option_chains = await pipe.execute()
-#
-#     # Process results
-#     for key, option_chain in zip(keys, option_chains):
-#         if option_chain:
+#             option_chain = await pipe.execute()
+#             # Process results
 #             all_option_chain[key] = option_chain
 #
 #     logging.info(f"Pulled option chain from prod redis in [ {datetime.now() - start_time} ]")
@@ -98,9 +136,9 @@ logging.basicConfig(
 #             if "FUT" in key:
 #                 # For future option chain first and second argument are same
 #                 pipe.delete(key)
-#                 pipe.hset(key, "FUT", option_chain["FUT"])
+#                 pipe.hset(key, "FUT", option_chain[0]["FUT"])
 #             else:
-#                 for strike, premium in option_chain.items():
+#                 for strike, premium in option_chain[0].items():
 #                     pipe.hset(key, strike, premium)
 #         await pipe.execute()
 #
@@ -108,8 +146,9 @@ logging.basicConfig(
 #         f"Time taken to update redis with option chain: [ {datetime.now() - start_time} ]"
 #     )
 #
+#     # set up master contract in redis
 #     # Choose the column to be used as the key
-#     key_column = "Formatted Ins Name"
+#     key_column = "Trading Symbol"
 #
 #     url = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
 #     response = await httpx.AsyncClient().get(url)
@@ -174,8 +213,15 @@ def test_config():
 @pytest_asyncio.fixture(scope="function")
 async def test_async_redis_client():
     test_config = get_config(ConfigFile.TEST)
-    _test_async_redis_client = await aioredis.StrictRedis.from_url(
-        test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+    # _test_async_redis_client = await aioredis.StrictRedis.from_url(
+    #     test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+    # )
+    _test_async_redis_client = aioredis.Redis(
+        host=test_config.data["cache_redis"]["host"],
+        port=test_config.data["cache_redis"]["port"],
+        password=test_config.data["cache_redis"]["password"],
+        encoding="utf-8",
+        decode_responses=True,
     )
     logging.info("test redis client created")
     yield _test_async_redis_client
