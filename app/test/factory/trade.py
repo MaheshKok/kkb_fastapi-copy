@@ -15,7 +15,7 @@ from app.test.factory.strategy import StrategyFactory
 def generate_expiry_date():
     today = datetime.today()
     current_weekday = today.weekday()
-    days_ahead = (3 - current_weekday) % 7  # 3 represents Thursday (Monday is 0, Sunday is 6)
+    days_ahead = (2 - current_weekday) % 7  # 3 represents Thursday (Monday is 0, Sunday is 6)
     next_thursday = today + timedelta(days=days_ahead)
     return next_thursday
 

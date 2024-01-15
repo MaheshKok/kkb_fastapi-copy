@@ -27,6 +27,8 @@ async def test_get_capital_cfd_lot_to_trade(monkeypatch):
         is_demo=True,
         funds=4000,
         name="test gold cfd",
+        compounding=True,
+        funds_usage_percent=1.0,
         user_id="fb90dd9c-9e16-4043-b5a5-18aacb42f726",
     )
     result = await get_capital_cfd_lot_to_trade(

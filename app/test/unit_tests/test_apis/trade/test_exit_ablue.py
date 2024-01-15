@@ -87,7 +87,7 @@ async def test_exit_alice_blue_trade(
     response = await test_async_client.post(trading_options_url, json=payload)
 
     assert response.status_code == 200
-    assert response.json() == "successfully bought a new trade"
+    assert response.json() == "successfully closed existing trades and bought a new trade"
 
     async with Database() as async_session:
         # fetch closed trades in db
