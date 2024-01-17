@@ -19,6 +19,17 @@ class StrategyCreateSchema(BaseModel):
     symbol: str = Field(description="Symbol", example="BANKNIFTY")
     name: str = Field(description="Name", example="BANKNIFTY1! TF:2 Brick_Size:35 Pyramiding:100")
     position: PositionEnum = Field(description="Position", example="LONG")
+
+    premium: float = Field(description="Premium", example=350.0)
+
+    funds: float = Field(description="Funds", example=1000000.0)
+    min_quantity: float = Field(description="Min Quantity", example=10)
+    margin_for_min_quantity: float = Field(description="Margin for Min Quantity", example=2.65)
+    incremental_step_size: float = Field(description="Incremental Step Size", example=0.1)
+    compounding: bool = Field(description="Compounding")
+    contracts: float = Field(description="Contracts", example=15)
+    funds_usage_percent: float = Field(description="Funds Usage Percent", example=0.25)
+
     broker_id: Optional[uuid.UUID] = Field(
         description="Broker on which strategy will be executed",
         example="6b38655e-0e28-471d-aefb-dd7ce2f6a825",

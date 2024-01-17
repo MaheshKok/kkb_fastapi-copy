@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
+from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.strategy import StrategySchema
@@ -129,6 +130,7 @@ async def calculate_profits(
     future_exit_price: float,
     signal_payload_schema: SignalPayloadSchema,
     redis_trade_schema_list: List[RedisTradeSchema],
+    strategy_schema: StrategySchema,
 ):
     updated_data = {}
     total_profit = 0
@@ -139,7 +141,7 @@ async def calculate_profits(
     for trade in redis_trade_schema_list:
         entry_price = trade.entry_price
         quantity = trade.quantity
-        position = trade.position
+        position = strategy_schema.position
         exit_price = strike_exit_price_dict.get(trade.strike) or 0.0
         if not exit_price:
             # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker
@@ -233,7 +235,7 @@ async def dump_trade_in_db_and_redis(
         await push_trade_to_redis(async_redis_client, trade_model, async_session)
 
 
-async def update_trades_in_db(
+async def close_trades_in_db_and_remove_from_redis(
     *,
     updated_data: dict,
     strategy_schema: StrategySchema,
@@ -367,11 +369,9 @@ async def task_entry_trade(
         return "successfully added trade to db"
 
 
-# @profile
-async def task_exit_trade(
+async def compute_trade_data_needed_for_closing_trade(
     *,
     signal_payload_schema: SignalPayloadSchema,
-    redis_strategy_key_hash: str,
     redis_trade_schema_list: list[RedisTradeSchema],
     async_redis_client: Redis,
     strategy_schema: StrategySchema,
@@ -400,32 +400,16 @@ async def task_exit_trade(
             position=future_position,
         )
 
-        exit_at = datetime.utcnow()
-        exit_received_at = signal_payload_schema.received_at
-
         updated_data = {
             trade_schema.id: {
                 "id": trade_schema.id,
                 "future_exit_price": future_exit_price,
                 "future_profit": future_profit,
-                "exit_received_at": exit_received_at,
-                "exit_at": exit_at,
+                "exit_received_at": signal_payload_schema.received_at,
+                "exit_at": datetime.utcnow(),
             }
         }
-
-        # update database with the updated data
-        await update_trades_in_db(
-            updated_data=updated_data,
-            strategy_schema=strategy_schema,
-            total_profit=0.0,
-            total_future_profit=future_profit,
-            total_redis_trades=len(redis_trade_schema_list),
-            async_redis_client=async_redis_client,
-            redis_strategy_key_hash=redis_strategy_key_hash,
-        )
-
-        return f"{redis_strategy_key_hash} closed trades, updated the take_away_profit with the profit and deleted the redis key"
-
+        return updated_data, 0.0, future_profit
     else:
         strike_exit_price_dict, future_exit_price = await asyncio.gather(
             get_strike_and_exit_price_dict(
@@ -448,20 +432,48 @@ async def task_exit_trade(
             future_exit_price=future_exit_price,
             signal_payload_schema=signal_payload_schema,
             redis_trade_schema_list=redis_trade_schema_list,
+            strategy_schema=strategy_schema,
         )
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], adding profit: [ {total_profit} ] and future profit: [ {total_future_profit} ]"
         )
+        return updated_data, total_profit, total_future_profit
 
-        # update database with the updated data
-        await update_trades_in_db(
-            updated_data=updated_data,
-            strategy_schema=strategy_schema,
-            total_profit=total_profit,
-            total_future_profit=total_future_profit,
-            total_redis_trades=len(redis_trade_schema_list),
-            async_redis_client=async_redis_client,
-            redis_strategy_key_hash=redis_strategy_key_hash,
-        )
 
-        return f"{redis_strategy_key_hash} closed trades, updated the take_away_profit with the profit and deleted the redis key"
+# @profile
+async def task_exit_trade(
+    *,
+    signal_payload_schema: SignalPayloadSchema,
+    redis_strategy_key_hash: str,
+    redis_trade_schema_list: list[RedisTradeSchema],
+    async_redis_client: Redis,
+    strategy_schema: StrategySchema,
+    async_httpx_client: AsyncClient,
+):
+    only_futures = True if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX else False
+
+    (
+        updated_data,
+        total_profit,
+        total_future_profit,
+    ) = await compute_trade_data_needed_for_closing_trade(
+        signal_payload_schema=signal_payload_schema,
+        redis_trade_schema_list=redis_trade_schema_list,
+        async_redis_client=async_redis_client,
+        strategy_schema=strategy_schema,
+        async_httpx_client=async_httpx_client,
+        only_futures=only_futures,
+    )
+
+    # update database with the updated data
+    await close_trades_in_db_and_remove_from_redis(
+        updated_data=updated_data,
+        strategy_schema=strategy_schema,
+        total_profit=total_profit,
+        total_future_profit=total_future_profit,
+        total_redis_trades=len(redis_trade_schema_list),
+        async_redis_client=async_redis_client,
+        redis_strategy_key_hash=redis_strategy_key_hash,
+    )
+
+    return f"{redis_strategy_key_hash} closed trades, updated the take_away_profit with the profit and deleted the redis key"

@@ -1,19 +1,13 @@
 from datetime import datetime
-from decimal import Decimal
-from unittest.mock import AsyncMock
 
 import pytest
 
-from app.api.utils import get_capital_cfd_lot_to_trade
+from app.api.utils import get_lots_to_trade_and_profit_or_loss
 from app.schemas.strategy import CFDStrategySchema
 
 
 @pytest.mark.asyncio
 async def test_get_capital_cfd_lot_to_trade(monkeypatch):
-    monkeypatch.setattr(
-        "app.api.utils.get_funds_to_use",
-        AsyncMock(return_value=Decimal("10000")),
-    )
     cfd_strategy_schema = CFDStrategySchema(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
@@ -31,8 +25,8 @@ async def test_get_capital_cfd_lot_to_trade(monkeypatch):
         funds_usage_percent=1.0,
         user_id="fb90dd9c-9e16-4043-b5a5-18aacb42f726",
     )
-    result = await get_capital_cfd_lot_to_trade(
-        None,
+    result = get_lots_to_trade_and_profit_or_loss(
+        1000,
         cfd_strategy_schema,
         600,
     )

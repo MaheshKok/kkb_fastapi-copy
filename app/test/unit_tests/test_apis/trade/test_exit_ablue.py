@@ -9,6 +9,7 @@ from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.models import User
 from app.database.session_manager.db_session import Database
+from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.test.factory.broker import BrokerFactory
@@ -23,13 +24,14 @@ from app.utils.constants import update_trade_columns
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "option_type", [OptionType.CE, OptionType.PE], ids=["CE Options", "PE Options"]
+    "action", [SignalTypeEnum.BUY, SignalTypeEnum.SELL], ids=["Buy Signal", "Sell Signal"]
 )
 async def test_exit_alice_blue_trade(
-    option_type, test_async_client, test_async_redis_client, monkeypatch
+    action, test_async_client, test_async_redis_client, monkeypatch
 ):
+    # If Buy Signal is generated and the unit test is exit then existing trade should be PE option and vice-versa.
     await create_open_trades(
-        users=1, strategies=1, trades=10, ce_trade=option_type != OptionType.CE
+        users=1, strategies=1, trades=10, ce_trade=action == SignalTypeEnum.SELL
     )
 
     async with Database() as async_session:
@@ -39,11 +41,8 @@ async def test_exit_alice_blue_trade(
         strategy_model.broker_id = broker_model.id
         await async_session.flush()
 
-        payload = get_test_post_trade_payload()
+        payload = get_test_post_trade_payload(action.value)
         payload["strategy_id"] = str(strategy_model.id)
-
-        if option_type == OptionType.PE:
-            payload["option_type"] = OptionType.PE
 
         # set strategy in redis
         await test_async_redis_client.hset(
@@ -95,7 +94,7 @@ async def test_exit_alice_blue_trade(
         fetch_trade_models_query = await async_session.execute(
             select(TradeModel).filter_by(
                 strategy_id=strategy_model.id,
-                option_type=OptionType.CE if option_type == OptionType.PE else OptionType.PE,
+                option_type=OptionType.CE if action == SignalTypeEnum.SELL else OptionType.PE,
             )
         )
         exited_trade_models = fetch_trade_models_query.scalars().all()
@@ -117,7 +116,8 @@ async def test_exit_alice_blue_trade(
 
         # assert new trade in redis
         redis_trade_json = await test_async_redis_client.hget(
-            f"{strategy_model.id}", f"{exited_trade_models[0].expiry} {option_type}"
+            f"{strategy_model.id}",
+            f"{exited_trade_models[0].expiry} {OptionType.CE if action == SignalTypeEnum.BUY else OptionType.PE}",
         )
         assert len(json.loads(redis_trade_json)) == 1
 

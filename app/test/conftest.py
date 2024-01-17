@@ -3,7 +3,6 @@ import asyncio
 # import io
 # import json
 import logging
-from datetime import datetime
 
 import aioredis
 
@@ -28,6 +27,7 @@ from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
+from app.schemas.strategy import StrategySchema
 
 # from app.schemas.enums import InstrumentTypeEnum
 # from app.tasks.utils import get_monthly_expiry_date
@@ -331,7 +331,9 @@ async def buy_task_payload_dict(test_async_redis_client):
             current_expiry_date,
             next_expiry_date,
             is_today_expiry,
-        ) = await get_current_and_next_expiry(test_async_redis_client, datetime.now().date())
+        ) = await get_current_and_next_expiry(
+            test_async_redis_client, StrategySchema.model_validate(strategy_model)
+        )
 
         post_trade_payload["strategy_id"] = strategy_model.id
         post_trade_payload["expiry"] = current_expiry_date

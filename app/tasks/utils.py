@@ -133,10 +133,10 @@ async def get_strike_and_exit_price_dict(
 
 
 async def get_strike_and_entry_price_from_option_chain(
-    option_chain, signal_payload_schema: SignalPayloadSchema
+    *, option_chain, signal_payload_schema: SignalPayloadSchema, premium: float
 ):
     strike = signal_payload_schema.strike
-    premium = signal_payload_schema.premium
+    premium = premium
     future_price = signal_payload_schema.future_entry_price_received
 
     # use bisect to find the strike and its price from option chain
@@ -171,7 +171,9 @@ async def get_strike_and_entry_price(
     async_httpx_client: AsyncClient,
 ) -> tuple[float, float]:
     strike, premium = await get_strike_and_entry_price_from_option_chain(
-        option_chain=option_chain, signal_payload_schema=signal_payload_schema
+        option_chain=option_chain,
+        signal_payload_schema=signal_payload_schema,
+        premium=strategy_schema.premium,
     )
 
     if strategy_schema.broker_id:

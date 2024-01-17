@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from app.schemas.enums import PositionEnum
 from app.test.factory.strategy import StrategyFactory
 from app.test.factory.take_away_profit import TakeAwayProfitFactory
 from app.test.factory.trade import CompletedTradeFactory
@@ -15,6 +16,7 @@ async def create_open_trades(
     take_away_profit=False,
     daily_profit=0,
     ce_trade=True,
+    position=PositionEnum.LONG,
 ):
     for _ in range(users):
         user = await UserFactory()
@@ -23,13 +25,13 @@ async def create_open_trades(
             strategy = await StrategyFactory(
                 user=user,
                 created_at=user.created_at + timedelta(days=1),
+                position=position,
             )
 
             for _ in range(trades):
-                if ce_trade:
-                    await LiveTradeFactory(strategy=strategy, option_type=OptionType.CE)
-                else:
-                    await LiveTradeFactory(strategy=strategy, option_type=OptionType.PE)
+                await LiveTradeFactory(
+                    strategy=strategy, option_type=OptionType.CE if ce_trade else OptionType.PE
+                )
 
             if take_away_profit:
                 # Just assume there were trades in db which are closed and their profit was taken away

@@ -6,7 +6,7 @@ class PositionEnum(str, Enum):
     SHORT = "SHORT"
 
 
-class DirectionEnum(str, Enum):
+class SignalTypeEnum(str, Enum):
     BUY = "buy"
     SELL = "sell"
 

@@ -7,27 +7,35 @@ from sqlalchemy import select
 from app.database.models import TradeModel
 from app.database.models.strategy import StrategyModel
 from app.database.session_manager.db_session import Database
+from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import SignalPayloadSchema
 from app.tasks.tasks import task_entry_trade
+from app.utils.constants import OptionType
 
 
 # I just fixed them , but didnt assert so many things
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("option_type", ["CE", "PE"], ids=["CE Options", "PE Options"])
+@pytest.mark.parametrize(
+    "action", [SignalTypeEnum.BUY, SignalTypeEnum.SELL], ids=["Buy Signal", "Sell Signal"]
+)
 async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
-    option_type, buy_task_payload_dict, test_async_redis_client
+    action, buy_task_payload_dict, test_async_redis_client
 ):
-    if option_type == "PE":
-        buy_task_payload_dict["option_type"] = "PE"
+    if action == SignalTypeEnum.BUY:
+        buy_task_payload_dict["option_type"] = OptionType.CE
+    else:
+        buy_task_payload_dict["option_type"] = OptionType.PE
 
     async with Database() as async_session:
         strategy_model = await async_session.get(
             StrategyModel, buy_task_payload_dict["strategy_id"]
         )
         strategy_schema = StrategySchema.model_validate(strategy_model)
+
+        # TODO: remove setting option_type to signalpayloadschema once it has been removed
         await task_entry_trade(
             signal_payload_schema=SignalPayloadSchema(**buy_task_payload_dict),
             async_redis_client=test_async_redis_client,
@@ -44,7 +52,7 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
         strategy_model = await async_session.scalar(select(StrategyModel))
 
         assert trade_model.strategy.id == strategy_model.id
-        assert trade_model.entry_price <= buy_task_payload_dict["premium"]
+        assert trade_model.entry_price <= strategy_schema.premium
         redis_trades_json = await test_async_redis_client.hget(
             f"{strategy_model.id}", f"{trade_model.expiry} {trade_model.option_type}"
         )
@@ -54,12 +62,16 @@ async def test_buy_trade_for_premium_and_add_trades_to_new_key_in_redis(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("option_type", ["CE", "PE"], ids=["CE Options", "PE Options"])
+@pytest.mark.parametrize(
+    "action", [SignalTypeEnum.BUY, SignalTypeEnum.SELL], ids=["Buy Signal", "Sell Signal"]
+)
 async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
-    test_async_redis_client, option_type, buy_task_payload_dict
+    test_async_redis_client, action, buy_task_payload_dict
 ):
-    if option_type == "PE":
-        buy_task_payload_dict["option_type"] = "PE"
+    if action == SignalTypeEnum.BUY:
+        buy_task_payload_dict["option_type"] = OptionType.CE
+    else:
+        buy_task_payload_dict["option_type"] = OptionType.PE
 
     # We dont need to create closed trades here explicitly
     # because get_test_buy_task_payload_dict already takes care of it
@@ -87,7 +99,7 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
         strategy_model = await async_session.scalar(select(StrategyModel))
 
         assert trade_model.strategy.id == strategy_model.id
-        assert trade_model.entry_price <= buy_task_payload_dict["premium"]
+        assert trade_model.entry_price <= strategy_schema.premium
 
         # trades are being added to redis
         redis_trades_json = await test_async_redis_client.hget(
@@ -99,14 +111,29 @@ async def test_buy_trade_for_premium_and_add_trade_to_ongoing_trades_in_redis(
 
 
 @pytest.mark.parametrize(
-    "payload_strike", ["43500.0", "43510.0"], ids=["valid strike", "invalid strike"]
+    "payload_strike, action",
+    [
+        ("43500.0", SignalTypeEnum.BUY),
+        ("43510.0", SignalTypeEnum.BUY),
+        ("43500.0", SignalTypeEnum.SELL),
+        ("43510.0", SignalTypeEnum.SELL),
+    ],
+    ids=[
+        "valid strike, Buy Signal",
+        "invalid strike Buy Signal",
+        "valid strike, Sell Signal",
+        "invalid strike Sell Signal",
+    ],
 )
 @pytest.mark.asyncio
 async def test_buy_trade_for_strike(
-    payload_strike, test_async_redis_client, buy_task_payload_dict
+    payload_strike, action, test_async_redis_client, buy_task_payload_dict
 ):
-    del buy_task_payload_dict["premium"]
     buy_task_payload_dict["strike"] = payload_strike
+    if action == SignalTypeEnum.BUY:
+        buy_task_payload_dict["option_type"] = OptionType.CE
+    else:
+        buy_task_payload_dict["option_type"] = OptionType.PE
 
     # We dont need to create closed trades here explicitly
     # because get_test_buy_task_payload_dict already takes care of it

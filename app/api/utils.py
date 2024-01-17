@@ -103,13 +103,10 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
         return session_id
 
 
-async def get_capital_cfd_lot_to_trade(
-    client, cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss
+def get_lots_to_trade_and_profit_or_loss(
+    funds_to_use, strategy_schema: CFDStrategySchema | StrategySchema, ongoing_profit_or_loss
 ):
-    funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
-
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
-    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
 
     getcontext().prec = 28  # Set a high precision
     try:
@@ -125,25 +122,25 @@ async def get_capital_cfd_lot_to_trade(
         #
 
         if funds_to_use < ongoing_profit_or_loss:
-            funds_to_trade = Decimal(cfd_strategy_schema.funds + (funds_to_use * 0.95))
+            funds_to_trade = Decimal(strategy_schema.funds + (funds_to_use * 0.95))
             to_update_profit_or_loss_in_db = funds_to_use
         else:
-            funds_to_trade = Decimal(cfd_strategy_schema.funds + (ongoing_profit_or_loss * 0.95))
+            funds_to_trade = Decimal(strategy_schema.funds + (ongoing_profit_or_loss * 0.95))
             to_update_profit_or_loss_in_db = ongoing_profit_or_loss
 
-        if not cfd_strategy_schema.compounding:
-            return cfd_strategy_schema.contracts, to_update_profit_or_loss_in_db
+        if not strategy_schema.compounding:
+            return strategy_schema.contracts, to_update_profit_or_loss_in_db
 
         # Calculate the quantity that can be traded in the current period
         approx_lots_to_trade = funds_to_trade / (
-            Decimal(cfd_strategy_schema.margin_for_min_quantity)
-            / Decimal(cfd_strategy_schema.min_quantity)
+            Decimal(strategy_schema.margin_for_min_quantity)
+            / Decimal(strategy_schema.min_quantity)
         )
 
         # Round down to the nearest multiple of
         # cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size
-        to_round_down = Decimal(cfd_strategy_schema.min_quantity) + Decimal(
-            cfd_strategy_schema.incremental_step_size
+        to_round_down = Decimal(strategy_schema.min_quantity) + Decimal(
+            strategy_schema.incremental_step_size
         )
         lots_to_trade = (approx_lots_to_trade // to_round_down) * to_round_down
 
@@ -152,8 +149,16 @@ async def get_capital_cfd_lot_to_trade(
 
         # Convert the result back to a float for consistency with your existing code
         lots_to_trade = float(lots_to_trade)
+
+        if isinstance(strategy_schema, CFDStrategySchema):
+            demo_or_live = "DEMO" if strategy_schema.is_demo else "LIVE"
+            symbol = strategy_schema.instrument
+        else:
+            demo_or_live = "DEMO" if strategy_schema.broker_id else "LIVE"
+            symbol = strategy_schema.symbol
+
         logging.info(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots to open [ {lots_to_trade} ], to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db} ]"
+            f"[ {demo_or_live} {symbol} ] : lots to open [ {lots_to_trade} ], to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db} ]"
         )
         return lots_to_trade, to_update_profit_or_loss_in_db
 
@@ -500,11 +505,13 @@ async def open_capital_lots(
                     logging.info(
                         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] calculating lots to open again as available funds are updated"
                     )
+                    funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
+
                     (
                         lots_to_open,
                         update_profit_or_loss_in_db,
-                    ) = await get_capital_cfd_lot_to_trade(
-                        client, cfd_strategy_schema, profit_or_loss
+                    ) = get_lots_to_trade_and_profit_or_loss(
+                        funds_to_use, cfd_strategy_schema, profit_or_loss
                     )
                     place_order_attempt += 1
                     await client.__log_out__()
@@ -613,88 +620,6 @@ async def open_capital_lots(
                     await asyncio.sleep(1)
             else:
                 msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while opening lots, Error: {e}"
-                logging.error(msg)
-                return msg
-
-
-async def manage_capital_lots(
-    *,
-    client: CapitalClient,
-    cfd_strategy_schema: CFDStrategySchema,
-    cfd_payload_schema: CFDPayloadSchema,
-    demo_or_live: str,
-    profit_or_loss: float = None,
-    lots_to_manage: float = None,
-    is_opening: bool = True,
-):
-    if is_opening:
-        lots_to_manage, update_profit_or_loss_in_db = await get_capital_cfd_lot_to_trade(
-            client, cfd_strategy_schema, profit_or_loss
-        )
-    else:
-        update_profit_or_loss_in_db = profit_or_loss
-
-    attempt = 1
-    while attempt <= 10:
-        try:
-            response = await client.create_position(
-                epic=cfd_strategy_schema.instrument,
-                direction=cfd_payload_schema.direction,
-                size=lots_to_manage,
-            )
-
-            if response["dealStatus"] == "ACCEPTED":
-                action = "opened" if is_opening else "closed"
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully {action} [ {lots_to_manage} ] trades."
-                logging.info(msg)
-                if update_profit_or_loss_in_db and is_opening:
-                    await update_capital_funds(
-                        cfd_strategy_schema=cfd_strategy_schema,
-                        demo_or_live=demo_or_live,
-                        profit_or_loss=update_profit_or_loss_in_db,
-                    )
-                return msg
-            elif response["dealStatus"] == "REJECTED":
-                if response["rejectReason"] in ["THROTTLING", "RISK_CHECK"]:
-                    logging.warning(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {attempt} ] {response['rejectReason']} while {( 'opening' if is_opening else 'closing' )} lots [ {lots_to_manage} ] response: {response}"
-                    )
-                    if is_opening and response["rejectReason"] == "RISK_CHECK":
-                        (
-                            lots_to_manage,
-                            update_profit_or_loss_in_db,
-                        ) = get_capital_cfd_lot_to_trade(
-                            client, cfd_strategy_schema, profit_or_loss
-                        )
-                    attempt += 1
-                    await asyncio.sleep(2 if response["rejectReason"] == "THROTTLING" else 1)
-                    continue
-                else:
-                    logging.error(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {attempt} ] rejected, reason: {response['rejectReason']}, status: {response['status']}"
-                    )
-                    return response
-            else:
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {attempt} ] Error, deal status: {response}"
-                logging.error(msg)
-                return msg
-        except Exception as e:
-            response, status_code, text = e.args
-            if status_code in [400, 404, 429]:
-                await handle_exception(
-                    client,
-                    status_code,
-                    demo_or_live,
-                    cfd_strategy_schema,
-                    cfd_payload_schema,
-                    lots_to_manage,
-                    is_opening,
-                    profit_or_loss,
-                )
-                attempt += 1
-                await asyncio.sleep(3)
-            else:
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {attempt} ] Error, Error: {e}"
                 logging.error(msg)
                 return msg
 
