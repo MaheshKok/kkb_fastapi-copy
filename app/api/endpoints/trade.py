@@ -20,7 +20,7 @@ from app.api.dependency import get_cfd_strategy_schema
 from app.api.dependency import get_strategy_schema
 from app.api.utils import close_capital_lots
 from app.api.utils import get_capital_cfd_existing_profit_or_loss
-from app.api.utils import get_current_and_next_expiry
+from app.api.utils import get_current_and_next_expiry_from_redis
 from app.api.utils import get_funds_to_use
 from app.api.utils import get_lots_to_trade_and_profit_or_loss
 from app.api.utils import open_capital_lots
@@ -240,9 +240,11 @@ async def post_nfo_indian_options(
         f"Received signal payload to buy: [ {signal_payload_schema.option_type} ] for strategy: {strategy_schema.name}"
     )
 
-    current_expiry_date, next_expiry_date, is_today_expiry = await get_current_and_next_expiry(
-        async_redis_client, strategy_schema
-    )
+    (
+        current_expiry_date,
+        next_expiry_date,
+        is_today_expiry,
+    ) = await get_current_and_next_expiry_from_redis(async_redis_client, strategy_schema)
     signal_payload_schema.expiry = current_expiry_date
 
     trades_key = f"{signal_payload_schema.strategy_id}"

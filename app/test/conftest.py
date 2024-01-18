@@ -1,13 +1,7 @@
 import asyncio
-
-# import io
-# import json
 import logging
 
 import aioredis
-
-# import httpx
-# import pandas as pd
 import pytest as pytest
 import pytest_asyncio
 
@@ -17,9 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import QueuePool
 
-from app.api.utils import get_current_and_next_expiry
-
-# from app.api.utils import get_expiry_list_from_alice_blue
+from app.api.utils import get_current_and_next_expiry_from_redis
 from app.core.config import get_config
 from app.create_app import get_app
 from app.database import Base
@@ -28,24 +20,27 @@ from app.database.base import get_db_url
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
-
-# from app.schemas.enums import InstrumentTypeEnum
-# from app.tasks.utils import get_monthly_expiry_date
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_pre_db_data
-
-# from app.utils.constants import REDIS_DATE_FORMAT
 from app.utils.constants import ConfigFile
 
-
-# from cron.update_fno_expiry import sync_expiry_dates_from_alice_blue_to_redis
 
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-
+# import io
+# import json
+# from datetime import datetime
+# import httpx
+# import pandas as pd
+# from app.utils.constants import REDIS_DATE_FORMAT
+# from app.schemas.enums import InstrumentTypeEnum
+# from app.tasks.utils import get_monthly_expiry_date
+# from app.api.utils import get_expiry_list_from_alice_blue
+#
+#
 # @pytest.fixture(scope="session", autouse=True)
 # async def setup_redis():
 #     test_config = get_config(ConfigFile.TEST)
@@ -58,8 +53,8 @@ logging.basicConfig(
 #     )
 #
 #     # update redis with necessary data i.e expiry list, option chain etc
-#     expiry_list = await get_expiry_list_from_alice_blue()
-#     for instrument_type, expiry in expiry_list.items():
+#     expiry_dict = await get_expiry_list_from_alice_blue()
+#     for instrument_type, expiry in expiry_dict.items():
 #         await _test_async_redis_client.set(instrument_type, json.dumps(expiry))
 #
 #     logging.info(f"Updated redis with expiry list: {datetime.now()}")
@@ -69,12 +64,12 @@ logging.basicConfig(
 #     keys = []
 #     current_expiry_date, next_expiry_date, is_today_expiry = None, None, False
 #     for symbol in symbols:
-#         for index, expiry_date_str in enumerate(expiry_list[InstrumentTypeEnum.OPTIDX][symbol]):
+#         for index, expiry_date_str in enumerate(expiry_dict[InstrumentTypeEnum.OPTIDX][symbol]):
 #             expiry_date = datetime.strptime(expiry_date_str, REDIS_DATE_FORMAT).date()
 #             if todays_date > expiry_date:
 #                 continue
 #             elif expiry_date == todays_date:
-#                 next_expiry_date = expiry_list[index + 1]
+#                 next_expiry_date = expiry_dict[InstrumentTypeEnum.OPTIDX][symbol][index + 1]
 #                 current_expiry_date = expiry_date_str
 #                 is_today_expiry = True
 #                 break
@@ -331,7 +326,7 @@ async def buy_task_payload_dict(test_async_redis_client):
             current_expiry_date,
             next_expiry_date,
             is_today_expiry,
-        ) = await get_current_and_next_expiry(
+        ) = await get_current_and_next_expiry_from_redis(
             test_async_redis_client, StrategySchema.model_validate(strategy_model)
         )
 

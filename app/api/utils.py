@@ -21,6 +21,7 @@ from app.database.models import BrokerModel
 from app.database.models import CFDStrategyModel
 from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema
+from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import CFDPayloadSchema
@@ -50,7 +51,9 @@ async def get_expiry_list_from_redis(async_redis_client, instrument_type, symbol
     return [datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list]
 
 
-async def get_current_and_next_expiry(async_redis_client, strategy_schema: StrategySchema):
+async def get_current_and_next_expiry_from_redis(
+    async_redis_client, strategy_schema: StrategySchema
+):
     todays_date = datetime.now().date()
     if todays_date in current_and_next_expiry_cache:
         return current_and_next_expiry_cache[todays_date]
@@ -61,11 +64,46 @@ async def get_current_and_next_expiry(async_redis_client, strategy_schema: Strat
     expiry_list = await get_expiry_list_from_redis(
         async_redis_client, strategy_schema.instrument_type, strategy_schema.symbol
     )
+
     for index, expiry_date in enumerate(expiry_list):
         if todays_date > expiry_date:
             continue
         elif expiry_date == todays_date:
             next_expiry_date = expiry_list[index + 1]
+            current_expiry_date = expiry_date
+            is_today_expiry = True
+            break
+        elif todays_date < expiry_date:
+            current_expiry_date = expiry_date
+            break
+
+    current_and_next_expiry_cache[todays_date] = (
+        current_expiry_date,
+        next_expiry_date,
+        is_today_expiry,
+    )
+
+    return current_expiry_date, next_expiry_date, is_today_expiry
+
+
+async def get_current_and_next_expiry_from_alice_blue(strategy_schema: StrategySchema):
+    todays_date = datetime.now().date()
+    if todays_date in current_and_next_expiry_cache:
+        return current_and_next_expiry_cache[todays_date]
+
+    is_today_expiry = False
+    current_expiry_date = None
+    next_expiry_date = None
+    expiry_dict = await get_expiry_list_from_alice_blue()
+    expiry_list = expiry_dict[InstrumentTypeEnum.OPTIDX][strategy_schema.symbol]
+    expiry_datetime_obj_list = [
+        datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list
+    ]
+    for index, expiry_date in enumerate(expiry_datetime_obj_list):
+        if todays_date > expiry_date:
+            continue
+        elif expiry_date == todays_date:
+            next_expiry_date = expiry_dict[index + 1]
             current_expiry_date = expiry_date
             is_today_expiry = True
             break

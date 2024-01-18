@@ -58,6 +58,9 @@ class RedisTradeSchema(SignalPayloadSchema):
     received_at: Optional[datetime] = Field(
         description="Received At", example="2023-05-22 05:11:01.117358", default=None
     )
+    action: Optional[SignalTypeEnum] = Field(
+        description="buy or sell signal", example="buy", default=None
+    )
 
     class Config(BaseConfig):
         exclude = {"symbol", "receive_at"}
@@ -101,6 +104,9 @@ class EntryTradeSchema(SignalPayloadSchema):
 
     expiry: date = Field(description="Expiry", example="2023-05-22")
     instrument: str = Field(description="Instrument name", example="BANKNIFTY27APR23FUT")
+    action: Optional[SignalTypeEnum] = Field(
+        description="buy or sell signal", example="buy", default=None
+    )
 
     @model_validator(mode="before")
     def populate_instrument(cls, values):

@@ -8,7 +8,7 @@ from httpx import AsyncClient
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
-from app.api.utils import get_current_and_next_expiry
+from app.api.utils import get_current_and_next_expiry_from_redis
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
@@ -48,7 +48,7 @@ async def rollover_to_next_expiry():
                 current_expiry,
                 next_expiry,
                 todays_expiry,
-            ) = await get_current_and_next_expiry(async_redis_client, strategy_schema)
+            ) = await get_current_and_next_expiry_from_redis(async_redis_client, strategy_schema)
 
             if not todays_expiry:
                 continue

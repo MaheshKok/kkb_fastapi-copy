@@ -193,7 +193,7 @@ async def push_trade_to_redis(
     redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
     redis_trades_json = await async_redis_client.hget(redis_key, redis_hash)
     new_trade_json = RedisTradeSchema.model_validate(trade_model).model_dump_json(
-        exclude={"received_at"}
+        exclude={"received_at"}, exclude_none=True
     )
     redis_trades_list = []
     if redis_trades_json:
@@ -221,11 +221,14 @@ async def dump_trade_in_db_and_redis(
             entry_price=entry_price,
             future_entry_price=future_entry_price,
             entry_received_at=signal_payload_schema.received_at,
-            **signal_payload_schema.model_dump(exclude={"premium"}),
+            **signal_payload_schema.model_dump(exclude={"premium", "action"}),
         )
 
         trade_model = TradeModel(
-            **trade_schema.model_dump(exclude={"premium", "broker_id", "symbol", "received_at"})
+            **trade_schema.model_dump(
+                exclude={"premium", "broker_id", "symbol", "received_at", "action"},
+                exclude_none=True,
+            )
         )
         async_session.add(trade_model)
         await async_session.commit()

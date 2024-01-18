@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import select
 
-from app.api.utils import get_current_and_next_expiry
+from app.api.utils import get_current_and_next_expiry_from_redis
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
@@ -35,7 +35,9 @@ async def sell_task_args(test_async_redis_client, take_away_profit=False, ce_tra
             current_expiry_date,
             next_expiry_date,
             is_today_expiry,
-        ) = await get_current_and_next_expiry(test_async_redis_client, datetime.now().date())
+        ) = await get_current_and_next_expiry_from_redis(
+            test_async_redis_client, datetime.now().date()
+        )
 
         post_trade_payload["strategy_id"] = strategy_model.id
         post_trade_payload["symbol"] = strategy_model.symbol

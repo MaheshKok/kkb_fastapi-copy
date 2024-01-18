@@ -6,7 +6,6 @@ import factory
 
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
-from app.schemas.enums import SignalTypeEnum
 from app.test.factory.base_factory import AsyncSQLAlchemyFactory
 from app.test.factory.create_async_session import async_session
 from app.test.factory.strategy import StrategyFactory
@@ -35,8 +34,6 @@ class LiveTradeFactory(AsyncSQLAlchemyFactory):
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)
     quantity = 25
-    action = SignalTypeEnum.BUY
-
     entry_price = 400.0
 
     future_entry_price_received = 44300.0
@@ -63,7 +60,6 @@ class CompletedTradeFactory(AsyncSQLAlchemyFactory):
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)
     quantity = 25
-    action = SignalTypeEnum.BUY
 
     entry_price = 400.0
     exit_price = 500.0
