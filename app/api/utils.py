@@ -144,6 +144,32 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
 def get_lots_to_trade_and_profit_or_loss(
     funds_to_use, strategy_schema: CFDStrategySchema | StrategySchema, ongoing_profit_or_loss
 ):
+    def _get_lots_to_trade(strategy_funds_to_trade, strategy_schema):
+        # below is the core of this function do not mendle with it
+        # Calculate the quantity that can be traded in the current period
+        approx_lots_to_trade = strategy_funds_to_trade * (
+            Decimal(strategy_schema.min_quantity)
+            / Decimal(strategy_schema.margin_for_min_quantity)
+        )
+
+        to_increment = Decimal(strategy_schema.incremental_step_size)
+        closest_lots_to_trade = (approx_lots_to_trade // to_increment) * to_increment
+
+        while closest_lots_to_trade + to_increment <= approx_lots_to_trade:
+            closest_lots_to_trade += to_increment
+
+        if closest_lots_to_trade + to_increment == approx_lots_to_trade:
+            lots_to_trade = closest_lots_to_trade + to_increment
+        else:
+            lots_to_trade = closest_lots_to_trade
+
+        # Add rounding here
+        lots_to_trade = lots_to_trade.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+
+        # Convert the result back to a float for consistency with your existing code
+        lots_to_trade = float(lots_to_trade)
+        return lots_to_trade
+
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
 
     getcontext().prec = 28  # Set a high precision
@@ -159,34 +185,35 @@ def get_lots_to_trade_and_profit_or_loss(
         # ) / (1 + drawdown_percentage)
         #
 
-        if funds_to_use < ongoing_profit_or_loss:
-            funds_to_trade = Decimal(strategy_schema.funds + (funds_to_use * 0.95))
-            to_update_profit_or_loss_in_db = funds_to_use
-        else:
-            funds_to_trade = Decimal(strategy_schema.funds + (ongoing_profit_or_loss * 0.95))
-            to_update_profit_or_loss_in_db = ongoing_profit_or_loss
+        # i think below code doesnt make any sense as i have seen if available funds are in negative still i can trade in broker,
+        # dont know how it works in indian broker like zerodha , keeping it for now
+        # if funds_to_use < ongoing_profit_or_loss:
+        #     funds_to_trade = Decimal(strategy_schema.funds + (funds_to_use * 0.95))
+        #     to_update_profit_or_loss_in_db = funds_to_use
+        # else:
+        #     funds_to_trade = Decimal(strategy_schema.funds + (ongoing_profit_or_loss * 0.95))
+        #     to_update_profit_or_loss_in_db = ongoing_profit_or_loss
 
+        strategy_funds_to_trade = Decimal(
+            (strategy_schema.funds + ongoing_profit_or_loss) * strategy_schema.funds_usage_percent
+        )
+
+        if strategy_funds_to_trade < Decimal(strategy_schema.margin_for_min_quantity):
+            strategy_funds_to_trade = Decimal(strategy_schema.margin_for_min_quantity)
+
+        to_update_profit_or_loss_in_db = ongoing_profit_or_loss
         if not strategy_schema.compounding:
-            return strategy_schema.contracts, to_update_profit_or_loss_in_db
-
-        # Calculate the quantity that can be traded in the current period
-        approx_lots_to_trade = funds_to_trade / (
-            Decimal(strategy_schema.margin_for_min_quantity)
-            / Decimal(strategy_schema.min_quantity)
-        )
-
-        # Round down to the nearest multiple of
-        # cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size
-        to_round_down = Decimal(strategy_schema.min_quantity) + Decimal(
-            strategy_schema.incremental_step_size
-        )
-        lots_to_trade = (approx_lots_to_trade // to_round_down) * to_round_down
-
-        # Add rounding here
-        lots_to_trade = lots_to_trade.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-
-        # Convert the result back to a float for consistency with your existing code
-        lots_to_trade = float(lots_to_trade)
+            funds_required_for_contracts = Decimal(
+                (strategy_schema.margin_for_min_quantity / strategy_schema.min_quantity)
+                * strategy_schema.contracts
+            )
+            available_funds = Decimal(strategy_schema.funds + ongoing_profit_or_loss)
+            if funds_required_for_contracts <= available_funds:
+                lots_to_trade = strategy_schema.contracts
+            else:
+                lots_to_trade = _get_lots_to_trade(available_funds, strategy_schema)
+        else:
+            lots_to_trade = _get_lots_to_trade(strategy_funds_to_trade, strategy_schema)
 
         if isinstance(strategy_schema, CFDStrategySchema):
             demo_or_live = "DEMO" if strategy_schema.is_demo else "LIVE"
@@ -312,10 +339,6 @@ async def get_funds_to_use(client, cfd_strategy_schema: CFDStrategySchema) -> fl
         try:
             all_accounts = await client.all_accounts()
             available_funds = all_accounts["accounts"][0]["balance"]["available"]
-            if cfd_strategy_schema.compounding:
-                available_funds = round(
-                    available_funds * cfd_strategy_schema.funds_usage_percent, 2
-                )
             return available_funds
 
         except Exception as e:
