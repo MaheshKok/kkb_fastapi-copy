@@ -10,10 +10,10 @@ from app.api.endpoints.cron_api import cron_api
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.strategy import strategy_router
 from app.api.endpoints.takeaway_profit import takeaway_profit
-from app.api.endpoints.trade import binance_router
-from app.api.endpoints.trade import forex_router
-from app.api.endpoints.trade import options_router
 from app.api.endpoints.trade import trading_router
+from app.api.endpoints.trade.cfd import forex_router
+from app.api.endpoints.trade.crypto import binance_router
+from app.api.endpoints.trade.indian_futures_and_options import options_router
 from app.core.config import get_config
 from app.database.base import engine_kw
 from app.database.base import get_db_url

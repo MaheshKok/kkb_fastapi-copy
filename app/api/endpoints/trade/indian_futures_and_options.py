@@ -7,7 +7,6 @@ from http.client import HTTPException  # noqa
 from typing import List
 
 from aioredis import Redis
-from binance.client import AsyncClient as BinanceAsyncClient
 from fastapi import APIRouter
 from fastapi import Depends
 from httpx import AsyncClient
@@ -16,15 +15,10 @@ from sqlalchemy import select
 
 from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
-from app.api.dependency import get_cfd_strategy_schema
 from app.api.dependency import get_strategy_schema
-from app.api.utils import close_capital_lots
-from app.api.utils import get_capital_cfd_existing_profit_or_loss
+from app.api.endpoints.trade import trading_router
 from app.api.utils import get_current_and_next_expiry_from_redis
-from app.api.utils import get_funds_to_use
 from app.api.utils import get_lots_to_trade_and_profit_or_loss
-from app.api.utils import open_capital_lots
-from app.broker.AsyncCapital import AsyncCapitalClient
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum
@@ -33,8 +27,6 @@ from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
-from app.schemas.trade import BinanceFuturesPayloadSchema
-from app.schemas.trade import CFDPayloadSchema
 from app.schemas.trade import DBEntryTradeSchema
 from app.schemas.trade import FuturesPayloadSchema
 from app.schemas.trade import RedisTradeSchema
@@ -50,10 +42,6 @@ logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-trading_router = APIRouter(
-    prefix="/api/trading",
-    tags=["trading"],
-)
 
 options_router = APIRouter(
     prefix=f"{trading_router.prefix}/nfo",
@@ -64,131 +52,6 @@ futures_router = APIRouter(
     prefix=f"{trading_router.prefix}/nfo",
     tags=["futures"],
 )
-
-forex_router = APIRouter(
-    prefix=f"{trading_router.prefix}/cfd",
-    tags=["forex"],
-)
-
-
-binance_router = APIRouter(
-    prefix=f"{trading_router.prefix}/binance",
-    tags=["binance"],
-)
-
-
-@binance_router.post("/futures", status_code=200)
-async def post_binance_futures(futures_payload_schema: BinanceFuturesPayloadSchema):
-    if futures_payload_schema.is_live:
-        api_key = "8eV439YeuT1JM5mYF0mX34jKSOakRukolfGayaF9Sj6FMBC4FV1qTHKUqycrpQ4T"
-        api_secret = "gFdKzcNXMvDoNfy1YbLNuS0hifnpE5gphs9iTkkyECv6TuYz5pRM4U4vwoNPQy6Q"
-        bnc_async_client = BinanceAsyncClient(
-            api_key=api_key, api_secret=api_secret, testnet=False
-        )
-    else:
-        api_key = "75d5c54b190c224d6527440534ffe2bfa2afb34c0ccae79beadf560b9d2c5c56"
-        api_secret = "db135fa6b2de30c06046891cc1eecfb50fddff0a560043dcd515fd9a57807a37"
-        bnc_async_client = BinanceAsyncClient(
-            api_key=api_key, api_secret=api_secret, testnet=True
-        )
-
-    ltp = round(float(futures_payload_schema.ltp), 2)
-    if futures_payload_schema.symbol == "BTCUSDT":
-        offset = 5
-        ltp = int(ltp)
-    elif futures_payload_schema.symbol == "ETHUSDT":
-        offset = 0.5
-    elif futures_payload_schema.symbol == "LTCUSDT":
-        offset = 0.05
-    elif futures_payload_schema.symbol == "ETCUSDT":
-        offset = 0.03
-    else:
-        return f"Invalid Symbol: {futures_payload_schema.symbol}"
-
-    if futures_payload_schema.side == SignalTypeEnum.BUY.value.upper():
-        price = round(ltp + offset, 2)
-    else:
-        price = round(ltp - offset, 2)
-
-    attempt = 1
-    while attempt <= 10:
-        try:
-            existing_position = await bnc_async_client.futures_position_information(
-                symbol=futures_payload_schema.symbol
-            )
-
-            existing_quantity = 0
-            if existing_position:
-                existing_quantity = abs(float(existing_position[0]["positionAmt"]))
-
-            quantity_to_place = round(futures_payload_schema.quantity + existing_quantity, 2)
-            result = await bnc_async_client.futures_create_order(
-                symbol=futures_payload_schema.symbol,
-                side=futures_payload_schema.side,
-                type=futures_payload_schema.type,
-                quantity=quantity_to_place,
-                timeinforce="GTC",
-                price=price,
-            )
-            return result
-        except Exception as e:
-            msg = f"Error occured while placing binance order, Error: {e}"
-            logging.error(msg)
-            attempt += 1
-            await asyncio.sleep(1)
-
-
-@forex_router.post("/", status_code=200)
-async def post_cfd(
-    cfd_payload_schema: CFDPayloadSchema,
-    cfd_strategy_schema: CFDStrategySchema = Depends(get_cfd_strategy_schema),
-):
-    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
-    logging.info(
-        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] received"
-    )
-
-    client = AsyncCapitalClient(
-        username="maheshkokare100@gmail.com",
-        password="SUua9Ydc83G.i!d",
-        api_key="qshPG64m0RCWQ3fe",
-        demo=cfd_strategy_schema.is_demo,
-    )
-
-    profit_or_loss, current_open_lots, direction = await get_capital_cfd_existing_profit_or_loss(
-        client, cfd_strategy_schema
-    )
-
-    if current_open_lots:
-        position_reversed = await close_capital_lots(
-            client=client,
-            cfd_strategy_schema=cfd_strategy_schema,
-            cfd_payload_schema=cfd_payload_schema,
-            demo_or_live=demo_or_live,
-            lots_to_close=current_open_lots,
-            profit_or_loss=profit_or_loss,
-        )
-
-        if position_reversed:
-            msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots [ {current_open_lots} ] are reversed in [ {direction} ] direction,  hence skipping opening new positions"
-            logging.info(msg)
-            return msg
-
-    if direction != cfd_payload_schema.direction.upper():
-        funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
-
-        return await open_capital_lots(
-            client=client,
-            cfd_strategy_schema=cfd_strategy_schema,
-            cfd_payload_schema=cfd_payload_schema,
-            demo_or_live=demo_or_live,
-            profit_or_loss=profit_or_loss,
-            funds_to_use=funds_to_use,
-        )
-    else:
-        msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] is same as current direction, hence skipping opening new positions"
-        logging.info(msg)
-        return msg
 
 
 @trading_router.get("/", status_code=200, response_model=List[DBEntryTradeSchema])

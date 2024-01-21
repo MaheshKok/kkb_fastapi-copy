@@ -339,8 +339,9 @@ async def get_funds_to_use(client, cfd_strategy_schema: CFDStrategySchema) -> fl
             available_funds = all_accounts["accounts"][0]["balance"]["available"]
             return available_funds
 
-        except Exception as e:
-            response, status_code, text = e.args
+        except httpx.HTTPStatusError as error:
+            response = error.response
+            status_code, text = response.status_code, response.text
             if status_code == 429:
                 get_all_positions_attempt += 1
                 await asyncio.sleep(2)
