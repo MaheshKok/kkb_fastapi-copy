@@ -39,7 +39,7 @@ class StrategyModel(Base):
     # strategy details
     name = Column(String, nullable=False, default="Renko Strategy Every Candle")
 
-    premium = Column(Float, nullable=False, default=350.0)
+    premium = Column(Float, nullable=True, default=350.0)
 
     funds = Column(Float, nullable=True)
 
