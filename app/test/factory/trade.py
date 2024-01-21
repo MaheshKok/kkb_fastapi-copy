@@ -6,7 +6,6 @@ import factory
 
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
-from app.schemas.enums import PositionEnum
 from app.test.factory.base_factory import AsyncSQLAlchemyFactory
 from app.test.factory.create_async_session import async_session
 from app.test.factory.strategy import StrategyFactory
@@ -15,7 +14,7 @@ from app.test.factory.strategy import StrategyFactory
 def generate_expiry_date():
     today = datetime.today()
     current_weekday = today.weekday()
-    days_ahead = (3 - current_weekday) % 7  # 3 represents Thursday (Monday is 0, Sunday is 6)
+    days_ahead = (2 - current_weekday) % 7  # 3 represents Thursday (Monday is 0, Sunday is 6)
     next_thursday = today + timedelta(days=days_ahead)
     return next_thursday
 
@@ -35,8 +34,6 @@ class LiveTradeFactory(AsyncSQLAlchemyFactory):
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)
     quantity = 25
-    position = PositionEnum.LONG
-
     entry_price = 400.0
 
     future_entry_price_received = 44300.0
@@ -63,7 +60,6 @@ class CompletedTradeFactory(AsyncSQLAlchemyFactory):
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)
     quantity = 25
-    position = PositionEnum.LONG
 
     entry_price = 400.0
     exit_price = 500.0

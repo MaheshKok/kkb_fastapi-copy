@@ -9,31 +9,35 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import model_validator
 
-from app.schemas.enums import DirectionEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
+from app.schemas.enums import SignalTypeEnum
 
 
 class SignalPayloadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    quantity: int = Field(description="Quantity", example=25)
     future_entry_price_received: float = Field(description="Future Entry Price", example=40600.5)
     strategy_id: uuid.UUID = Field(
         description="Strategy ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3"
     )
-    option_type: OptionTypeEnum = Field(
+    received_at: datetime = Field(description="Received At", example="2023-05-22 05:11:01.117358")
+    action: SignalTypeEnum = Field(description="buy or sell signal", example="buy")
+    strike: Optional[float] = Field(description="Strike", example=42500.0, default=0.0)
+
+    # TODO: try removing option_type and expiry as they are set on tradeschema and then accessed
+    # rather have it send as arguments to the function
+
+    # option type is decided based on strategy's position column
+    # if strategy position is long and signal action is buy, then option type is CE else PE
+    # if strategy position is short and signal action is buy, then option type is PE else CE
+    option_type: Optional[OptionTypeEnum] = Field(
         description="Option Type",
         example="CE",
-    )
-    received_at: datetime = Field(description="Received At", example="2023-05-22 05:11:01.117358")
-    premium: Optional[float] = Field(description="Premium", example=350.0, default=0.0)
-    strike: Optional[float] = Field(description="Strike", example=42500.0, default=0.0)
-    position: PositionEnum = Field(description="Position", example="LONG")
-    broker_id: Optional[uuid.UUID] = Field(
-        description="Broker ID", example="dd9acef9-e6c4-4792-9d43-d266b4d685c3", default=None
+        default="",
     )
     expiry: Optional[date] = Field(description="Expiry", example="2023-06-16", default=None)
+    quantity: Optional[int] = Field(description="Quantity", example=15, default=0)
 
 
 class RedisTradeSchema(SignalPayloadSchema):
@@ -53,6 +57,9 @@ class RedisTradeSchema(SignalPayloadSchema):
     symbol: Optional[str] = Field(description="Symbol", example="BANKNIFTY", default="")
     received_at: Optional[datetime] = Field(
         description="Received At", example="2023-05-22 05:11:01.117358", default=None
+    )
+    action: Optional[SignalTypeEnum] = Field(
+        description="buy or sell signal", example="buy", default=None
     )
 
     class Config(BaseConfig):
@@ -97,10 +104,13 @@ class EntryTradeSchema(SignalPayloadSchema):
 
     expiry: date = Field(description="Expiry", example="2023-05-22")
     instrument: str = Field(description="Instrument name", example="BANKNIFTY27APR23FUT")
+    action: Optional[SignalTypeEnum] = Field(
+        description="buy or sell signal", example="buy", default=None
+    )
 
     @model_validator(mode="before")
     def populate_instrument(cls, values):
-        # it is must to send symbol
+        # it must send symbol
         if isinstance(values, dict):
             return {
                 **values,
@@ -120,7 +130,7 @@ class DBEntryTradeSchema(BaseModel):
         example="CE",
     )
     instrument: str = Field(description="Instrument", example="BANKNIFTY16JUN2343500CE")
-    position: PositionEnum = Field(description="Position", example="LONG")
+    action: SignalTypeEnum = Field(description="Buy or Sell Action", example="buy")
     entry_price: float = Field(description="Entry Price", example=350.5)
     future_entry_price: float = Field(description="Future Entry Price", example=40600.5)
     future_entry_price_received: float = Field(description="Future Entry Price", example=40600.5)
@@ -139,14 +149,18 @@ class DBEntryTradeSchema(BaseModel):
 class CFDPayloadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     strategy_id: uuid.UUID = Field(description="strategy id")
-    direction: DirectionEnum = Field(description="Position", example="buy")
+    direction: SignalTypeEnum = Field(description="buy or sell signal", example="buy")
+
+
+class FuturesPayloadSchema(CFDPayloadSchema):
+    pass
 
 
 class BinanceFuturesPayloadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     symbol: str = Field(description="Symbol", example="BTCUSDT")
     quantity: float = Field(description="Quantity", example=1)
-    side: DirectionEnum = Field(description="Position", example="buy")
+    side: SignalTypeEnum = Field(description="buy or sell signal", example="buy")
     type: str = Field(description="Type", example="MARKET")
     ltp: float = Field(description="LTP", example="27913")
     is_live: bool = Field(description="trades to be executed on demo account", default=False)

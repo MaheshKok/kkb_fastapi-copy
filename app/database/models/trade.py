@@ -20,7 +20,6 @@ class TradeModel(Base):
     instrument = Column(String, nullable=False, index=True)
 
     quantity = Column(Integer, default=25)
-    position = Column(String, nullable=False, index=True)
 
     entry_price = Column(Float, nullable=False)
     exit_price = Column(Float, nullable=True)

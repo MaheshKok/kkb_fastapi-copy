@@ -31,3 +31,13 @@ class StrategyFactory(AsyncSQLAlchemyFactory):
 
     user = factory.SubFactory(UserFactory)
     created_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(days=n))
+
+    premium = 350.0
+    funds = 200000
+    min_quantity = 15
+    margin_for_min_quantity = 95000
+    incremental_step_size = 15
+    compounding = True
+    # if compounding is True then contracts will be 0.0 and if compounding is False then contracts needs to be set
+    contracts = 0.0
+    funds_usage_percent = 1.0

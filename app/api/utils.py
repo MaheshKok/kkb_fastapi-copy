@@ -1,8 +1,10 @@
 import asyncio
+import io
 import logging
 from datetime import datetime
 
 import httpx
+import pandas as pd
 from _decimal import ROUND_DOWN
 from _decimal import Decimal
 from _decimal import getcontext
@@ -17,6 +19,7 @@ from app.database.models import BrokerModel
 from app.database.models import CFDStrategyModel
 from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema
+from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import CFDPayloadSchema
@@ -24,13 +27,31 @@ from app.utils.constants import REDIS_DATE_FORMAT
 from app.utils.in_memory_cache import current_and_next_expiry_cache
 
 
-async def get_expiry_list(async_redis_client, instrument_type, symbol):
+async def get_expiry_list_from_alice_blue():
+    api = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
+
+    response = await httpx.AsyncClient().get(api)
+    data_stream = io.StringIO(response.text)
+    df = pd.read_csv(data_stream)
+    result = {}
+    for (instrument_type, symbol), group in df.groupby(["Instrument Type", "Symbol"]):
+        if instrument_type not in result:
+            result[instrument_type] = {}
+        expiry_dates = sorted(set(group["Expiry Date"].tolist()))
+        result[instrument_type][symbol] = expiry_dates
+
+    return result
+
+
+async def get_expiry_list_from_redis(async_redis_client, instrument_type, symbol):
     instrument_expiry = await async_redis_client.get(instrument_type)
     expiry_list = eval(instrument_expiry)[symbol]
     return [datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list]
 
 
-async def get_current_and_next_expiry(async_redis_client, strategy_schema: StrategySchema):
+async def get_current_and_next_expiry_from_redis(
+    async_redis_client, strategy_schema: StrategySchema
+):
     todays_date = datetime.now().date()
     if todays_date in current_and_next_expiry_cache:
         return current_and_next_expiry_cache[todays_date]
@@ -38,14 +59,49 @@ async def get_current_and_next_expiry(async_redis_client, strategy_schema: Strat
     is_today_expiry = False
     current_expiry_date = None
     next_expiry_date = None
-    expiry_list = await get_expiry_list(
+    expiry_list = await get_expiry_list_from_redis(
         async_redis_client, strategy_schema.instrument_type, strategy_schema.symbol
     )
+
     for index, expiry_date in enumerate(expiry_list):
         if todays_date > expiry_date:
             continue
         elif expiry_date == todays_date:
             next_expiry_date = expiry_list[index + 1]
+            current_expiry_date = expiry_date
+            is_today_expiry = True
+            break
+        elif todays_date < expiry_date:
+            current_expiry_date = expiry_date
+            break
+
+    current_and_next_expiry_cache[todays_date] = (
+        current_expiry_date,
+        next_expiry_date,
+        is_today_expiry,
+    )
+
+    return current_expiry_date, next_expiry_date, is_today_expiry
+
+
+async def get_current_and_next_expiry_from_alice_blue(strategy_schema: StrategySchema):
+    todays_date = datetime.now().date()
+    if todays_date in current_and_next_expiry_cache:
+        return current_and_next_expiry_cache[todays_date]
+
+    is_today_expiry = False
+    current_expiry_date = None
+    next_expiry_date = None
+    expiry_dict = await get_expiry_list_from_alice_blue()
+    expiry_list = expiry_dict[InstrumentTypeEnum.OPTIDX][strategy_schema.symbol]
+    expiry_datetime_obj_list = [
+        datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list
+    ]
+    for index, expiry_date in enumerate(expiry_datetime_obj_list):
+        if todays_date > expiry_date:
+            continue
+        elif expiry_date == todays_date:
+            next_expiry_date = expiry_dict[index + 1]
             current_expiry_date = expiry_date
             is_today_expiry = True
             break
@@ -83,14 +139,36 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
         return session_id
 
 
-async def get_capital_cfd_lot_to_trade(
-    client, cfd_strategy_schema: CFDStrategySchema, ongoing_profit_or_loss
+def get_lots_to_trade_and_profit_or_loss(
+    funds_to_use, strategy_schema: CFDStrategySchema | StrategySchema, ongoing_profit_or_loss
 ):
-    funds_to_use = await get_available_funds(client, cfd_strategy_schema)
+    def _get_lots_to_trade(strategy_funds_to_trade, strategy_schema):
+        # below is the core of this function do not mendle with it
+        # Calculate the quantity that can be traded in the current period
+        approx_lots_to_trade = strategy_funds_to_trade * (
+            Decimal(strategy_schema.min_quantity)
+            / Decimal(strategy_schema.margin_for_min_quantity)
+        )
+
+        to_increment = Decimal(strategy_schema.incremental_step_size)
+        closest_lots_to_trade = (approx_lots_to_trade // to_increment) * to_increment
+
+        while closest_lots_to_trade + to_increment <= approx_lots_to_trade:
+            closest_lots_to_trade += to_increment
+
+        if closest_lots_to_trade + to_increment == approx_lots_to_trade:
+            lots_to_trade = closest_lots_to_trade + to_increment
+        else:
+            lots_to_trade = closest_lots_to_trade
+
+        # Add rounding here
+        lots_to_trade = lots_to_trade.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+
+        # Convert the result back to a float for consistency with your existing code
+        lots_to_trade = float(lots_to_trade)
+        return lots_to_trade
 
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
-    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
-
     getcontext().prec = 28  # Set a high precision
     try:
         # below code is to secure funds as per drawdown percentage
@@ -104,51 +182,45 @@ async def get_capital_cfd_lot_to_trade(
         # ) / (1 + drawdown_percentage)
         #
 
-        if funds_to_use < ongoing_profit_or_loss:
-            funds_to_trade = Decimal(cfd_strategy_schema.funds + (funds_to_use * 0.95))
-            to_update_profit_or_loss_in_db = funds_to_use
-        else:
-            funds_to_trade = Decimal(cfd_strategy_schema.funds + (ongoing_profit_or_loss * 0.95))
-            to_update_profit_or_loss_in_db = ongoing_profit_or_loss
+        # i think below code doesnt make any sense as i have seen if available funds are in negative still i can trade in broker,
+        # dont know how it works in indian broker like zerodha , keeping it for now
+        # if funds_to_use < ongoing_profit_or_loss:
+        #     funds_to_trade = Decimal(strategy_schema.funds + (funds_to_use * 0.95))
+        #     to_update_profit_or_loss_in_db = funds_to_use
+        # else:
+        #     funds_to_trade = Decimal(strategy_schema.funds + (ongoing_profit_or_loss * 0.95))
+        #     to_update_profit_or_loss_in_db = ongoing_profit_or_loss
 
-        funds_for_1_contract = Decimal(cfd_strategy_schema.margin_for_min_quantity) / Decimal(
-            cfd_strategy_schema.min_quantity
+        strategy_funds_to_trade = Decimal(
+            (strategy_schema.funds + ongoing_profit_or_loss) * strategy_schema.funds_usage_percent
         )
 
-        if not cfd_strategy_schema.compounding:
-            funds_required_for_contracts = (
-                Decimal(cfd_strategy_schema.contracts) * funds_for_1_contract
+        if strategy_funds_to_trade < Decimal(strategy_schema.margin_for_min_quantity):
+            strategy_funds_to_trade = Decimal(strategy_schema.margin_for_min_quantity)
+
+        to_update_profit_or_loss_in_db = ongoing_profit_or_loss
+        if not strategy_schema.compounding:
+            funds_required_for_contracts = Decimal(
+                (strategy_schema.margin_for_min_quantity / strategy_schema.min_quantity)
+                * strategy_schema.contracts
             )
-            funds_available = Decimal(cfd_strategy_schema.funds) + Decimal(
-                to_update_profit_or_loss_in_db
-            )
-            if funds_required_for_contracts < funds_available:
-                return cfd_strategy_schema.contracts, to_update_profit_or_loss_in_db
+            available_funds = Decimal(strategy_schema.funds + ongoing_profit_or_loss)
+            if funds_required_for_contracts <= available_funds:
+                lots_to_trade = strategy_schema.contracts
             else:
-                contracts_in_available_funds = funds_available / funds_for_1_contract
-                # Add rounding here
-                contracts_in_available_funds = contracts_in_available_funds.quantize(
-                    Decimal("0.01"), rounding=ROUND_DOWN
-                )
-                return float(contracts_in_available_funds), to_update_profit_or_loss_in_db
+                lots_to_trade = _get_lots_to_trade(available_funds, strategy_schema)
+        else:
+            lots_to_trade = _get_lots_to_trade(strategy_funds_to_trade, strategy_schema)
 
-        # Calculate the quantity that can be traded in the current period
-        approx_lots_to_trade = funds_to_trade / funds_for_1_contract
+        if isinstance(strategy_schema, CFDStrategySchema):
+            demo_or_live = "DEMO" if strategy_schema.is_demo else "LIVE"
+            symbol = strategy_schema.instrument
+        else:
+            demo_or_live = "DEMO" if strategy_schema.broker_id else "LIVE"
+            symbol = strategy_schema.symbol
 
-        # Round down to the nearest multiple of
-        # cfd_strategy_schema.min_quantity + cfd_strategy_schema.incremental_step_size
-        to_round_down = Decimal(cfd_strategy_schema.min_quantity) + Decimal(
-            cfd_strategy_schema.incremental_step_size
-        )
-        lots_to_trade = (approx_lots_to_trade // to_round_down) * to_round_down
-
-        # Add rounding here
-        lots_to_trade = lots_to_trade.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-
-        # Convert the result back to a float for consistency with your existing code
-        lots_to_trade = float(lots_to_trade)
         logging.info(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots to open [ {lots_to_trade} ], to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db} ]"
+            f"[ {demo_or_live} {symbol} ] : lots to open [ {lots_to_trade} ], to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db} ]"
         )
         return lots_to_trade, to_update_profit_or_loss_in_db
 
@@ -238,7 +310,7 @@ async def get_all_open_orders(
 
 
 async def get_capital_cfd_existing_profit_or_loss(
-    client, cfd_strategy_schema: CFDStrategySchema
+    client: AsyncCapitalClient, cfd_strategy_schema: CFDStrategySchema
 ) -> tuple[int, int, str | None]:
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
     direction = None
@@ -257,7 +329,7 @@ async def get_capital_cfd_existing_profit_or_loss(
     return round(profit_or_loss, 2), existing_lot, direction
 
 
-async def get_available_funds(client, cfd_strategy_schema: CFDStrategySchema) -> float:
+async def get_funds_to_use(client, cfd_strategy_schema: CFDStrategySchema) -> float:
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
 
     get_all_positions_attempt = 1
@@ -265,15 +337,10 @@ async def get_available_funds(client, cfd_strategy_schema: CFDStrategySchema) ->
         try:
             all_accounts = await client.all_accounts()
             available_funds = all_accounts["accounts"][0]["balance"]["available"]
-            if cfd_strategy_schema.compounding:
-                available_funds = round(
-                    available_funds * cfd_strategy_schema.funds_usage_percent, 2
-                )
             return available_funds
-        except httpx.HTTPStatusError as error:
-            response = error.response
-            status_code, text = response.status_code, response.text
 
+        except Exception as e:
+            response, status_code, text = e.args
             if status_code == 429:
                 get_all_positions_attempt += 1
                 await asyncio.sleep(2)
@@ -467,9 +534,10 @@ async def open_capital_lots(
     cfd_payload_schema: CFDPayloadSchema,
     demo_or_live: str,
     profit_or_loss: float,
+    funds_to_use=float,
 ):
-    lots_to_open, update_profit_or_loss_in_db = await get_capital_cfd_lot_to_trade(
-        client, cfd_strategy_schema, profit_or_loss
+    lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
+        funds_to_use, cfd_strategy_schema, profit_or_loss
     )
 
     place_order_attempt = 1
@@ -502,11 +570,13 @@ async def open_capital_lots(
                     logging.info(
                         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] calculating lots to open again as available funds are updated"
                     )
+                    funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
+
                     (
                         lots_to_open,
                         update_profit_or_loss_in_db,
-                    ) = await get_capital_cfd_lot_to_trade(
-                        client, cfd_strategy_schema, profit_or_loss
+                    ) = get_lots_to_trade_and_profit_or_loss(
+                        funds_to_use, cfd_strategy_schema, profit_or_loss
                     )
                     place_order_attempt += 1
                     await client.__log_out__()

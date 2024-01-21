@@ -13,12 +13,12 @@ from app.schemas.strategy import StrategySchema
 
 
 strategy_router = APIRouter(
-    prefix="/api/strategy",
+    prefix="/api",
     tags=["strategy"],
 )
 
 
-@strategy_router.get("", response_model=list[StrategySchema])
+@strategy_router.get("/strategy", response_model=list[StrategySchema])
 async def get_strategies():
     async with Database() as async_session:
         fetch_strategy_query = await async_session.execute(select(StrategyModel))
@@ -26,7 +26,7 @@ async def get_strategies():
         return strategy_models
 
 
-@strategy_router.post("", response_model=StrategySchema)
+@strategy_router.post("/strategy", response_model=StrategySchema)
 async def post_strategy(
     strategy_schema: StrategyCreateSchema,
     async_redis_client: Redis = Depends(get_async_redis_client),

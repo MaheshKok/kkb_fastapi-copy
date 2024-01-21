@@ -601,7 +601,7 @@ class Pya3Aliceblue(Aliceblue):
             key = f"{symbol} {expiry_date.strftime(ALICE_BLUE_DATE_FORMAT).upper()} {FUT}"
         else:
             # TODO: remove conversion of strik to float when in redis we start storing strike as float
-            key = f"{symbol} {expiry_date.strftime(ALICE_BLUE_DATE_FORMAT).upper()} {int(strike)} {OptionType.CE if is_CE else OptionType.PE}"
+            key = f"{symbol}{expiry_date.strftime(ALICE_BLUE_DATE_FORMAT).upper()}{OptionType.CE[0] if is_CE else OptionType.PE[0]}{int(strike)}"
 
         instrument_json = await async_redis_client.get(key)
         result = json.loads(instrument_json or "{}")
@@ -610,7 +610,7 @@ class Pya3Aliceblue(Aliceblue):
                 result["Exch"],
                 result["Token"],
                 result["Symbol"],
-                result["Trading Symbol"],
+                key,
                 result["Expiry Date"],
                 result["Lot Size"],
             )

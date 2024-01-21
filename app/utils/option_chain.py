@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from app.api.utils import get_expiry_list
+from app.api.utils import get_expiry_list_from_redis
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.utils.constants import OptionType
@@ -20,7 +20,7 @@ async def get_option_chain(
 
     if is_future:
         current_month_number = datetime.now().date().month
-        expiry_list = await get_expiry_list(
+        expiry_list = await get_expiry_list_from_redis(
             async_redis_client, InstrumentTypeEnum.FUTIDX, strategy_schema.symbol
         )
         for _, expiry_date in enumerate(expiry_list):

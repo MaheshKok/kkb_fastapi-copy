@@ -7,7 +7,6 @@ from aioredis import Redis
 from fastapi import HTTPException
 from httpx import AsyncClient
 
-from app.api.utils import get_expiry_list
 from app.broker.utils import buy_alice_blue_trades
 from app.broker.utils import close_alice_blue_trades
 from app.schemas.enums import InstrumentTypeEnum
@@ -41,46 +40,57 @@ async def get_exit_price_from_option_chain(
     return {strike: option_chain[strike] for strike in strikes}
 
 
-async def get_monthly_expiry_date(async_redis_client, instrument_type, symbol) -> datetime:
-    """
-    if expiry_list = ["06 Jul 2023", "13 Jul 2023", "20 Jul 2023", "27 Jul 2023", "03 Aug 2023", "31 Aug 2023", "28 Sep 2023", "28 Dec 2023", "31 Dec 2026", "24 Jun 2027", "30 Dec 2027"]
-    and today is 27th June then we have to find july months expiry
+def strip_previous_expiry_dates(expiry_list_date_obj):
+    todays_date = datetime.today().date()
+    upcoming_expiry_dates = [_date for _date in expiry_list_date_obj if _date >= todays_date]
+    return upcoming_expiry_dates
 
-    logic:
-        start iterating over expiry list till second last expiry_date
-        now check if the current item expiry date month is less then next expiry_date in list
 
-    if today is june then current month will be set to july month and thats why logic will work
+async def get_monthly_expiry_date(*, async_redis_client, instrument_type, symbol):
+    symbol_expiry_str = await async_redis_client.get(instrument_type)
+    symbol_expiry = json.loads(symbol_expiry_str)
+    expiry_list_date_obj = [
+        datetime.strptime(expiry, "%Y-%m-%d").date() for expiry in symbol_expiry[symbol]
+    ]
+    expiry_list_date_obj = strip_previous_expiry_dates(expiry_list_date_obj)
+    current_month_expiry = expiry_list_date_obj[0]
+    next_month_expiry = None
+    is_today_months_expiry = False
 
-    """
+    for i in range(1, len(expiry_list_date_obj)):
+        if (
+            expiry_list_date_obj[i].month != expiry_list_date_obj[i - 1].month
+        ):  # If a change of month is detected in the list
+            # Save the last date of the previous month
+            if expiry_list_date_obj[i - 1].month == datetime.now().month:  # adjust this as needed
+                current_month_expiry = expiry_list_date_obj[i - 1]
+                if current_month_expiry == datetime.now().date():
+                    is_today_months_expiry = True
+            elif expiry_list_date_obj[i - 1].month == ((datetime.now().month % 12) + 1):
+                next_month_expiry = expiry_list_date_obj[i - 1]
+        # Catch the last date of the next month, in case the loop finishes
+        elif i == len(expiry_list_date_obj) - 1 and expiry_list_date_obj[i].month == (
+            (datetime.now().month % 12) + 1
+        ):
+            next_month_expiry = expiry_list_date_obj[i]
 
-    expiry_dates = await get_expiry_list(async_redis_client, instrument_type, symbol)
-    monthly_expiry_date = None
-
-    current_month = datetime.now().date().month
-    if current_month < expiry_dates[0].month:
-        current_month = current_month + 1
-
-    for index, expiry_date in enumerate(expiry_dates[:-1]):
-        if current_month < expiry_dates[index + 1].month:
-            monthly_expiry_date = expiry_date
-            break
-
-    return monthly_expiry_date
+    return current_month_expiry, next_month_expiry, is_today_months_expiry
 
 
 async def get_future_price(async_redis_client, strategy_schema) -> float:
-    monthly_expiry_date = await get_monthly_expiry_date(
-        async_redis_client, InstrumentTypeEnum.FUTIDX, strategy_schema.symbol
+    current_month_expiry, _, _ = await get_monthly_expiry_date(
+        async_redis_client=async_redis_client,
+        instrument_type=InstrumentTypeEnum.FUTIDX,
+        symbol=strategy_schema.symbol,
     )
 
     # I hope this never happens
-    if not monthly_expiry_date:
+    if not current_month_expiry:
         return 0.0
 
     future_option_chain = await get_option_chain(
         async_redis_client=async_redis_client,
-        expiry=monthly_expiry_date,
+        expiry=current_month_expiry,
         strategy_schema=strategy_schema,
         is_future=True,
     )
@@ -123,10 +133,10 @@ async def get_strike_and_exit_price_dict(
 
 
 async def get_strike_and_entry_price_from_option_chain(
-    option_chain, signal_payload_schema: SignalPayloadSchema
+    *, option_chain, signal_payload_schema: SignalPayloadSchema, premium: float
 ):
     strike = signal_payload_schema.strike
-    premium = signal_payload_schema.premium
+    premium = premium
     future_price = signal_payload_schema.future_entry_price_received
 
     # use bisect to find the strike and its price from option chain
@@ -161,7 +171,9 @@ async def get_strike_and_entry_price(
     async_httpx_client: AsyncClient,
 ) -> tuple[float, float]:
     strike, premium = await get_strike_and_entry_price_from_option_chain(
-        option_chain=option_chain, signal_payload_schema=signal_payload_schema
+        option_chain=option_chain,
+        signal_payload_schema=signal_payload_schema,
+        premium=strategy_schema.premium,
     )
 
     if strategy_schema.broker_id:

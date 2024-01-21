@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
+from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.strategy import StrategySchema
@@ -140,7 +141,7 @@ async def calculate_profits(
     for trade in redis_trade_schema_list:
         entry_price = trade.entry_price
         quantity = trade.quantity
-        position = trade.position
+        position = strategy_schema.position
         exit_price = strike_exit_price_dict.get(trade.strike) or 0.0
         if not exit_price:
             # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker
@@ -192,7 +193,7 @@ async def push_trade_to_redis(
     redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
     redis_trades_json = await async_redis_client.hget(redis_key, redis_hash)
     new_trade_json = RedisTradeSchema.model_validate(trade_model).model_dump_json(
-        exclude={"received_at"}
+        exclude={"received_at"}, exclude_none=True
     )
     redis_trades_list = []
     if redis_trades_json:
@@ -220,11 +221,14 @@ async def dump_trade_in_db_and_redis(
             entry_price=entry_price,
             future_entry_price=future_entry_price,
             entry_received_at=signal_payload_schema.received_at,
-            **signal_payload_schema.model_dump(exclude={"premium"}),
+            **signal_payload_schema.model_dump(exclude={"premium", "action"}),
         )
 
         trade_model = TradeModel(
-            **trade_schema.model_dump(exclude={"premium", "broker_id", "symbol", "received_at"})
+            **trade_schema.model_dump(
+                exclude={"premium", "broker_id", "symbol", "received_at", "action"},
+                exclude_none=True,
+            )
         )
         async_session.add(trade_model)
         await async_session.commit()
@@ -234,7 +238,7 @@ async def dump_trade_in_db_and_redis(
         await push_trade_to_redis(async_redis_client, trade_model, async_session)
 
 
-async def update_trades_in_db(
+async def close_trades_in_db_and_remove_from_redis(
     *,
     updated_data: dict,
     strategy_schema: StrategySchema,
@@ -292,56 +296,151 @@ async def task_entry_trade(
     async_redis_client: aioredis.StrictRedis,
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
+    only_futures: bool = False,
 ):
-    option_chain = await get_option_chain(
-        async_redis_client=async_redis_client,
-        expiry=signal_payload_schema.expiry,
-        option_type=signal_payload_schema.option_type,
-        strategy_schema=strategy_schema,
-    )
-
-    strike_and_entry_price, future_entry_price = await asyncio.gather(
-        get_strike_and_entry_price(
-            option_chain=option_chain,
-            signal_payload_schema=signal_payload_schema,
-            strategy_schema=strategy_schema,
-            async_redis_client=async_redis_client,
-            async_httpx_client=async_httpx_client,
-        ),
-        get_future_price(
+    if only_futures:
+        future_entry_price = await get_future_price(
             async_redis_client=async_redis_client,
             strategy_schema=strategy_schema,
-        ),
-    )
-
-    strike, entry_price = strike_and_entry_price
-
-    # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
-    if not strike:
-        logging.info(
-            f"Strategy: [ {strategy_schema.name} ], skipping entry of new tradde as strike is Null: {entry_price}"
         )
-        return None
+        logging.info(
+            f"Strategy: [ {strategy_schema.name} ], new trade with future entry price: [ {future_entry_price} ] entering into db"
+        )
+        logging.info(
+            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
+        )
 
-    logging.info(
-        f"Strategy: [ {strategy_schema.name} ], new trade with strike: [ {strike} ] and entry price: [ {entry_price} ] entering into db"
-    )
-    logging.info(
-        f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
-    )
+        await dump_trade_in_db_and_redis(
+            entry_price=0.0,
+            strategy_schema=strategy_schema,
+            future_entry_price=future_entry_price,
+            signal_payload_schema=signal_payload_schema,
+            async_redis_client=async_redis_client,
+        )
 
-    # this is very important to set strike to signal_payload_schema as it would be used hereafter
-    signal_payload_schema.strike = strike
+        return "successfully added trade to db"
 
-    await dump_trade_in_db_and_redis(
-        strategy_schema=strategy_schema,
-        entry_price=entry_price,
-        future_entry_price=future_entry_price,
-        signal_payload_schema=signal_payload_schema,
-        async_redis_client=async_redis_client,
-    )
+    else:
+        option_chain = await get_option_chain(
+            async_redis_client=async_redis_client,
+            expiry=signal_payload_schema.expiry,
+            option_type=signal_payload_schema.option_type,
+            strategy_schema=strategy_schema,
+        )
 
-    return "successfully added trade to db"
+        strike_and_entry_price, future_entry_price = await asyncio.gather(
+            get_strike_and_entry_price(
+                option_chain=option_chain,
+                signal_payload_schema=signal_payload_schema,
+                strategy_schema=strategy_schema,
+                async_redis_client=async_redis_client,
+                async_httpx_client=async_httpx_client,
+            ),
+            get_future_price(
+                async_redis_client=async_redis_client,
+                strategy_schema=strategy_schema,
+            ),
+        )
+
+        strike, entry_price = strike_and_entry_price
+
+        # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
+        if not strike:
+            logging.info(
+                f"Strategy: [ {strategy_schema.name} ], skipping entry of new tradde as strike is Null: {entry_price}"
+            )
+            return None
+
+        logging.info(
+            f"Strategy: [ {strategy_schema.name} ], new trade with strike: [ {strike} ] and entry price: [ {entry_price} ] entering into db"
+        )
+        logging.info(
+            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
+        )
+
+        # this is very important to set strike to signal_payload_schema as it would be used hereafter
+        signal_payload_schema.strike = strike
+
+        await dump_trade_in_db_and_redis(
+            strategy_schema=strategy_schema,
+            entry_price=entry_price,
+            future_entry_price=future_entry_price,
+            signal_payload_schema=signal_payload_schema,
+            async_redis_client=async_redis_client,
+        )
+
+        return "successfully added trade to db"
+
+
+async def compute_trade_data_needed_for_closing_trade(
+    *,
+    signal_payload_schema: SignalPayloadSchema,
+    redis_trade_schema_list: list[RedisTradeSchema],
+    async_redis_client: Redis,
+    strategy_schema: StrategySchema,
+    async_httpx_client: AsyncClient,
+    only_futures: bool = False,
+):
+    if only_futures:
+        future_exit_price = await get_future_price(
+            async_redis_client=async_redis_client,
+            strategy_schema=strategy_schema,
+        )
+        logging.info(
+            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
+        )
+
+        trade_schema = redis_trade_schema_list[0]
+        future_position = (
+            PositionEnum.SHORT
+            if trade_schema.option_type == OptionTypeEnum.PE
+            else PositionEnum.LONG
+        )
+        future_profit = get_futures_profit(
+            entry_price=trade_schema.future_entry_price,
+            exit_price=future_exit_price,
+            quantity=trade_schema.quantity,
+            position=future_position,
+        )
+
+        updated_data = {
+            trade_schema.id: {
+                "id": trade_schema.id,
+                "future_exit_price": future_exit_price,
+                "future_profit": future_profit,
+                "exit_received_at": signal_payload_schema.received_at,
+                "exit_at": datetime.utcnow(),
+            }
+        }
+        return updated_data, 0.0, future_profit
+    else:
+        strike_exit_price_dict, future_exit_price = await asyncio.gather(
+            get_strike_and_exit_price_dict(
+                async_redis_client=async_redis_client,
+                signal_payload_schema=signal_payload_schema,
+                redis_trade_schema_list=redis_trade_schema_list,
+                strategy_schema=strategy_schema,
+                async_httpx_client=async_httpx_client,
+            ),
+            get_future_price(
+                async_redis_client=async_redis_client,
+                strategy_schema=strategy_schema,
+            ),
+        )
+        logging.info(
+            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
+        )
+        updated_data, total_profit, total_future_profit = await calculate_profits(
+            strike_exit_price_dict=strike_exit_price_dict,
+            future_exit_price=future_exit_price,
+            signal_payload_schema=signal_payload_schema,
+            redis_trade_schema_list=redis_trade_schema_list,
+            strategy_schema=strategy_schema,
+        )
+        logging.info(
+            f"Strategy: [ {strategy_schema.name} ], adding profit: [ {total_profit} ] and future profit: [ {total_future_profit} ]"
+        )
+        return updated_data, total_profit, total_future_profit
 
 
 # @profile
@@ -354,36 +453,23 @@ async def task_exit_trade(
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
 ):
-    strike_exit_price_dict, future_exit_price = await asyncio.gather(
-        get_strike_and_exit_price_dict(
-            async_redis_client=async_redis_client,
-            signal_payload_schema=signal_payload_schema,
-            redis_trade_schema_list=redis_trade_schema_list,
-            strategy_schema=strategy_schema,
-            async_httpx_client=async_httpx_client,
-        ),
-        get_future_price(
-            async_redis_client=async_redis_client,
-            strategy_schema=strategy_schema,
-        ),
-    )
-    logging.info(
-        f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
-    )
+    only_futures = True if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX else False
 
-    updated_data, total_profit, total_future_profit = await calculate_profits(
-        strike_exit_price_dict=strike_exit_price_dict,
-        future_exit_price=future_exit_price,
+    (
+        updated_data,
+        total_profit,
+        total_future_profit,
+    ) = await compute_trade_data_needed_for_closing_trade(
         signal_payload_schema=signal_payload_schema,
-        strategy_schema=strategy_schema,
         redis_trade_schema_list=redis_trade_schema_list,
-    )
-    logging.info(
-        f"Strategy: [ {strategy_schema.name} ], adding profit: [ {total_profit} ] and future profit: [ {total_future_profit} ]"
+        async_redis_client=async_redis_client,
+        strategy_schema=strategy_schema,
+        async_httpx_client=async_httpx_client,
+        only_futures=only_futures,
     )
 
     # update database with the updated data
-    await update_trades_in_db(
+    await close_trades_in_db_and_remove_from_redis(
         updated_data=updated_data,
         strategy_schema=strategy_schema,
         total_profit=total_profit,

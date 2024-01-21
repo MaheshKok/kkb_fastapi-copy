@@ -12,4 +12,7 @@ url = "rediss://default:eb1101f635b44826807ba6992778829d@us1-right-muskox-39790.
 
 
 [cache_redis]
-url = "redis://default:PaXXc09TmCTTdZ5krEk7GIQ1BYs6CtUr@redis-11831.c52.us-east-1-4.ec2.cloud.redislabs.com:11831"
+host = "redis-16366.c8.us-east-1-4.ec2.cloud.redislabs.com"
+port = "16366"
+password = "ndzSBdflQ29c6nHcSRIejVTLtcffdjsb"
+db = "test-redis"

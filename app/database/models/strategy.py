@@ -3,6 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import Boolean
 from sqlalchemy import Column
+from sqlalchemy import Float
 from sqlalchemy import ForeignKey
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import TIMESTAMP
@@ -37,6 +38,17 @@ class StrategyModel(Base):
     is_active = Column(Boolean, default=True)
     # strategy details
     name = Column(String, nullable=False, default="Renko Strategy Every Candle")
+
+    premium = Column(Float, nullable=True, default=350.0)
+
+    funds = Column(Float, nullable=True)
+
+    min_quantity = Column(Float, nullable=False)
+    margin_for_min_quantity = Column(Float, nullable=False)
+    incremental_step_size = Column(Float, nullable=False)
+    compounding = Column(Boolean, nullable=False, default=True)
+    contracts = Column(Float, nullable=True)
+    funds_usage_percent = Column(Float, nullable=False, default=1.0)
 
     broker_id = Column(
         UUID(as_uuid=True), ForeignKey("broker.id", ondelete="CASCADE"), nullable=True, index=True
