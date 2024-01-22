@@ -7,7 +7,6 @@ from app.api.dependency import get_cfd_strategy_schema
 from app.api.endpoints.trade import trading_router
 from app.api.utils import close_capital_lots
 from app.api.utils import get_capital_cfd_existing_profit_or_loss
-from app.api.utils import get_funds_to_use
 from app.api.utils import open_capital_lots
 from app.broker.AsyncCapital import AsyncCapitalClient
 from app.schemas.strategy import CFDStrategySchema
@@ -57,7 +56,7 @@ async def post_cfd(
             return msg
 
     if direction != cfd_payload_schema.direction.upper():
-        funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
+        # funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
 
         return await open_capital_lots(
             client=client,
@@ -65,7 +64,7 @@ async def post_cfd(
             cfd_payload_schema=cfd_payload_schema,
             demo_or_live=demo_or_live,
             profit_or_loss=profit_or_loss,
-            funds_to_use=funds_to_use,
+            funds_to_use=0.0,
         )
     else:
         msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] is same as current direction, hence skipping opening new positions"

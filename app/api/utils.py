@@ -246,26 +246,36 @@ async def get_all_positions(
             status_code, text = response.status_code, response.text
             if status_code == 429:
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] Error occured while getting all positions {status_code} {text}"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] HTTPStatusError occured while getting all positions {status_code} {text}"
                 )
                 await client.__log_out__()
                 get_all_positions_attempt += 1
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
             elif status_code == 400:
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] Error occured while getting all positions {status_code} {text}"
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] HTTPStatusError occured while getting all positions {status_code} {text}"
                 )
                 await client.__log_out__()
                 get_all_positions_attempt += 1
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)
             else:
-                logging.error(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] Error occured while getting all positions {status_code} {text}"
+                logging.warning(
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] HTTPStatusError occured while getting all positions {status_code} {text}"
                 )
-                break
+                get_all_positions_attempt += 1
+                await asyncio.sleep(1)
+        except Exception as error:
+            logging.warning(
+                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] Exception Error occured while getting all positions {error}"
+            )
+            get_all_positions_attempt += 1
+            await asyncio.sleep(1)
     else:
         logging.error(
             f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : All attemps exhausted in getting all positions, Error {status_code} {text}"
+        )
+        raise HTTPException(
+            status_code=400, detail="All attemps exhausted in getting all positions"
         )
 
 
@@ -332,8 +342,8 @@ async def get_capital_cfd_existing_profit_or_loss(
 async def get_funds_to_use(client, cfd_strategy_schema: CFDStrategySchema) -> float:
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
 
-    get_all_positions_attempt = 1
-    while get_all_positions_attempt < 10:
+    get_all_accounts_attempt = 1
+    while get_all_accounts_attempt < 10:
         try:
             all_accounts = await client.all_accounts()
             available_funds = all_accounts["accounts"][0]["balance"]["available"]
@@ -342,20 +352,18 @@ async def get_funds_to_use(client, cfd_strategy_schema: CFDStrategySchema) -> fl
         except httpx.HTTPStatusError as error:
             response = error.response
             status_code, text = response.status_code, response.text
-            if status_code == 429:
-                get_all_positions_attempt += 1
-                await asyncio.sleep(2)
-            elif status_code == 400:
-                get_all_positions_attempt += 1
-                await asyncio.sleep(2)
-            else:
-                logging.error(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all positions {status_code} {text}"
-                )
-                break
+            # known error code 400, 401, and 429
+            # 400: invalid credentials
+            # 401: {"errorCode":"error.invalid.details"}
+            # 429: too many requests
+            get_all_accounts_attempt += 1
+            await asyncio.sleep(1)
+            logging.warning(
+                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attemp [ {get_all_accounts_attempt} ] HTTPStatusError occured while getting all accounts {status_code} {text}"
+            )
     else:
         logging.error(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all positions {text}"
+            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all accounts {status_code} {text}"
         )
 
 
@@ -571,13 +579,13 @@ async def open_capital_lots(
                     logging.info(
                         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] calculating lots to open again as available funds are updated"
                     )
-                    funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
+                    # funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
 
                     (
                         lots_to_open,
                         update_profit_or_loss_in_db,
                     ) = get_lots_to_trade_and_profit_or_loss(
-                        funds_to_use, cfd_strategy_schema, profit_or_loss
+                        0.0, cfd_strategy_schema, profit_or_loss
                     )
                     place_order_attempt += 1
                     await client.__log_out__()

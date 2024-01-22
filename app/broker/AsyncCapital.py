@@ -9,6 +9,9 @@ from Crypto.Cipher import PKCS1_v1_5
 from Crypto.PublicKey import RSA
 
 
+timeout = (60, 60, 60, 60)
+
+
 class AsyncCapitalClient:
     def __init__(self, username, api_key, password, demo=False):
         self.username = username
@@ -30,7 +33,7 @@ class AsyncCapitalClient:
         self.enc_key = [data["encryptionKey"], data["timeStamp"]]
 
     async def __make_request__(self, type, url, payload=None):
-        async with httpx.AsyncClient(timeout=300) as client:
+        async with httpx.AsyncClient(timeout=timeout) as client:
             if payload is None:
                 payload = {}
             response = await client.request(type, url, headers=self.headers, json=payload)
@@ -395,7 +398,11 @@ class AsyncCapitalClient:
                     await asyncio.sleep(1)
                     attempt_logout += 1
                     logging.warning(
-                        f"Attemp: {attempt_logout}, HTTP Status Error while logging out: {error.response.status_code} - {error.response.json()}"
+                        f"Attemp: {attempt_logout}, HTTPStatusError while logging out: {error.response.status_code} - {error.response.json()}"
+                    )
+                except Exception as error:
+                    logging.warning(
+                        f"Attemp: {attempt_logout}, Exception while logging out: {error}"
                     )
         else:
             logging.warning(
