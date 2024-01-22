@@ -33,7 +33,7 @@ class AsyncCapitalClient:
         self.enc_key = [data["encryptionKey"], data["timeStamp"]]
 
     async def __make_request__(self, type, url, payload=None):
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx.AsyncClient() as client:
             if payload is None:
                 payload = {}
             response = await client.request(type, url, headers=self.headers, json=payload)
