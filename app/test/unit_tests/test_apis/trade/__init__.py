@@ -1,1 +1,1 @@
-trading_options_url = "/api/trading/nfo/options"
+trading_options_url = "/api/trading/nfo"
