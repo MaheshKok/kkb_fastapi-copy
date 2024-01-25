@@ -233,7 +233,7 @@ async def place_ablue_order(
     is_CE: bool,
     is_buy: bool,
 ):
-    instrument = await pya3_obj.get_instrument_for_fno_from_redis(
+    instrument = await pya3_obj.get_fno_instrument_from_redis(
         async_redis_client=async_redis_client,
         symbol=strategy_schema.symbol,
         expiry_date=expiry,

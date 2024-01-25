@@ -31,19 +31,19 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-# import io
-# import json
-# from datetime import datetime
-# import httpx
-# import pandas as pd
-# from app.utils.constants import REDIS_DATE_FORMAT
-# from app.schemas.enums import InstrumentTypeEnum
-# from app.tasks.utils import get_monthly_expiry_date_from_redis
-# from app.api.utils import get_expiry_dict_from_alice_blue
-#
-#
+
 # @pytest.fixture(scope="session", autouse=True)
 # async def setup_redis():
+#     import io
+#     import json
+#     from datetime import datetime
+#     import httpx
+#     import pandas as pd
+#     from app.utils.constants import REDIS_DATE_FORMAT
+#     from app.schemas.enums import InstrumentTypeEnum
+#     from app.tasks.utils import get_monthly_expiry_date_from_redis
+#     from app.api.utils import get_expiry_dict_from_alice_blue
+#
 #     test_config = get_config(ConfigFile.TEST)
 #     _test_async_redis_client = aioredis.Redis(
 #         host=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["host"],
@@ -111,7 +111,9 @@ logging.basicConfig(
 #
 #     prod_config = get_config()
 #     prod_async_redis_client = await aioredis.StrictRedis.from_url(
-#         prod_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["url"], encoding="utf-8", decode_responses=True
+#         prod_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["url"],
+#         encoding="utf-8",
+#         decode_responses=True,
 #     )
 #
 #     all_option_chain = {}
@@ -143,16 +145,12 @@ logging.basicConfig(
 #     )
 #
 #     # set up master contract in redis
-#     # Choose the column to be used as the key
-#     key_column = "Trading Symbol"
-#
-#     url = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
-#     response = await httpx.AsyncClient().get(url)
+#     response = await httpx.AsyncClient().get(AB_NFO_CONTRACTS_URL)
 #     data_stream = io.StringIO(response.text)
 #     try:
 #         df = pd.read_csv(data_stream)
 #         full_name_row_dict = {}
-#         for key, value in df.set_index(key_column).T.to_dict().items():
+#         for key, value in df.set_index(INSTRUMENT_COLUMN).T.to_dict().items():
 #             if "BANKNIFTY" in key or "NIFTY" in key:
 #                 full_name_row_dict[key] = json.dumps(value)
 #     except Exception as e:

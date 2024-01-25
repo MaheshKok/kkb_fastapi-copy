@@ -9,6 +9,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import model_validator
 
+from app.api.endpoints.trade.utils import generate_trading_symbol
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum
@@ -115,15 +116,18 @@ class EntryTradeSchema(SignalPayloadSchema):
         # it must send symbol
         if isinstance(values, dict):
             if values.get("option_type"):
-                return {
-                    **values,
-                    "instrument": f"{values['symbol']}{values['expiry'].strftime('%d%b%y').upper()}{values['strike']}{values['option_type']}",
-                }
+                instrument = generate_trading_symbol(
+                    symbol=values["symbol"],
+                    expiry=values["expiry"],
+                    option_type=values["option_type"],
+                    strike=values["strike"],
+                )
+                return {**values, "instrument": instrument}
             else:
-                return {
-                    **values,
-                    "instrument": f"{values['symbol']}{values['expiry'].strftime('%d%b%y').upper()}FUT",
-                }
+                instrument = generate_trading_symbol(
+                    symbol=values["symbol"], expiry=values["expiry"], is_fut=True
+                )
+                return {**values, "instrument": instrument}
 
 
 class DBEntryTradeSchema(BaseModel):

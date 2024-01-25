@@ -18,8 +18,7 @@ from pya3 import OrderType
 from pya3 import ProductType
 from pya3 import encrypt_string
 
-from app.utils.constants import ALICE_BLUE_DATE_FORMAT
-from app.utils.constants import FUT
+from app.api.endpoints.trade.utils import generate_trading_symbol
 from app.utils.constants import OptionType
 
 
@@ -582,7 +581,7 @@ class Pya3Aliceblue(Aliceblue):
         return placeorderresp
 
     @staticmethod
-    async def get_instrument_for_fno_from_redis(
+    async def get_fno_instrument_from_redis(
         async_redis_client,
         symbol,
         expiry_date: datetime.date,
@@ -598,10 +597,14 @@ class Pya3Aliceblue(Aliceblue):
             raise ValueError("strike price is required for options")
 
         if is_fut:
-            key = f"{symbol} {expiry_date.strftime(ALICE_BLUE_DATE_FORMAT).upper()} {FUT}"
+            key = generate_trading_symbol(symbol=symbol, expiry=expiry_date, is_fut=True)
         else:
-            # TODO: remove conversion of strik to float when in redis we start storing strike as float
-            key = f"{symbol}{expiry_date.strftime(ALICE_BLUE_DATE_FORMAT).upper()}{OptionType.CE[0] if is_CE else OptionType.PE[0]}{int(strike)}"
+            key = generate_trading_symbol(
+                symbol=symbol,
+                expiry=expiry_date,
+                option_type=OptionType.CE if is_CE else OptionType.PE,
+                strike=strike,
+            )
 
         instrument_json = await async_redis_client.get(key)
         result = json.loads(instrument_json or "{}")

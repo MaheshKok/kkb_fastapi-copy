@@ -35,6 +35,9 @@ SQLALCHEMY_DATE_FORMAT = "%Y-%m-%d"
 ALICE_BLUE_DATE_FORMAT = "%d%b%y"
 FUT = "FUT"
 TRADES_AND_OPTION_CHAIN_REDIS = "trades_and_option_chain_redis"
+AB_NFO_CONTRACTS_URL = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
+# Choose the column to be used as the key
+INSTRUMENT_COLUMN = "Trading Symbol"
 
 update_trade_columns = {
     "exit_price",
