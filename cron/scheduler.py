@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 
 base_urls = {
     "flaskstockpi": "https://flaskstockapi.herokuapp.com/api",
-    "kokobrothers-be": "https://kokobrothers-be.herokuapp.com/api",
+    "kokobrothers-be": "https://kokobrothers-fastapi-864126af779b.herokuapp.com/api",
     # "kkbfastapi": "https://kkb-fastapi.herokuapp.com/api",
 }
 
