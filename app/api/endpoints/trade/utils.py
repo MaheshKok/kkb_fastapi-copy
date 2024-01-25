@@ -18,8 +18,7 @@ def generate_trading_symbol(
     expiry_formatted = expiry.strftime(ALICE_BLUE_DATE_FORMAT).upper()
     if is_fut:
         return f"{symbol}{expiry_formatted}F"
-
     else:
         is_ce = option_type == OptionType.CE
         option_char = OptionType.CE[0] if is_ce else OptionType.PE[0]
-        return f"{symbol}{expiry_formatted}{option_char}{strike}"
+        return f"{symbol}{expiry_formatted}{option_char}{int(strike)}"
