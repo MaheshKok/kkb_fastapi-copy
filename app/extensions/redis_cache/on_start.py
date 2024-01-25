@@ -92,11 +92,11 @@ async def cache_ongoing_trades(async_redis_client):
                         )
                         if result:
                             logging.info(
-                                f"Ongoing trades cached in redis for {strategy_id} {redis_strategy_hash}"
+                                f"Ongoing trades cached in redis for strategy: [ {strategy_id} ], hash: [ {redis_strategy_hash} ]"
                             )
                         else:
                             logging.error(
-                                f"Ongoing trades not cached in redis for {strategy_id} {redis_strategy_hash}"
+                                f"Ongoing trades not cached in redis for strategy: [ {strategy_id} ], hash: [ {redis_strategy_hash} ]"
                             )
 
         await pipe.execute()

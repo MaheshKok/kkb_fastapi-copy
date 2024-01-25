@@ -34,7 +34,7 @@ REDIS_DATE_FORMAT = "%Y-%m-%d"
 SQLALCHEMY_DATE_FORMAT = "%Y-%m-%d"
 ALICE_BLUE_DATE_FORMAT = "%d%b%y"
 FUT = "FUT"
-
+TRADES_AND_OPTION_CHAIN_REDIS = "trades_and_option_chain_redis"
 
 update_trade_columns = {
     "exit_price",

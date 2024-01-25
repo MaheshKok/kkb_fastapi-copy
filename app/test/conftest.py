@@ -22,6 +22,7 @@ from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_pre_db_data
+from app.utils.constants import TRADES_AND_OPTION_CHAIN_REDIS
 from app.utils.constants import ConfigFile
 
 
@@ -45,9 +46,9 @@ logging.basicConfig(
 # async def setup_redis():
 #     test_config = get_config(ConfigFile.TEST)
 #     _test_async_redis_client = aioredis.Redis(
-#         host=test_config.data["cache_redis"]["host"],
-#         port=test_config.data["cache_redis"]["port"],
-#         password=test_config.data["cache_redis"]["password"],
+#         host=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["host"],
+#         port=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["port"],
+#         password=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["password"],
 #         encoding="utf-8",
 #         decode_responses=True,
 #     )
@@ -110,7 +111,7 @@ logging.basicConfig(
 #
 #     prod_config = get_config()
 #     prod_async_redis_client = await aioredis.StrictRedis.from_url(
-#         prod_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
+#         prod_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["url"], encoding="utf-8", decode_responses=True
 #     )
 #
 #     all_option_chain = {}
@@ -208,13 +209,10 @@ def test_config():
 @pytest_asyncio.fixture(scope="function")
 async def test_async_redis_client():
     test_config = get_config(ConfigFile.TEST)
-    # _test_async_redis_client = await aioredis.StrictRedis.from_url(
-    #     test_config.data["cache_redis"]["url"], encoding="utf-8", decode_responses=True
-    # )
     _test_async_redis_client = aioredis.Redis(
-        host=test_config.data["cache_redis"]["host"],
-        port=test_config.data["cache_redis"]["port"],
-        password=test_config.data["cache_redis"]["password"],
+        host=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["host"],
+        port=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["port"],
+        password=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["password"],
         encoding="utf-8",
         decode_responses=True,
     )
