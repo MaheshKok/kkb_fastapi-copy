@@ -103,4 +103,3 @@ async def lifespan(app):
         logging.info("Application shutdown")
         # Close the connection when the application shuts down
         await app.state.async_redis_client.close()
-        await app.state.async_session_maker.kw["bind"].dispose()
