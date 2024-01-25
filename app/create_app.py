@@ -13,7 +13,7 @@ from app.api.endpoints.takeaway_profit import takeaway_profit
 from app.api.endpoints.trade import trading_router
 from app.api.endpoints.trade.cfd import forex_router
 from app.api.endpoints.trade.crypto import binance_router
-from app.api.endpoints.trade.indian_futures_and_options import options_router
+from app.api.endpoints.trade.indian_futures_and_options import fno_router
 from app.core.config import get_config
 from app.database.base import engine_kw
 from app.database.base import get_db_url
@@ -31,7 +31,7 @@ def register_routers(app: FastAPI):
     # include all routers
     app.include_router(healthcheck_router)
     app.include_router(trading_router)
-    app.include_router(options_router)
+    app.include_router(fno_router)
     app.include_router(strategy_router)
     app.include_router(takeaway_profit)
     app.include_router(forex_router)
