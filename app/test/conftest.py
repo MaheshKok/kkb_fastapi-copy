@@ -37,8 +37,8 @@ logging.basicConfig(
 # import pandas as pd
 # from app.utils.constants import REDIS_DATE_FORMAT
 # from app.schemas.enums import InstrumentTypeEnum
-# from app.tasks.utils import get_monthly_expiry_date
-# from app.api.utils import get_expiry_list_from_alice_blue
+# from app.tasks.utils import get_monthly_expiry_date_from_redis
+# from app.api.utils import get_expiry_dict_from_alice_blue
 #
 #
 # @pytest.fixture(scope="session", autouse=True)
@@ -53,7 +53,7 @@ logging.basicConfig(
 #     )
 #
 #     # update redis with necessary data i.e expiry list, option chain etc
-#     expiry_dict = await get_expiry_list_from_alice_blue()
+#     expiry_dict = await get_expiry_dict_from_alice_blue()
 #     for instrument_type, expiry in expiry_dict.items():
 #         await _test_async_redis_client.set(instrument_type, json.dumps(expiry))
 #
@@ -95,7 +95,7 @@ logging.basicConfig(
 #             current_month_expiry,
 #             next_month_expiry,
 #             is_today_months_expiry,
-#         ) = await get_monthly_expiry_date(
+#         ) = await get_monthly_expiry_date_from_redis(
 #             async_redis_client=_test_async_redis_client,
 #             instrument_type=InstrumentTypeEnum.FUTIDX,
 #             symbol=symbol,
@@ -131,7 +131,7 @@ logging.basicConfig(
 #             if "FUT" in key:
 #                 # For future option chain first and second argument are same
 #                 pipe.delete(key)
-#                 pipe.hset(key, "FUT", option_chain[0]["FUT"])
+#                 pipe.hset(key, "FUT", option_chain[0].get("FUT", 0.0))
 #             else:
 #                 for strike, premium in option_chain[0].items():
 #                     pipe.hset(key, strike, premium)

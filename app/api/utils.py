@@ -84,7 +84,7 @@ async def get_current_and_next_expiry_from_redis(
     return current_expiry_date, next_expiry_date, is_today_expiry
 
 
-async def get_current_and_next_expiry_from_alice_blue(strategy_schema: StrategySchema):
+async def get_current_and_next_expiry_from_alice_blue(symbol: str):
     todays_date = datetime.now().date()
     if todays_date in current_and_next_expiry_cache:
         return current_and_next_expiry_cache[todays_date]
@@ -93,7 +93,7 @@ async def get_current_and_next_expiry_from_alice_blue(strategy_schema: StrategyS
     current_expiry_date = None
     next_expiry_date = None
     expiry_dict = await get_expiry_dict_from_alice_blue()
-    expiry_list = expiry_dict[InstrumentTypeEnum.OPTIDX][strategy_schema.symbol]
+    expiry_list = expiry_dict[InstrumentTypeEnum.OPTIDX][symbol]
     expiry_datetime_obj_list = [
         datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list
     ]

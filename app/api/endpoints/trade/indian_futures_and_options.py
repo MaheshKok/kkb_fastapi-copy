@@ -108,7 +108,7 @@ async def post_nfo_indian_options(
         redis_hash = (
             f"{current_expiry_date} {'PE' if signal_payload_schema.option_type == 'CE' else 'CE'}"
         )
-        only_futures = True
+        only_futures = False
     else:
         (
             current_expiry_date,

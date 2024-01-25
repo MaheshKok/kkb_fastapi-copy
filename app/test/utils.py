@@ -3,7 +3,6 @@ from datetime import timedelta
 from app.api.utils import get_current_and_next_expiry_from_alice_blue
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import PositionEnum
-from app.schemas.strategy import StrategySchema
 from app.tasks.utils import get_monthly_expiry_date_from_alice_blue
 from app.test.factory.strategy import StrategyFactory
 from app.test.factory.take_away_profit import TakeAwayProfitFactory
@@ -11,6 +10,10 @@ from app.test.factory.trade import CompletedTradeFactory
 from app.test.factory.trade import LiveTradeFactory
 from app.test.factory.user import UserFactory
 from app.utils.constants import OptionType
+
+
+option_entry_price = 350.0
+future_entry_price = 44300.0
 
 
 async def create_open_trades(
@@ -36,9 +39,14 @@ async def create_open_trades(
             )
 
             if not expiry_date:
-                current_expiry, _, _ = await get_monthly_expiry_date_from_alice_blue(
-                    instrument_type=strategy.instrument_type, symbol=strategy.symbol
-                )
+                if instrument_type == InstrumentTypeEnum.OPTIDX:
+                    current_expiry, _, _ = await get_current_and_next_expiry_from_alice_blue(
+                        symbol=strategy.symbol
+                    )
+                else:
+                    current_expiry, _, _ = await get_monthly_expiry_date_from_alice_blue(
+                        instrument_type=strategy.instrument_type, symbol=strategy.symbol
+                    )
 
                 expiry_date = current_expiry
 
@@ -48,6 +56,7 @@ async def create_open_trades(
                         strategy=strategy,
                         option_type=OptionType.CE if ce_trade else OptionType.PE,
                         expiry=expiry_date,
+                        entry_price=option_entry_price,
                     )
             else:
                 for _ in range(trades):
@@ -57,6 +66,7 @@ async def create_open_trades(
                         entry_price=None,
                         strike=None,
                         option_type=None,
+                        future_entry_price=future_entry_price,
                     )
 
             if take_away_profit:
@@ -91,9 +101,15 @@ async def create_pre_db_data(
             )
 
             if not expiry_date:
-                current_expiry, _, _ = await get_current_and_next_expiry_from_alice_blue(
-                    StrategySchema.model_validate(strategy)
-                )
+                if instrument_type == InstrumentTypeEnum.OPTIDX:
+                    current_expiry, _, _ = await get_current_and_next_expiry_from_alice_blue(
+                        symbol=strategy.symbol
+                    )
+                else:
+                    current_expiry, _, _ = await get_monthly_expiry_date_from_alice_blue(
+                        instrument_type=strategy.instrument_type, symbol=strategy.symbol
+                    )
+
                 expiry_date = current_expiry
 
             total_profit = 0

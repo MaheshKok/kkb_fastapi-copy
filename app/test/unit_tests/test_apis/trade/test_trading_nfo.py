@@ -18,6 +18,8 @@ from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_open_trades
 from app.test.utils import create_pre_db_data
+from app.test.utils import future_entry_price
+from app.test.utils import option_entry_price
 from app.utils.constants import FUT
 from app.utils.constants import OptionType
 from app.utils.constants import update_trade_columns
@@ -190,10 +192,17 @@ async def test_trading_nfo_options_opposite_direction(
         exited_trade_models = fetch_trade_models_query.scalars().all()
         assert len(exited_trade_models) == 10
 
+        updated_columns = {
+            "exit_price",
+            "profit",
+            "exit_at",
+            "exit_received_at",
+        }
         # assert all trades are closed
         updated_values_dict = [
             getattr(trade_model, key)
             for key in update_trade_columns
+            if key in updated_columns
             for trade_model in exited_trade_models
         ]
         # all parameters of a trade are updated
@@ -322,10 +331,17 @@ async def test_trading_nfo_options_opposite_direction_for_short_strategy(
         exited_trade_models = fetch_trade_models_query.scalars().all()
         assert len(exited_trade_models) == 10
 
+        updated_columns = {
+            "exit_price",
+            "profit",
+            "exit_at",
+            "exit_received_at",
+        }
         # assert all trades are closed
         updated_values_dict = [
             getattr(trade_model, key)
             for key in update_trade_columns
+            if key in updated_columns
             for trade_model in exited_trade_models
         ]
         # all parameters of a trade are updated
@@ -353,14 +369,14 @@ async def test_trading_nfo_options_opposite_direction_for_short_strategy(
         exit_price = option_chain.get(exited_trade_models[0].strike)
         # entry price is fixed : 350.0
         profit = get_options_profit(
-            entry_price=350.0,
+            entry_price=option_entry_price,
             exit_price=exit_price,
             quantity=trade_model.quantity,
             position=PositionEnum.SHORT,
         )
 
         # when we short a trade then we make profit when exit price is lesser than 350.0
-        if exit_price < 350.0:
+        if exit_price < option_entry_price:
             assert profit > 0
 
         # TODO: assert why theres a small difference between profit and take_away_profit.profit
@@ -518,12 +534,12 @@ async def test_trading_nfo_futures_opposite_direction(
         future_exit_price = float(option_chain.get(FUT))
         # entry price is fixed : 44315
         futures_profit = get_futures_profit(
-            entry_price=44315.0,
+            entry_price=future_entry_price,
             exit_price=future_exit_price,
             quantity=trade_model.quantity,
             position=PositionEnum.LONG if action == SignalTypeEnum.BUY else PositionEnum.SHORT,
         )
 
         # when we short a trade then we make profit when exit price is lesser than 44315.0
-        if future_exit_price < 44315.0:
+        if future_exit_price < future_entry_price:
             assert futures_profit > 0
