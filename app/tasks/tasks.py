@@ -27,6 +27,7 @@ from app.schemas.trade import SignalPayloadSchema
 from app.tasks.utils import get_future_price
 from app.tasks.utils import get_strike_and_entry_price
 from app.tasks.utils import get_strike_and_exit_price_dict
+from app.utils.constants import FUT
 from app.utils.constants import update_trade_columns
 from app.utils.option_chain import get_option_chain
 
@@ -97,14 +98,16 @@ def construct_update_query(updated_data):
     def generate_case_clause(column_name, data_dict):
         case_clauses = [f"{column_name} = CASE id"]
         for _id, values in data_dict.items():
-            if (
-                column_name in ["exit_received_at", "exit_at"]
-                and values.get(column_name) != "NULL"
-            ):
-                value = f"'{values.get(column_name)}'::TIMESTAMP WITH TIME ZONE"
+            value = values.get(column_name)
+            if value is None:
+                value = "NULL"
+            elif column_name in ["exit_received_at", "exit_at"]:
+                value = f"'{value}'::TIMESTAMP WITH TIME ZONE"
             else:
-                value = values.get(column_name)
+                value = f"'{value}'"
+
             case_clauses.append(f"WHEN '{_id}'::UUID THEN {value}")
+
         case_clauses.append(f"ELSE {column_name} END")
         return " ".join(case_clauses)
 
@@ -190,7 +193,7 @@ async def push_trade_to_redis(
     # it works i confirmed this with python_console with dummy data,
     # interesting part is to get such trades i have to call lrange with 0, -1
     redis_key = str(trade_model.strategy_id)
-    redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
+    redis_hash = f"{trade_model.expiry} {trade_model.option_type or FUT}"
     redis_trades_json = await async_redis_client.hget(redis_key, redis_hash)
     new_trade_json = RedisTradeSchema.model_validate(trade_model).model_dump_json(
         exclude={"received_at"}, exclude_none=True
@@ -390,29 +393,31 @@ async def compute_trade_data_needed_for_closing_trade(
             f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
         )
 
-        trade_schema = redis_trade_schema_list[0]
-        future_position = (
-            PositionEnum.SHORT
-            if trade_schema.option_type == OptionTypeEnum.PE
-            else PositionEnum.LONG
-        )
-        future_profit = get_futures_profit(
-            entry_price=trade_schema.future_entry_price,
-            exit_price=future_exit_price,
-            quantity=trade_schema.quantity,
-            position=future_position,
-        )
+        updated_data = {}
+        total_future_profit = 0
+        for trade_schema in redis_trade_schema_list:
+            future_position = (
+                PositionEnum.SHORT
+                if trade_schema.option_type == OptionTypeEnum.PE
+                else PositionEnum.LONG
+            )
+            future_profit = get_futures_profit(
+                entry_price=trade_schema.future_entry_price,
+                exit_price=future_exit_price,
+                quantity=trade_schema.quantity,
+                position=future_position,
+            )
 
-        updated_data = {
-            trade_schema.id: {
+            updated_data[trade_schema.id] = {
                 "id": trade_schema.id,
                 "future_exit_price": future_exit_price,
                 "future_profit": future_profit,
                 "exit_received_at": signal_payload_schema.received_at,
                 "exit_at": datetime.utcnow(),
             }
-        }
-        return updated_data, 0.0, future_profit
+            total_future_profit += future_profit
+
+        return updated_data, 0.0, total_future_profit
     else:
         strike_exit_price_dict, future_exit_price = await asyncio.gather(
             get_strike_and_exit_price_dict(

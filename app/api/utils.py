@@ -27,7 +27,7 @@ from app.utils.constants import REDIS_DATE_FORMAT
 from app.utils.in_memory_cache import current_and_next_expiry_cache
 
 
-async def get_expiry_list_from_alice_blue():
+async def get_expiry_dict_from_alice_blue():
     api = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
 
     response = await httpx.AsyncClient().get(api)
@@ -92,7 +92,7 @@ async def get_current_and_next_expiry_from_alice_blue(strategy_schema: StrategyS
     is_today_expiry = False
     current_expiry_date = None
     next_expiry_date = None
-    expiry_dict = await get_expiry_list_from_alice_blue()
+    expiry_dict = await get_expiry_dict_from_alice_blue()
     expiry_list = expiry_dict[InstrumentTypeEnum.OPTIDX][strategy_schema.symbol]
     expiry_datetime_obj_list = [
         datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list
@@ -101,7 +101,7 @@ async def get_current_and_next_expiry_from_alice_blue(strategy_schema: StrategyS
         if todays_date > expiry_date:
             continue
         elif expiry_date == todays_date:
-            next_expiry_date = expiry_dict[index + 1]
+            next_expiry_date = expiry_list[index + 1]
             current_expiry_date = expiry_date
             is_today_expiry = True
             break

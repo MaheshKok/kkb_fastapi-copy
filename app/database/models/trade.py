@@ -19,9 +19,9 @@ class TradeModel(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     instrument = Column(String, nullable=False, index=True)
 
-    quantity = Column(Integer, default=25)
+    quantity = Column(Integer, default=25, nullable=False)
 
-    entry_price = Column(Float, nullable=False)
+    entry_price = Column(Float, nullable=True)
     exit_price = Column(Float, nullable=True)
     profit = Column(Float, nullable=True)
 
@@ -37,7 +37,7 @@ class TradeModel(Base):
 
     strike = Column(Float, nullable=True)
     option_type = Column(String, nullable=True, index=True)
-    expiry = Column(Date, index=True)
+    expiry = Column(Date, index=True, nullable=False)
 
     strategy_id = Column(
         UUID(as_uuid=True),

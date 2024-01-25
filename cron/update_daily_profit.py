@@ -15,7 +15,7 @@ from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.tasks.tasks import get_futures_profit
 from app.tasks.tasks import get_options_profit
-from app.tasks.utils import get_monthly_expiry_date
+from app.tasks.utils import get_monthly_expiry_date_from_redis
 
 
 async def update_daily_profit():
@@ -51,7 +51,7 @@ async def update_daily_profit():
                     current_month_expiry,
                     next_month_expiry,
                     is_today_months_expiry,
-                ) = await get_monthly_expiry_date(
+                ) = await get_monthly_expiry_date_from_redis(
                     async_redis_client=async_redis_client,
                     instrument_type=live_trade_db.strategy.instrument_type,
                     symbol=live_trade_db.strategy.symbol,

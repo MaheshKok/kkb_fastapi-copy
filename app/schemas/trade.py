@@ -23,7 +23,7 @@ class SignalPayloadSchema(BaseModel):
     )
     received_at: datetime = Field(description="Received At", example="2023-05-22 05:11:01.117358")
     action: SignalTypeEnum = Field(description="buy or sell signal", example="buy")
-    strike: Optional[float] = Field(description="Strike", example=42500.0, default=0.0)
+    strike: Optional[float] = Field(description="Strike", example=42500.0, default=None)
 
     # TODO: try removing option_type and expiry as they are set on tradeschema and then accessed
     # rather have it send as arguments to the function
@@ -34,7 +34,7 @@ class SignalPayloadSchema(BaseModel):
     option_type: Optional[OptionTypeEnum] = Field(
         description="Option Type",
         example="CE",
-        default="",
+        default=None,
     )
     expiry: Optional[date] = Field(description="Expiry", example="2023-06-16", default=None)
     quantity: Optional[int] = Field(description="Quantity", example=15, default=0)
@@ -44,9 +44,11 @@ class RedisTradeSchema(SignalPayloadSchema):
     # main purpose is for testing
 
     id: uuid.UUID = Field(description="Trade ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3")
-    strike: float = Field(description="Strike", example=42500.0)
-    entry_price: float = Field(description="Entry Price", example=350.5)
-    future_entry_price: float = Field(description="Future Entry Price", example=40600.5)
+    strike: Optional[float] = Field(description="Strike", example=42500.0, default=None)
+    entry_price: Optional[float] = Field(description="Entry Price", example=350.5, default=None)
+    future_entry_price: Optional[float] = Field(
+        description="Future Entry Price", example=40600.5, default=None
+    )
     expiry: date = Field(description="Expiry", example="2023-06-16")
     instrument: str = Field(description="Instrument", example="BANKNIFTY16JUN2343500CE")
     entry_received_at: datetime = Field(
@@ -112,10 +114,16 @@ class EntryTradeSchema(SignalPayloadSchema):
     def populate_instrument(cls, values):
         # it must send symbol
         if isinstance(values, dict):
-            return {
-                **values,
-                "instrument": f"{values['symbol']}{values['expiry'].strftime('%d%b%y').upper()}{values['strike']}{values['option_type']}",
-            }
+            if values.get("option_type"):
+                return {
+                    **values,
+                    "instrument": f"{values['symbol']}{values['expiry'].strftime('%d%b%y').upper()}{values['strike']}{values['option_type']}",
+                }
+            else:
+                return {
+                    **values,
+                    "instrument": f"{values['symbol']}{values['expiry'].strftime('%d%b%y').upper()}FUT",
+                }
 
 
 class DBEntryTradeSchema(BaseModel):

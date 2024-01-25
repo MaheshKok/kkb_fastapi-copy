@@ -7,12 +7,14 @@ from aioredis import Redis
 from fastapi import HTTPException
 from httpx import AsyncClient
 
+from app.api.utils import get_expiry_dict_from_alice_blue
 from app.broker.utils import buy_alice_blue_trades
 from app.broker.utils import close_alice_blue_trades
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
+from app.utils.constants import REDIS_DATE_FORMAT
 from app.utils.constants import OptionType
 from app.utils.option_chain import get_option_chain
 
@@ -46,7 +48,7 @@ def strip_previous_expiry_dates(expiry_list_date_obj):
     return upcoming_expiry_dates
 
 
-async def get_monthly_expiry_date(*, async_redis_client, instrument_type, symbol):
+async def get_monthly_expiry_date_from_redis(*, async_redis_client, instrument_type, symbol):
     symbol_expiry_str = await async_redis_client.get(instrument_type)
     symbol_expiry = json.loads(symbol_expiry_str)
     expiry_list_date_obj = [
@@ -77,8 +79,39 @@ async def get_monthly_expiry_date(*, async_redis_client, instrument_type, symbol
     return current_month_expiry, next_month_expiry, is_today_months_expiry
 
 
+async def get_monthly_expiry_date_from_alice_blue(*, instrument_type, symbol):
+    expiry_dict = await get_expiry_dict_from_alice_blue()
+    expiry_list = expiry_dict[instrument_type][symbol]
+    expiry_datetime_obj_list = [
+        datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list
+    ]
+    expiry_list_date_obj = strip_previous_expiry_dates(expiry_datetime_obj_list)
+    current_month_expiry = expiry_list_date_obj[0]
+    next_month_expiry = None
+    is_today_months_expiry = False
+
+    for i in range(1, len(expiry_list_date_obj)):
+        if (
+            expiry_list_date_obj[i].month != expiry_list_date_obj[i - 1].month
+        ):  # If a change of month is detected in the list
+            # Save the last date of the previous month
+            if expiry_list_date_obj[i - 1].month == datetime.now().month:  # adjust this as needed
+                current_month_expiry = expiry_list_date_obj[i - 1]
+                if current_month_expiry == datetime.now().date():
+                    is_today_months_expiry = True
+            elif expiry_list_date_obj[i - 1].month == ((datetime.now().month % 12) + 1):
+                next_month_expiry = expiry_list_date_obj[i - 1]
+        # Catch the last date of the next month, in case the loop finishes
+        elif i == len(expiry_list_date_obj) - 1 and expiry_list_date_obj[i].month == (
+            (datetime.now().month % 12) + 1
+        ):
+            next_month_expiry = expiry_list_date_obj[i]
+
+    return current_month_expiry, next_month_expiry, is_today_months_expiry
+
+
 async def get_future_price(async_redis_client, strategy_schema) -> float:
-    current_month_expiry, _, _ = await get_monthly_expiry_date(
+    current_month_expiry, _, _ = await get_monthly_expiry_date_from_redis(
         async_redis_client=async_redis_client,
         instrument_type=InstrumentTypeEnum.FUTIDX,
         symbol=strategy_schema.symbol,

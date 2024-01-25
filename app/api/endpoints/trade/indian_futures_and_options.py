@@ -35,7 +35,8 @@ from app.tasks.tasks import close_trades_in_db_and_remove_from_redis
 from app.tasks.tasks import compute_trade_data_needed_for_closing_trade
 from app.tasks.tasks import task_entry_trade
 from app.tasks.tasks import task_exit_trade
-from app.tasks.utils import get_monthly_expiry_date
+from app.tasks.utils import get_monthly_expiry_date_from_redis
+from app.utils.constants import FUT
 
 
 logging.basicConfig(
@@ -92,24 +93,37 @@ async def post_nfo_indian_options(
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
 ):
-    start_time = time.perf_counter()
-    set_option_type(strategy_schema, signal_payload_schema)
-
     logging.info(
         f"Received signal payload to buy: [ {signal_payload_schema.option_type} ] for strategy: {strategy_schema.name}"
     )
 
-    (
-        current_expiry_date,
-        next_expiry_date,
-        is_today_expiry,
-    ) = await get_current_and_next_expiry_from_redis(async_redis_client, strategy_schema)
-    signal_payload_schema.expiry = current_expiry_date
+    start_time = time.perf_counter()
+    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
+        set_option_type(strategy_schema, signal_payload_schema)
+        (
+            current_expiry_date,
+            next_expiry_date,
+            is_today_expiry,
+        ) = await get_current_and_next_expiry_from_redis(async_redis_client, strategy_schema)
+        redis_hash = (
+            f"{current_expiry_date} {'PE' if signal_payload_schema.option_type == 'CE' else 'CE'}"
+        )
+        only_futures = True
+    else:
+        (
+            current_expiry_date,
+            next_expiry_date,
+            is_today_expiry,
+        ) = await get_monthly_expiry_date_from_redis(
+            async_redis_client=async_redis_client,
+            instrument_type=strategy_schema.instrument_type,
+            symbol=strategy_schema.symbol,
+        )
+        redis_hash = f"{current_expiry_date} {FUT}"
+        only_futures = True
 
+    signal_payload_schema.expiry = current_expiry_date
     trades_key = f"{signal_payload_schema.strategy_id}"
-    redis_hash = (
-        f"{current_expiry_date} {'PE' if signal_payload_schema.option_type == 'CE' else 'CE'}"
-    )
 
     # TODO: in future decide based on strategy new column, strategy_type:
     # if strategy_position is "every" then close all ongoing trades and buy new trade
@@ -122,6 +136,7 @@ async def post_nfo_indian_options(
         "async_redis_client": async_redis_client,
         "strategy_schema": strategy_schema,
         "async_httpx_client": async_httpx_client,
+        "only_futures": only_futures,
     }
 
     lots_to_open, ongoing_profit_or_loss = get_lots_to_trade_and_profit_or_loss(
@@ -141,10 +156,6 @@ async def post_nfo_indian_options(
                 [json.loads(trade) for trade in exiting_trades_json_list]
             )
 
-            only_futures = (
-                True if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX else False
-            )
-
             (
                 updated_data,
                 total_profit,
@@ -152,7 +163,6 @@ async def post_nfo_indian_options(
             ) = await compute_trade_data_needed_for_closing_trade(
                 **kwargs,
                 redis_trade_schema_list=redis_trade_schema_list,
-                only_futures=only_futures,
             )
 
             lots_to_open, ongoing_profit_or_loss = get_lots_to_trade_and_profit_or_loss(
@@ -210,7 +220,7 @@ async def post_nfo_indian_futures(
         current_month_expiry,
         next_month_expiry,
         is_today_months_expiry,
-    ) = await get_monthly_expiry_date(
+    ) = await get_monthly_expiry_date_from_redis(
         async_redis_client=async_redis_client,
         instrument_type=strategy_schema,
         symbol=strategy_schema.instrument,

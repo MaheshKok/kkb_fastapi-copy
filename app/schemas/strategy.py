@@ -22,7 +22,7 @@ class StrategyCreateSchema(BaseModel):
     name: str = Field(description="Name", example="BANKNIFTY1! TF:2 Brick_Size:35 Pyramiding:100")
     position: PositionEnum = Field(description="Position", example="LONG")
 
-    premium: Optional[float] = Field(description="Premium", example=350.0, default=0.0)
+    premium: Optional[float] = Field(description="Premium", example=350.0, default=None)
 
     funds: float = Field(description="Funds", example=1000000.0)
     min_quantity: float = Field(description="Min Quantity", example=10)
@@ -94,7 +94,7 @@ class CFDStrategySchema(BaseModel):
     name: str = Field(description="Name", example="Renko Strategy Every Candle")
 
     compounding: bool = Field(description="Compounding")
-    contracts: Optional[float] = Field(description="Contracts", example=15, default=0.0)
+    contracts: Optional[float] = Field(description="Contracts", example=15, default=None)
     funds_usage_percent: float = Field(description="Funds Usage Percent", example=0.25)
 
     user_id: uuid.UUID = Field(
