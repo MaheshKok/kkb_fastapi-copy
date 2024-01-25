@@ -78,6 +78,24 @@ def set_option_type(strategy_schema: StrategySchema, payload: SignalPayloadSchem
     )
 
 
+def set_quantity(
+    *,
+    signal_payload_schema: SignalPayloadSchema,
+    quantity: float,
+    strategy_schema: StrategySchema,
+) -> None:
+    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
+        if strategy_schema.position == PositionEnum.LONG:
+            signal_payload_schema.quantity = quantity
+        else:
+            signal_payload_schema.quantity = -quantity
+    else:
+        if signal_payload_schema.action == SignalTypeEnum.BUY:
+            signal_payload_schema.quantity = quantity
+        else:
+            signal_payload_schema.quantity = -quantity
+
+
 @fno_router.post("/nfo", status_code=200)
 async def post_nfo_indian_options(
     signal_payload_schema: SignalPayloadSchema,
@@ -111,7 +129,7 @@ async def post_nfo_indian_options(
             instrument_type=strategy_schema.instrument_type,
             symbol=strategy_schema.symbol,
         )
-        redis_hash = f"{current_expiry_date} {FUT}"
+        redis_hash = f"{current_expiry_date} {PositionEnum.LONG if signal_payload_schema.action == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
         only_futures = True
 
     signal_payload_schema.expiry = current_expiry_date
@@ -162,7 +180,12 @@ async def post_nfo_indian_options(
                 strategy_schema=strategy_schema,
                 ongoing_profit_or_loss=total_profit,
             )
-            signal_payload_schema.quantity = lots_to_open
+
+            set_quantity(
+                signal_payload_schema=signal_payload_schema,
+                quantity=lots_to_open,
+                strategy_schema=strategy_schema,
+            )
 
             # update database with the updated data
             exit_task = asyncio.create_task(

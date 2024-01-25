@@ -5,7 +5,9 @@ from sqlalchemy import select
 
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
+from app.schemas.enums import PositionEnum
 from app.schemas.trade import RedisTradeSchema
+from app.utils.constants import FUT
 
 
 async def cache_ongoing_trades(async_redis_client):
@@ -38,7 +40,10 @@ async def cache_ongoing_trades(async_redis_client):
         ongoing_trades_model = live_trades_query.scalars().all()
         redis_key_trade_models_dict = {}
         for ongoing_trade_model in ongoing_trades_model:
-            redis_hash = f"{ongoing_trade_model.expiry} {ongoing_trade_model.option_type}"
+            if ongoing_trade_model.option_type:
+                redis_hash = f"{ongoing_trade_model.expiry} {ongoing_trade_model.option_type}"
+            else:
+                redis_hash = f"{ongoing_trade_model.expiry} {PositionEnum.LONG if ongoing_trade_model.quantity > 0 else PositionEnum.SHORT} {FUT}"
             strategy_id = f"{ongoing_trade_model.strategy_id}"
             if strategy_id not in redis_key_trade_models_dict:
                 redis_key_trade_models_dict[strategy_id] = {redis_hash: []}

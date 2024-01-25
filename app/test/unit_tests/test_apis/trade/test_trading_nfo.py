@@ -423,7 +423,8 @@ async def test_trading_nfo_futures_first_ever_trade(
 
         # assert trade in redis
         redis_trade_json = await test_async_redis_client.hget(
-            f"{strategy_model.id}", f"{trade_model.expiry} {FUT}"
+            f"{strategy_model.id}",
+            f"{trade_model.expiry} {PositionEnum.LONG if action==SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}",
         )
         redis_trade_list = [
             RedisTradeSchema.model_validate_json(trade) for trade in json.loads(redis_trade_json)
@@ -442,7 +443,7 @@ async def test_trading_nfo_futures_opposite_direction(
         users=1,
         strategies=1,
         trades=10,
-        position=PositionEnum.SHORT,
+        position=PositionEnum.LONG,
         instrument_type=InstrumentTypeEnum.FUTIDX,
     )
 
@@ -473,7 +474,7 @@ async def test_trading_nfo_futures_opposite_direction(
         trade_model = strategy_model.trades[0]
         await test_async_redis_client.hset(
             f"{strategy_model.id}",
-            f"{trade_model.expiry} {FUT}",
+            f"{trade_model.expiry} {PositionEnum.LONG if action == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}",
             redis_trade_schema_list,
         )
 
@@ -520,7 +521,7 @@ async def test_trading_nfo_futures_opposite_direction(
         # assert new trade in redis
         redis_trade_list_json = await test_async_redis_client.hget(
             str(strategy_model.id),
-            f"{exited_trade_models[0].expiry} {FUT}",
+            f"{exited_trade_models[0].expiry} {PositionEnum.LONG if action==SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}",
         )
         assert len(json.loads(redis_trade_list_json)) == 1
         # calculate profits

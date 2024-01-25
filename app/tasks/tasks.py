@@ -11,7 +11,6 @@ from line_profiler import profile  # noqa
 from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
@@ -19,6 +18,7 @@ from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
+from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import EntryTradeSchema
 from app.schemas.trade import ExitTradeSchema
@@ -187,13 +187,19 @@ async def calculate_profits(
 
 
 async def push_trade_to_redis(
-    async_redis_client: aioredis.StrictRedis, trade_model: TradeModel, async_session: AsyncSession
+    *,
+    async_redis_client: aioredis.StrictRedis,
+    trade_model: TradeModel,
+    signal_type: SignalTypeEnum,
 ):
     # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
     # it works i confirmed this with python_console with dummy data,
     # interesting part is to get such trades i have to call lrange with 0, -1
     redis_key = str(trade_model.strategy_id)
-    redis_hash = f"{trade_model.expiry} {trade_model.option_type or FUT}"
+    if trade_model.option_type:
+        redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
+    else:
+        redis_hash = f"{trade_model.expiry} {PositionEnum.LONG if signal_type == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
     redis_trades_json = await async_redis_client.hget(redis_key, redis_hash)
     new_trade_json = RedisTradeSchema.model_validate(trade_model).model_dump_json(
         exclude={"received_at"}, exclude_none=True
@@ -238,7 +244,11 @@ async def dump_trade_in_db_and_redis(
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], new trade: [{trade_model.id}] added to DB"
         )
-        await push_trade_to_redis(async_redis_client, trade_model, async_session)
+        await push_trade_to_redis(
+            async_redis_client=async_redis_client,
+            trade_model=trade_model,
+            signal_type=signal_payload_schema.action,
+        )
 
 
 async def close_trades_in_db_and_remove_from_redis(
