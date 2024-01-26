@@ -10,7 +10,6 @@ from httpx import AsyncClient
 from app.api.utils import get_expiry_dict_from_alice_blue
 from app.broker.utils import buy_alice_blue_trades
 from app.broker.utils import close_alice_blue_trades
-from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
@@ -110,20 +109,10 @@ async def get_monthly_expiry_date_from_alice_blue(*, instrument_type, symbol):
     return current_month_expiry, next_month_expiry, is_today_months_expiry
 
 
-async def get_future_price(async_redis_client, strategy_schema) -> float:
-    current_month_expiry, _, _ = await get_monthly_expiry_date_from_redis(
-        async_redis_client=async_redis_client,
-        instrument_type=InstrumentTypeEnum.FUTIDX,
-        symbol=strategy_schema.symbol,
-    )
-
-    # I hope this never happens
-    if not current_month_expiry:
-        return 0.0
-
+async def get_future_price(*, async_redis_client, strategy_schema, expiry_date) -> float:
     future_option_chain = await get_option_chain(
         async_redis_client=async_redis_client,
-        expiry=current_month_expiry,
+        expiry=expiry_date,
         strategy_schema=strategy_schema,
         is_future=True,
     )

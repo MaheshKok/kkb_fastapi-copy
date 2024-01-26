@@ -315,6 +315,7 @@ async def task_entry_trade(
         future_entry_price = await get_future_price(
             async_redis_client=async_redis_client,
             strategy_schema=strategy_schema,
+            expiry_date=signal_payload_schema.expiry,
         )
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], new trade with future entry price: [ {future_entry_price} ] entering into db"
@@ -352,6 +353,7 @@ async def task_entry_trade(
             get_future_price(
                 async_redis_client=async_redis_client,
                 strategy_schema=strategy_schema,
+                expiry_date=signal_payload_schema.expiry,
             ),
         )
 
@@ -398,6 +400,7 @@ async def compute_trade_data_needed_for_closing_trade(
         future_exit_price = await get_future_price(
             async_redis_client=async_redis_client,
             strategy_schema=strategy_schema,
+            expiry_date=signal_payload_schema.expiry,
         )
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
@@ -440,6 +443,7 @@ async def compute_trade_data_needed_for_closing_trade(
             get_future_price(
                 async_redis_client=async_redis_client,
                 strategy_schema=strategy_schema,
+                expiry_date=signal_payload_schema.expiry,
             ),
         )
         logging.info(
