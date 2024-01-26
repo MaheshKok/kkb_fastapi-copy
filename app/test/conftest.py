@@ -43,6 +43,7 @@ logging.basicConfig(
 #     from app.schemas.enums import InstrumentTypeEnum
 #     from app.tasks.utils import get_monthly_expiry_date_from_redis
 #     from app.api.utils import get_expiry_dict_from_alice_blue
+#     from app.utils.constants import AB_NFO_CONTRACTS_URL, INSTRUMENT_COLUMN
 #
 #     test_config = get_config(ConfigFile.TEST)
 #     _test_async_redis_client = aioredis.Redis(
