@@ -10,6 +10,9 @@ from httpx import AsyncClient
 from app.api.utils import get_expiry_dict_from_alice_blue
 from app.broker.utils import buy_alice_blue_trades
 from app.broker.utils import close_alice_blue_trades
+from app.schemas.enums import InstrumentTypeEnum
+from app.schemas.enums import PositionEnum
+from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
@@ -218,3 +221,22 @@ async def get_strike_and_entry_price(
             raise HTTPException(status_code=500, detail=json.dumps(e))
 
     return strike, premium
+
+
+def set_quantity(
+    *,
+    signal_payload_schema: SignalPayloadSchema,
+    quantity: float,
+    strategy_schema: StrategySchema,
+) -> None:
+    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
+        if strategy_schema.position == PositionEnum.LONG:
+            signal_payload_schema.quantity = quantity
+        else:
+            signal_payload_schema.quantity = -quantity
+    else:
+        # this is for futures
+        if signal_payload_schema.action == SignalTypeEnum.BUY:
+            signal_payload_schema.quantity = quantity
+        else:
+            signal_payload_schema.quantity = -quantity

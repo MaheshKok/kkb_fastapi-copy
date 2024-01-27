@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+import traceback
+from datetime import date
 from datetime import datetime
 from typing import List
 
@@ -12,10 +14,10 @@ from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy import text
 
+from app.api.utils import get_lots_to_trade_and_profit_or_loss
 from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
-from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum
@@ -27,6 +29,7 @@ from app.schemas.trade import SignalPayloadSchema
 from app.tasks.utils import get_future_price
 from app.tasks.utils import get_strike_and_entry_price
 from app.tasks.utils import get_strike_and_exit_price_dict
+from app.tasks.utils import set_quantity
 from app.utils.constants import FUT
 from app.utils.constants import update_trade_columns
 from app.utils.option_chain import get_option_chain
@@ -456,41 +459,64 @@ async def compute_trade_data_needed_for_closing_trade(
         return updated_data, total_profit, total_future_profit
 
 
-# TODO: replace this with get_sell_task i.e all unit test should test that func and not this one
-# @profile
 async def task_exit_trade(
     *,
     signal_payload_schema: SignalPayloadSchema,
-    redis_strategy_key_hash: str,
-    redis_trade_schema_list: list[RedisTradeSchema],
-    async_redis_client: Redis,
     strategy_schema: StrategySchema,
+    async_redis_client: Redis,
     async_httpx_client: AsyncClient,
+    only_futures: bool,
+    redis_hash: str,
+    expiry_date: date,
+    redis_trade_schema_list: List[RedisTradeSchema],
 ):
-    only_futures = True if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX else False
+    signal_payload_schema.expiry = expiry_date
+    trades_key = f"{signal_payload_schema.strategy_id}"
 
-    (
-        updated_data,
-        total_profit,
-        total_future_profit,
-    ) = await compute_trade_data_needed_for_closing_trade(
-        signal_payload_schema=signal_payload_schema,
-        redis_trade_schema_list=redis_trade_schema_list,
-        async_redis_client=async_redis_client,
-        strategy_schema=strategy_schema,
-        async_httpx_client=async_httpx_client,
-        only_futures=only_futures,
-    )
+    # TODO: in future decide based on strategy new column, strategy_type:
+    # if strategy_position is "every" then close all ongoing trades and buy new trade
+    # 2. strategy_position is "signal", then on action: EXIT, close same option type trades
+    # and buy new trade on BUY action,
+    # To be decided in future, the name of actions
 
-    # update database with the updated data
-    await close_trades_in_db_and_remove_from_redis(
-        updated_data=updated_data,
-        strategy_schema=strategy_schema,
-        total_profit=total_profit,
-        total_future_profit=total_future_profit,
-        total_redis_trades=len(redis_trade_schema_list),
-        async_redis_client=async_redis_client,
-        redis_strategy_key_hash=redis_strategy_key_hash,
-    )
+    try:
+        (
+            updated_data,
+            total_profit,
+            total_future_profit,
+        ) = await compute_trade_data_needed_for_closing_trade(
+            signal_payload_schema=signal_payload_schema,
+            redis_trade_schema_list=redis_trade_schema_list,
+            async_redis_client=async_redis_client,
+            strategy_schema=strategy_schema,
+            async_httpx_client=async_httpx_client,
+            only_futures=only_futures,
+        )
 
-    return f"{redis_strategy_key_hash} closed trades, updated the take_away_profit with the profit and deleted the redis key"
+        lots_to_open, ongoing_profit_or_loss = get_lots_to_trade_and_profit_or_loss(
+            funds_to_use=strategy_schema.funds,
+            strategy_schema=strategy_schema,
+            ongoing_profit_or_loss=total_profit,
+        )
+
+        set_quantity(
+            signal_payload_schema=signal_payload_schema,
+            quantity=lots_to_open,
+            strategy_schema=strategy_schema,
+        )
+
+        # update database with the updated data
+        return asyncio.create_task(
+            close_trades_in_db_and_remove_from_redis(
+                updated_data=updated_data,
+                strategy_schema=strategy_schema,
+                total_profit=ongoing_profit_or_loss,
+                total_future_profit=total_future_profit,
+                total_redis_trades=len(redis_trade_schema_list),
+                async_redis_client=async_redis_client,
+                redis_strategy_key_hash=f"{trades_key} {redis_hash}",
+            )
+        )
+    except Exception as e:
+        logging.error(f"Exception while exiting trade: {e}")
+        traceback.print_exc()

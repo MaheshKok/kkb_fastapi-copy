@@ -2,8 +2,6 @@ import asyncio
 import json
 import logging
 import time
-import traceback
-from datetime import date
 from http.client import HTTPException  # noqa
 from typing import List
 
@@ -30,9 +28,8 @@ from app.schemas.strategy import StrategySchema
 from app.schemas.trade import DBEntryTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
-from app.tasks.tasks import close_trades_in_db_and_remove_from_redis
-from app.tasks.tasks import compute_trade_data_needed_for_closing_trade
 from app.tasks.tasks import task_entry_trade
+from app.tasks.tasks import task_exit_trade
 from app.tasks.utils import get_monthly_expiry_date_from_redis
 from app.utils.constants import FUT
 
@@ -77,24 +74,6 @@ def set_option_type(strategy_schema: StrategySchema, payload: SignalPayloadSchem
     payload.option_type = position_based_trade.get(payload.action) or opposite_trade.get(
         payload.option_type
     )
-
-
-def set_quantity(
-    *,
-    signal_payload_schema: SignalPayloadSchema,
-    quantity: float,
-    strategy_schema: StrategySchema,
-) -> None:
-    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if strategy_schema.position == PositionEnum.LONG:
-            signal_payload_schema.quantity = quantity
-        else:
-            signal_payload_schema.quantity = -quantity
-    else:
-        if signal_payload_schema.action == SignalTypeEnum.BUY:
-            signal_payload_schema.quantity = quantity
-        else:
-            signal_payload_schema.quantity = -quantity
 
 
 def get_opposite_trade_option_type(strategy_position, signal_action) -> OptionTypeEnum:
@@ -170,11 +149,13 @@ async def post_nfo_indian_options(
         redis_trade_schema_list = TypeAdapter(List[RedisTradeSchema]).validate_python(
             [json.loads(trade) for trade in exiting_trades_json_list]
         )
-        exit_task = get_sell_task(
-            **kwargs,
-            redis_hash=redis_hash,
-            expiry_date=current_expiry_date,
-            redis_trade_schema_list=redis_trade_schema_list,
+        exit_task = asyncio.create_task(
+            task_exit_trade(
+                **kwargs,
+                redis_hash=redis_hash,
+                expiry_date=current_expiry_date,
+                redis_trade_schema_list=redis_trade_schema_list,
+            )
         )
 
     # initiate buy_trade
@@ -200,66 +181,3 @@ async def post_nfo_indian_options(
     process_time = time.perf_counter() - start_time
     logging.info(f" API: [ post_nfo ] request processing time: {process_time} seconds")
     return msg
-
-
-async def get_sell_task(
-    *,
-    signal_payload_schema: SignalPayloadSchema,
-    strategy_schema: StrategySchema,
-    async_redis_client: Redis,
-    async_httpx_client: AsyncClient,
-    only_futures: bool,
-    redis_hash: str,
-    expiry_date: date,
-    redis_trade_schema_list: List[RedisTradeSchema],
-):
-    signal_payload_schema.expiry = expiry_date
-    trades_key = f"{signal_payload_schema.strategy_id}"
-
-    # TODO: in future decide based on strategy new column, strategy_type:
-    # if strategy_position is "every" then close all ongoing trades and buy new trade
-    # 2. strategy_position is "signal", then on action: EXIT, close same option type trades
-    # and buy new trade on BUY action,
-    # To be decided in future, the name of actions
-
-    try:
-        (
-            updated_data,
-            total_profit,
-            total_future_profit,
-        ) = await compute_trade_data_needed_for_closing_trade(
-            signal_payload_schema=signal_payload_schema,
-            redis_trade_schema_list=redis_trade_schema_list,
-            async_redis_client=async_redis_client,
-            strategy_schema=strategy_schema,
-            async_httpx_client=async_httpx_client,
-            only_futures=only_futures,
-        )
-
-        lots_to_open, ongoing_profit_or_loss = get_lots_to_trade_and_profit_or_loss(
-            funds_to_use=strategy_schema.funds,
-            strategy_schema=strategy_schema,
-            ongoing_profit_or_loss=total_profit,
-        )
-
-        set_quantity(
-            signal_payload_schema=signal_payload_schema,
-            quantity=lots_to_open,
-            strategy_schema=strategy_schema,
-        )
-
-        # update database with the updated data
-        return asyncio.create_task(
-            close_trades_in_db_and_remove_from_redis(
-                updated_data=updated_data,
-                strategy_schema=strategy_schema,
-                total_profit=ongoing_profit_or_loss,
-                total_future_profit=total_future_profit,
-                total_redis_trades=len(redis_trade_schema_list),
-                async_redis_client=async_redis_client,
-                redis_strategy_key_hash=f"{trades_key} {redis_hash}",
-            )
-        )
-    except Exception as e:
-        logging.error(f"Exception while exiting trade: {e}")
-        traceback.print_exc()
