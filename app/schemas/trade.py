@@ -93,7 +93,7 @@ class ExitTradeSchema(BaseModel):
 class EntryTradeSchema(SignalPayloadSchema):
     model_config = ConfigDict(from_attributes=True)
 
-    entry_price: float = Field(description="Entry Price", example=350.5)
+    entry_price: Optional[float] = Field(description="Entry Price", example=350.5, default=None)
     future_entry_price: float = Field(description="Future Entry Price", example=40600.5)
 
     entry_at: datetime = Field(

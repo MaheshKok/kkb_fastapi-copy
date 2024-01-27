@@ -474,7 +474,7 @@ async def test_trading_nfo_futures_opposite_direction(
         trade_model = strategy_model.trades[0]
         await test_async_redis_client.hset(
             f"{strategy_model.id}",
-            f"{trade_model.expiry} {PositionEnum.LONG if action == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}",
+            f"{trade_model.expiry} {PositionEnum.SHORT if action == SignalTypeEnum.BUY else PositionEnum.LONG} {FUT}",
             redis_trade_schema_list,
         )
 

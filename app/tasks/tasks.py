@@ -311,11 +311,13 @@ async def task_entry_trade(
     async_httpx_client: AsyncClient,
     only_futures: bool = False,
 ):
+    # i have no clue how expiry is getting set to None after execution of get_future_price
+    expiry = signal_payload_schema.expiry
     if only_futures:
         future_entry_price = await get_future_price(
             async_redis_client=async_redis_client,
             strategy_schema=strategy_schema,
-            expiry_date=signal_payload_schema.expiry,
+            expiry_date=expiry,
         )
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], new trade with future entry price: [ {future_entry_price} ] entering into db"
@@ -323,21 +325,12 @@ async def task_entry_trade(
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
         )
-
-        await dump_trade_in_db_and_redis(
-            entry_price=future_entry_price,
-            strategy_schema=strategy_schema,
-            future_entry_price=future_entry_price,
-            signal_payload_schema=signal_payload_schema,
-            async_redis_client=async_redis_client,
-        )
-
-        return "successfully added trade to db"
+        entry_price = None
 
     else:
         option_chain = await get_option_chain(
             async_redis_client=async_redis_client,
-            expiry=signal_payload_schema.expiry,
+            expiry=expiry,
             option_type=signal_payload_schema.option_type,
             strategy_schema=strategy_schema,
         )
@@ -376,15 +369,16 @@ async def task_entry_trade(
         # this is very important to set strike to signal_payload_schema as it would be used hereafter
         signal_payload_schema.strike = strike
 
-        await dump_trade_in_db_and_redis(
-            strategy_schema=strategy_schema,
-            entry_price=entry_price,
-            future_entry_price=future_entry_price,
-            signal_payload_schema=signal_payload_schema,
-            async_redis_client=async_redis_client,
-        )
+    signal_payload_schema.expiry = expiry
+    await dump_trade_in_db_and_redis(
+        strategy_schema=strategy_schema,
+        entry_price=entry_price,
+        future_entry_price=future_entry_price,
+        signal_payload_schema=signal_payload_schema,
+        async_redis_client=async_redis_client,
+    )
 
-        return "successfully added trade to db"
+    return "successfully added trade to db"
 
 
 async def compute_trade_data_needed_for_closing_trade(
@@ -462,6 +456,7 @@ async def compute_trade_data_needed_for_closing_trade(
         return updated_data, total_profit, total_future_profit
 
 
+# TODO: replace this with get_sell_task i.e all unit test should test that func and not this one
 # @profile
 async def task_exit_trade(
     *,
