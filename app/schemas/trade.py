@@ -130,6 +130,7 @@ class EntryTradeSchema(SignalPayloadSchema):
                 return {**values, "instrument": instrument}
 
 
+# below schema is used only for as Response Model in endpoints where trades are retrieved from DB
 class DBEntryTradeSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

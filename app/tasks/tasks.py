@@ -325,7 +325,7 @@ async def task_entry_trade(
         )
 
         await dump_trade_in_db_and_redis(
-            entry_price=0.0,
+            entry_price=future_entry_price,
             strategy_schema=strategy_schema,
             future_entry_price=future_entry_price,
             signal_payload_schema=signal_payload_schema,
