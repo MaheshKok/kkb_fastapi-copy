@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy import select
 
-from app.broker.alice_blue import Pya3Aliceblue
+from app.broker.AliceBlue import Pya3Aliceblue
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.models import User

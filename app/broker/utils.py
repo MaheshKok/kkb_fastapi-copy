@@ -19,8 +19,8 @@ from pya3 import TransactionType
 from sqlalchemy import select
 
 from app.api.utils import update_session_token
-from app.broker.alice_blue import Pya3Aliceblue
-from app.broker.alice_blue import logging
+from app.broker.AliceBlue import Pya3Aliceblue
+from app.broker.AliceBlue import logging
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema

@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy import update
 
-from app.broker.alice_blue import Pya3Aliceblue
+from app.broker.AliceBlue import Pya3Aliceblue
 from app.broker.AsyncCapital import AsyncCapitalClient
 from app.database.models import BrokerModel
 from app.database.models import CFDStrategyModel
