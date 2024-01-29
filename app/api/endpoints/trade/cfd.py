@@ -1,4 +1,5 @@
 import logging
+import time
 
 from fastapi import APIRouter
 from fastapi import Depends
@@ -24,6 +25,8 @@ async def post_cfd(
     cfd_payload_schema: CFDPayloadSchema,
     cfd_strategy_schema: CFDStrategySchema = Depends(get_cfd_strategy_schema),
 ):
+    start_time = time.perf_counter()
+
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
     logging.info(
         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] received"
@@ -53,18 +56,26 @@ async def post_cfd(
         if position_reversed:
             msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots [ {current_open_lots} ] are reversed in [ {direction} ] direction,  hence skipping opening new positions"
             logging.info(msg)
+            process_time = time.perf_counter() - start_time
+            logging.info(
+                f" API: [ post_capital_cfd ] request processing time: {process_time} seconds"
+            )
             return msg
 
     if direction != cfd_payload_schema.direction.upper():
         # funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
 
-        return await open_capital_lots(
+        await open_capital_lots(
             client=client,
             cfd_strategy_schema=cfd_strategy_schema,
             cfd_payload_schema=cfd_payload_schema,
             demo_or_live=demo_or_live,
             profit_or_loss=profit_or_loss,
             funds_to_use=0.0,
+        )
+        process_time = time.perf_counter() - start_time
+        logging.info(
+            f" API: [ post_capital_cfd ] request processing time: {process_time} seconds"
         )
     else:
         msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] is same as current direction, hence skipping opening new positions"
