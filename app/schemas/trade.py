@@ -78,7 +78,7 @@ class ExitTradeSchema(BaseModel):
     id: uuid.UUID = Field(description="Trade ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3")
     exit_price: float = Field(description="Exit Price", example=450.5)
     profit: float = Field(description="Profit", example=2500.0)
-    future_exit_price: float = Field(description="Future Exit Price", example=40700.5)
+    future_exit_price_received: float = Field(description="Future Exit Price", example=40700.5)
     future_profit: float = Field(description="Future Profit", example=2500.0)
     exit_at: datetime = Field(
         description="Exited At", default=datetime.utcnow(), example="2023-05-22 06:25:03.117358"

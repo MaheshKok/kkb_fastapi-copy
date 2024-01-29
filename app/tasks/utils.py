@@ -1,6 +1,7 @@
 import json
 import logging
 import traceback
+from datetime import date
 from datetime import datetime
 
 from aioredis import Redis
@@ -50,7 +51,9 @@ def strip_previous_expiry_dates(expiry_list_date_obj):
     return upcoming_expiry_dates
 
 
-async def get_monthly_expiry_date_from_redis(*, async_redis_client, instrument_type, symbol):
+async def get_monthly_expiry_date_from_redis(
+    *, async_redis_client: Redis, instrument_type: InstrumentTypeEnum, symbol: str
+):
     symbol_expiry_str = await async_redis_client.get(instrument_type)
     symbol_expiry = json.loads(symbol_expiry_str)
     expiry_list_date_obj = [
@@ -133,6 +136,7 @@ async def get_strike_and_exit_price_dict(
     redis_trade_schema_list: list[RedisTradeSchema],
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
+    expiry_date: date,
 ) -> dict:
     # Reason being trade_payload is an entry trade and we want to close all ongoing trades of opposite option_type
     ongoing_trades_option_type = (
@@ -149,7 +153,7 @@ async def get_strike_and_exit_price_dict(
         strike_exit_price_dict = await get_exit_price_from_option_chain(
             async_redis_client=async_redis_client,
             redis_trade_schema_list=redis_trade_schema_list,
-            expiry_date=signal_payload_schema.expiry,
+            expiry_date=expiry_date,
             option_type=ongoing_trades_option_type,
             strategy_schema=strategy_schema,
         )

@@ -97,48 +97,59 @@ async def post_nfo_indian_options(
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
 ):
-    logging.info(
-        f"Received signal payload to buy: [ {signal_payload_schema.option_type} ] for strategy: {strategy_schema.name}"
-    )
-
     start_time = time.perf_counter()
-
-    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
-        set_option_type(strategy_schema, signal_payload_schema)
-        (
-            current_expiry_date,
-            next_expiry_date,
-            is_today_expiry,
-        ) = await get_current_and_next_expiry_from_redis(async_redis_client, strategy_schema)
-        # fetch opposite position based trades
-        opposite_trade_option_type = get_opposite_trade_option_type(
-            strategy_schema.position, signal_payload_schema.action
-        )
-        redis_hash = f"{current_expiry_date} {opposite_trade_option_type}"
-        only_futures = False
-    else:
-        (
-            current_expiry_date,
-            next_expiry_date,
-            is_today_expiry,
-        ) = await get_monthly_expiry_date_from_redis(
-            async_redis_client=async_redis_client,
-            instrument_type=strategy_schema.instrument_type,
-            symbol=strategy_schema.symbol,
-        )
-        # fetch opposite position based trades
-        redis_hash = f"{current_expiry_date} {PositionEnum.SHORT if signal_payload_schema.action == SignalTypeEnum.BUY else PositionEnum.LONG} {FUT}"
-        only_futures = True
+    logging.info(
+        f"Received [ {signal_payload_schema.action} ] signal for strategy: {strategy_schema.name}"
+    )
 
     kwargs = {
         "signal_payload_schema": signal_payload_schema,
         "strategy_schema": strategy_schema,
         "async_redis_client": async_redis_client,
         "async_httpx_client": async_httpx_client,
-        "only_futures": only_futures,
     }
 
-    signal_payload_schema.expiry = current_expiry_date
+    # hardcoded instrument_type because i want to explicitly get expiry for futures
+    # i cant fetch it from strategy_schema.instrument_type because it can be OPTIDX.
+    (
+        current_futures_expiry_date,
+        next_futures_expiry_date,
+        is_today_futures_expiry,
+    ) = await get_monthly_expiry_date_from_redis(
+        async_redis_client=async_redis_client,
+        instrument_type=InstrumentTypeEnum.FUTIDX,
+        symbol=strategy_schema.symbol,
+    )
+    # fetch opposite position based trades
+    redis_hash = f"{current_futures_expiry_date} {PositionEnum.SHORT if signal_payload_schema.action == SignalTypeEnum.BUY else PositionEnum.LONG} {FUT}"
+    signal_payload_schema.expiry = current_futures_expiry_date
+    kwargs.update(
+        {
+            "only_futures": True,
+            "futures_expiry_date": current_futures_expiry_date,
+        }
+    )
+
+    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
+        set_option_type(strategy_schema, signal_payload_schema)
+        (
+            current_options_expiry_date,
+            next_options_expiry_date,
+            is_today_options_expiry,
+        ) = await get_current_and_next_expiry_from_redis(async_redis_client, strategy_schema)
+        # fetch opposite position based trades
+        opposite_trade_option_type = get_opposite_trade_option_type(
+            strategy_schema.position, signal_payload_schema.action
+        )
+        redis_hash = f"{current_options_expiry_date} {opposite_trade_option_type}"
+        signal_payload_schema.expiry = current_options_expiry_date
+        kwargs.update(
+            {
+                "only_futures": False,
+                "options_expiry_date": current_options_expiry_date,
+            }
+        )
+
     trades_key = f"{signal_payload_schema.strategy_id}"
     lots_to_open = None
     if exiting_trades_json := await async_redis_client.hget(trades_key, redis_hash):
@@ -151,7 +162,7 @@ async def post_nfo_indian_options(
         lots_to_open = await task_exit_trade(
             **kwargs,
             redis_hash=redis_hash,
-            expiry_date=current_expiry_date,
+            expiry_date=signal_payload_schema.expiry,
             redis_trade_schema_list=redis_trade_schema_list,
         )
 

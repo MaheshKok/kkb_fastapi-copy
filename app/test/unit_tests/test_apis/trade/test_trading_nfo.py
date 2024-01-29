@@ -26,6 +26,35 @@ from app.utils.constants import update_trade_columns
 from app.utils.option_chain import get_option_chain
 
 
+futures_entry_columns_captured = {
+    "instrument",
+    "quantity",
+    "entry_price",
+    "future_entry_price_received",
+    "entry_priceceived_at",
+    "entry_at",
+    "expiry",
+    "action",
+    "strategy_id",
+}
+options_specific_entry_columns = {"strike", "option_type"}
+options_entry_columns_captured = {
+    *futures_entry_columns_captured,
+    *options_specific_entry_columns,
+}
+
+exit_columns_captured = futures_exit_columns_captured = {
+    *futures_entry_columns_captured,
+    "exit_price",
+    "future_exit_price_received",
+    "exit_received_at",
+    "exit_at",
+    "profit",
+    "future_profit",
+}
+options_exit_columns_captured = {*options_entry_columns_captured, *exit_columns_captured}
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "action", [SignalTypeEnum.BUY, SignalTypeEnum.SELL], ids=["Buy Signal", "Sell Signal"]
@@ -56,6 +85,20 @@ async def test_trading_nfo_options_first_ever_trade(
         trade_model = await async_session.scalar(select(TradeModel))
         await async_session.refresh(strategy_model)
         assert trade_model.strategy_id == strategy_model.id
+
+        # expunge all trade models from session
+        async_session.expunge_all()
+
+        trade_models = [trade_model]
+        # assert all trades are closed
+        updated_values_dict = [
+            getattr(trade_model, key)
+            for key in update_trade_columns
+            if key in options_entry_columns_captured
+            for trade_model in trade_models
+        ]
+        # all parameters of a trade are updated
+        assert all(updated_values_dict)
 
         # assert trade in redis
         redis_trade_json = await test_async_redis_client.hget(
@@ -196,17 +239,11 @@ async def test_trading_nfo_options_opposite_direction(
         exited_trade_models = fetch_trade_models_query.scalars().all()
         assert len(exited_trade_models) == 10
 
-        updated_columns = {
-            "exit_price",
-            "profit",
-            "exit_at",
-            "exit_received_at",
-        }
         # assert all trades are closed
         updated_values_dict = [
             getattr(trade_model, key)
             for key in update_trade_columns
-            if key in updated_columns
+            if key in options_exit_columns_captured
             for trade_model in exited_trade_models
         ]
         # all parameters of a trade are updated
@@ -261,6 +298,20 @@ async def test_trading_nfo_options_first_ever_trade_for_short_strategy(
             if action == SignalTypeEnum.SELL
             else OptionType.PE
         )
+
+        # expunge all trade models from session
+        async_session.expunge_all()
+
+        trade_models = [trade_model]
+        # assert all trades are closed
+        updated_values_dict = [
+            getattr(trade_model, key)
+            for key in update_trade_columns
+            if key in options_entry_columns_captured
+            for trade_model in trade_models
+        ]
+        # all parameters of a trade are updated
+        assert all(updated_values_dict)
 
         # assert trade in redis
         redis_trade_json = await test_async_redis_client.hget(
@@ -336,17 +387,11 @@ async def test_trading_nfo_options_opposite_direction_for_short_strategy(
         exited_trade_models = fetch_trade_models_query.scalars().all()
         assert len(exited_trade_models) == 10
 
-        updated_columns = {
-            "exit_price",
-            "profit",
-            "exit_at",
-            "exit_received_at",
-        }
         # assert all trades are closed
         updated_values_dict = [
             getattr(trade_model, key)
             for key in update_trade_columns
-            if key in updated_columns
+            if key in options_exit_columns_captured
             for trade_model in exited_trade_models
         ]
         # all parameters of a trade are updated
@@ -426,6 +471,20 @@ async def test_trading_nfo_futures_first_ever_trade(
         assert trade_model.strategy_id == strategy_model.id
         assert trade_model.option_type == None  # noqa
 
+        # expunge all trade models from session
+        async_session.expunge_all()
+
+        trade_models = [trade_model]
+        # assert all trades are closed
+        updated_values_dict = [
+            getattr(trade_model, key)
+            for key in update_trade_columns
+            if key in futures_entry_columns_captured
+            for trade_model in trade_models
+        ]
+        # all parameters of a trade are updated
+        assert all(updated_values_dict)
+
         # assert trade in redis
         redis_trade_json = await test_async_redis_client.hget(
             f"{strategy_model.id}",
@@ -496,23 +555,17 @@ async def test_trading_nfo_futures_opposite_direction(
             select(TradeModel).filter(
                 TradeModel.strategy_id == strategy_model.id,
                 TradeModel.option_type == None,  # noqa
-                TradeModel.future_exit_price != None,  # noqa
+                TradeModel.future_exit_price_received != None,  # noqa
             )
         )
         exited_trade_models = fetch_trade_models_query.scalars().all()
         assert len(exited_trade_models) == 10
 
-        updated_columns = {
-            "future_exit_price",
-            "future_profit",
-            "exit_at",
-            "exit_received_at",
-        }
         # assert all trades are closed
         updated_values_dict = [
             getattr(trade_model, key)
             for key in update_trade_columns
-            if key in updated_columns
+            if key in futures_exit_columns_captured
             for trade_model in exited_trade_models
         ]
         # all parameters of a trade are updated

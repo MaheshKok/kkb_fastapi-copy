@@ -38,8 +38,6 @@ class LiveTradeFactory(AsyncSQLAlchemyFactory):
     entry_price = 400.0
 
     future_entry_price_received = 44300.0
-    future_entry_price = 44315.0
-
     entry_received_at = factory.Sequence(
         lambda n: datetime.utcnow() - timedelta(days=n, minutes=1)
     )
@@ -68,8 +66,7 @@ class CompletedTradeFactory(AsyncSQLAlchemyFactory):
     profit = 2500.0
 
     future_entry_price_received = 44300.0
-    future_entry_price = 44315.0
-    future_exit_price = 44625.0
+    future_exit_price_received = 44625.0
     future_profit = 7500.0
 
     entry_received_at = factory.Sequence(

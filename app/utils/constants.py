@@ -42,7 +42,7 @@ INSTRUMENT_COLUMN = "Trading Symbol"
 update_trade_columns = {
     "exit_price",
     "profit",
-    "future_exit_price",
+    "future_exit_price_received",
     "future_profit",
     "exit_received_at",
     "exit_at",

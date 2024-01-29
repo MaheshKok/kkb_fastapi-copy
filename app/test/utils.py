@@ -60,16 +60,16 @@ async def create_open_trades(
                         expiry=expiry_date,
                         entry_price=option_entry_price,
                         action=action,
+                        future_entry_price_received=future_entry_price,
                     )
             else:
                 for _ in range(trades):
                     await LiveTradeFactory(
                         strategy=strategy,
                         expiry=expiry_date,
-                        entry_price=None,
                         strike=None,
                         option_type=None,
-                        future_entry_price=future_entry_price,
+                        future_entry_price_received=future_entry_price,
                     )
 
             if take_away_profit:

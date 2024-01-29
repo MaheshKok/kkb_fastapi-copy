@@ -21,13 +21,12 @@ class TradeModel(Base):
 
     quantity = Column(Integer, default=25, nullable=False)
 
-    entry_price = Column(Float, nullable=True)
+    entry_price = Column(Float, nullable=False)
     exit_price = Column(Float, nullable=True)
     profit = Column(Float, nullable=True)
 
-    future_entry_price_received = Column(Float, nullable=True)
-    future_entry_price = Column(Float, nullable=True)
-    future_exit_price = Column(Float, nullable=True)
+    future_entry_price_received = Column(Float, nullable=False)
+    future_exit_price_received = Column(Float, nullable=True)
     future_profit = Column(Float, nullable=True)
 
     entry_received_at = Column(TIMESTAMP(timezone=True), nullable=False)

@@ -155,13 +155,13 @@ async def calculate_profits(
         profit = get_options_profit(
             entry_price=entry_price, exit_price=exit_price, quantity=quantity, position=position
         )
-        future_entry_price = trade.future_entry_price
+        future_entry_price_received = trade.future_entry_price_received
         # if option_type is PE then position is SHORT and for CE its LONG
         future_position = (
             PositionEnum.SHORT if trade.option_type == OptionTypeEnum.PE else PositionEnum.LONG
         )
         future_profit = get_futures_profit(
-            entry_price=future_entry_price,
+            entry_price=future_entry_price_received,
             exit_price=future_exit_price,
             quantity=quantity,
             position=future_position,
@@ -169,12 +169,12 @@ async def calculate_profits(
 
         mapping = {
             "id": trade.id,
+            "future_exit_price_received": signal_payload_schema.future_entry_price_received,
             "exit_price": exit_price,
-            "profit": profit,
-            "future_exit_price": future_exit_price,
-            "future_profit": future_profit,
             "exit_received_at": exit_received_at,
             "exit_at": exit_at,
+            "profit": profit,
+            "future_profit": future_profit,
         }
 
         updated_data[trade.id] = mapping
@@ -309,57 +309,64 @@ async def task_entry_trade(
     async_redis_client: aioredis.StrictRedis,
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
+    futures_expiry_date: date,
+    options_expiry_date: date = None,
     only_futures: bool = False,
 ):
-    # i have no clue how expiry is getting set to None after execution of get_future_price
-    expiry = signal_payload_schema.expiry
-    if only_futures:
-        future_entry_price = await get_future_price(
-            async_redis_client=async_redis_client,
-            strategy_schema=strategy_schema,
-            expiry_date=expiry,
+    tasks = [
+        asyncio.create_task(
+            get_future_price(
+                async_redis_client=async_redis_client,
+                strategy_schema=strategy_schema,
+                expiry_date=futures_expiry_date,
+            )
         )
-        logging.info(
-            f"Strategy: [ {strategy_schema.name} ], new trade with future entry price: [ {future_entry_price} ] entering into db"
-        )
-        logging.info(
-            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
-        )
-        entry_price = None
-
-    else:
+    ]
+    if not only_futures:
         option_chain = await get_option_chain(
             async_redis_client=async_redis_client,
-            expiry=expiry,
+            expiry=options_expiry_date,
             option_type=signal_payload_schema.option_type,
             strategy_schema=strategy_schema,
         )
 
-        strike_and_entry_price = await get_strike_and_entry_price(
-            option_chain=option_chain,
-            signal_payload_schema=signal_payload_schema,
-            strategy_schema=strategy_schema,
-            async_redis_client=async_redis_client,
-            async_httpx_client=async_httpx_client,
+        tasks.append(
+            asyncio.create_task(
+                get_strike_and_entry_price(
+                    option_chain=option_chain,
+                    signal_payload_schema=signal_payload_schema,
+                    strategy_schema=strategy_schema,
+                    async_redis_client=async_redis_client,
+                    async_httpx_client=async_httpx_client,
+                )
+            )
         )
 
+    if not only_futures:
+        future_entry_price, strike_and_entry_price = await asyncio.gather(*tasks)
         strike, entry_price = strike_and_entry_price
-
-        # TODO: please remove this when we focus on explicitly buying only futures because strike is Null for futures
         if not strike:
             logging.info(
                 f"Strategy: [ {strategy_schema.name} ], skipping entry of new tradde as strike is Null: {entry_price}"
             )
             return None
 
+        signal_payload_schema.strike = strike
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], new trade with strike: [ {strike} ] and entry price: [ {entry_price} ] entering into db"
         )
 
-        # this is very important to set strike to signal_payload_schema as it would be used hereafter
-        signal_payload_schema.strike = strike
+    else:
+        result = await asyncio.gather(*tasks)
+        future_entry_price = result[0]
+        logging.info(
+            f"Strategy: [ {strategy_schema.name} ], new trade with future entry price: [ {future_entry_price} ] entering into db"
+        )
+        logging.info(
+            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
+        )
+        entry_price = future_entry_price
 
-    signal_payload_schema.expiry = expiry
     await dump_trade_in_db_and_redis(
         strategy_schema=strategy_schema,
         entry_price=entry_price,
@@ -377,43 +384,56 @@ async def compute_trade_data_needed_for_closing_trade(
     async_redis_client: Redis,
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
+    futures_expiry_date: date,
+    options_expiry_date: date = None,
     only_futures: bool = False,
 ):
     if only_futures:
-        future_exit_price = await get_future_price(
+        actual_exit_price = await get_future_price(
             async_redis_client=async_redis_client,
             strategy_schema=strategy_schema,
-            expiry_date=signal_payload_schema.expiry,
+            expiry_date=futures_expiry_date,
         )
         logging.info(
-            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
+            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {signal_payload_schema.future_entry_price_received - actual_exit_price } points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
         )
 
         updated_data = {}
-        total_future_profit = 0
+        total_actual_profit = 0
+        total_expected_profit = 0
         for trade_schema in redis_trade_schema_list:
             future_position = (
                 PositionEnum.SHORT
                 if trade_schema.option_type == OptionTypeEnum.PE
                 else PositionEnum.LONG
             )
-            future_profit = get_futures_profit(
-                entry_price=trade_schema.future_entry_price,
-                exit_price=future_exit_price,
+            actual_profit = get_futures_profit(
+                entry_price=trade_schema.entry_price,
+                exit_price=actual_exit_price,
+                quantity=trade_schema.quantity,
+                position=future_position,
+            )
+
+            expected_profit = get_futures_profit(
+                entry_price=trade_schema.future_entry_price_received,
+                exit_price=signal_payload_schema.future_entry_price_received,
                 quantity=trade_schema.quantity,
                 position=future_position,
             )
 
             updated_data[trade_schema.id] = {
                 "id": trade_schema.id,
-                "future_exit_price": future_exit_price,
-                "future_profit": future_profit,
+                "future_exit_price_received": signal_payload_schema.future_entry_price_received,
+                "exit_price": actual_exit_price,
                 "exit_received_at": signal_payload_schema.received_at,
                 "exit_at": datetime.utcnow(),
+                "profit": actual_profit,
+                "future_profit": expected_profit,
             }
-            total_future_profit += future_profit
+            total_actual_profit += actual_profit
+            total_expected_profit += expected_profit
 
-        return updated_data, 0.0, total_future_profit
+        return updated_data, total_actual_profit, total_expected_profit
     else:
         strike_exit_price_dict, future_exit_price = await asyncio.gather(
             get_strike_and_exit_price_dict(
@@ -422,17 +442,18 @@ async def compute_trade_data_needed_for_closing_trade(
                 redis_trade_schema_list=redis_trade_schema_list,
                 strategy_schema=strategy_schema,
                 async_httpx_client=async_httpx_client,
+                expiry_date=options_expiry_date,
             ),
             get_future_price(
                 async_redis_client=async_redis_client,
                 strategy_schema=strategy_schema,
-                expiry_date=signal_payload_schema.expiry,
+                expiry_date=futures_expiry_date,
             ),
         )
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
         )
-        updated_data, total_profit, total_future_profit = await calculate_profits(
+        updated_data, total_profit, total_actual_profit = await calculate_profits(
             strike_exit_price_dict=strike_exit_price_dict,
             future_exit_price=future_exit_price,
             signal_payload_schema=signal_payload_schema,
@@ -440,9 +461,9 @@ async def compute_trade_data_needed_for_closing_trade(
             strategy_schema=strategy_schema,
         )
         logging.info(
-            f"Strategy: [ {strategy_schema.name} ], adding profit: [ {total_profit} ] and future profit: [ {total_future_profit} ]"
+            f"Strategy: [ {strategy_schema.name} ], adding profit: [ {total_profit} ] and future profit: [ {total_actual_profit} ]"
         )
-        return updated_data, total_profit, total_future_profit
+        return updated_data, total_profit, total_actual_profit
 
 
 async def task_exit_trade(
@@ -455,6 +476,8 @@ async def task_exit_trade(
     redis_hash: str,
     expiry_date: date,
     redis_trade_schema_list: List[RedisTradeSchema],
+    futures_expiry_date: date,
+    options_expiry_date: date = None,
 ):
     signal_payload_schema.expiry = expiry_date
     trades_key = f"{signal_payload_schema.strategy_id}"
@@ -477,6 +500,8 @@ async def task_exit_trade(
             strategy_schema=strategy_schema,
             async_httpx_client=async_httpx_client,
             only_futures=only_futures,
+            futures_expiry_date=futures_expiry_date,
+            options_expiry_date=options_expiry_date,
         )
 
         lots_to_open, ongoing_profit_or_loss = get_lots_to_trade_and_profit_or_loss(
