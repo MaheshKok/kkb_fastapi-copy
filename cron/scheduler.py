@@ -5,6 +5,7 @@ from datetime import datetime
 import aiocron
 import httpx
 from cron.download_master_contracts import download_master_contract
+from cron.update_fno_expiry import sync_expiry_dates_from_alice_blue_to_redis
 
 
 logging.basicConfig(level=logging.INFO)
@@ -45,10 +46,7 @@ async def task_clean_redis():
 
 async def task_update_expiry_list():
     logging.info(f"Job update_expiry_list executed at: {datetime.now()}")
-    tasks = []
-    for app in base_urls:
-        tasks.append(get_api(f"{base_urls[app]}/update_expiry_list"))
-    await asyncio.gather(*tasks)
+    await sync_expiry_dates_from_alice_blue_to_redis()
 
 
 async def task_update_session_token():
