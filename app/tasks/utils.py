@@ -3,6 +3,8 @@ import logging
 import traceback
 from datetime import date
 from datetime import datetime
+from typing import List
+from typing import Optional
 
 from aioredis import Redis
 from fastapi import HTTPException
@@ -115,7 +117,12 @@ async def get_monthly_expiry_date_from_alice_blue(*, instrument_type, symbol):
     return current_month_expiry, next_month_expiry, is_today_months_expiry
 
 
-async def get_future_price(*, async_redis_client, strategy_schema, expiry_date) -> float:
+async def get_future_price_from_redis(
+    *,
+    async_redis_client: Redis,
+    strategy_schema: StrategySchema,
+    expiry_date: date,
+):
     future_option_chain = await get_option_chain(
         async_redis_client=async_redis_client,
         expiry=expiry_date,
@@ -127,6 +134,40 @@ async def get_future_price(*, async_redis_client, strategy_schema, expiry_date) 
         return 0.0
 
     return float(future_option_chain["FUT"])
+
+
+async def get_future_price(
+    *,
+    async_redis_client: Redis,
+    strategy_schema: StrategySchema,
+    expiry_date: date,
+    signal_payload_schema: SignalPayloadSchema,
+    async_httpx_client: AsyncClient,
+    redis_trade_schema_list: Optional[List[RedisTradeSchema]] = None,
+) -> float:
+    if strategy_schema.broker_id:
+        if signal_payload_schema.action == SignalTypeEnum.BUY:
+            future_price = await buy_alice_blue_trades(
+                strike=None,
+                signal_payload_schema=signal_payload_schema,
+                async_redis_client=async_redis_client,
+                strategy_schema=strategy_schema,
+                async_httpx_client=async_httpx_client,
+            )
+            return future_price
+        else:
+            future_price_dict = await close_alice_blue_trades(
+                redis_trade_schema_list, strategy_schema, async_redis_client, async_httpx_client
+            )
+            future_price = future_price_dict[None]
+            return future_price
+    else:
+        future_price = await get_future_price_from_redis(
+            async_redis_client=async_redis_client,
+            strategy_schema=strategy_schema,
+            expiry_date=expiry_date,
+        )
+        return future_price
 
 
 async def get_strike_and_exit_price_dict(
@@ -144,7 +185,6 @@ async def get_strike_and_exit_price_dict(
     )
 
     if strategy_schema.broker_id:
-        # TODO: close trades in broker and get exit price
         strike_exit_price_dict = await close_alice_blue_trades(
             redis_trade_schema_list, strategy_schema, async_redis_client, async_httpx_client
         )

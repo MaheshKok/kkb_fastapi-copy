@@ -5,6 +5,7 @@ import datetime
 import hashlib
 import os
 from collections import defaultdict
+from typing import Optional
 
 from aioredis import Redis
 from cryptography.hazmat.primitives.ciphers import Cipher
@@ -121,7 +122,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya
 
 async def buy_alice_blue_trades(
     *,
-    strike: float,
+    strike: Optional[float],
     signal_payload_schema: SignalPayloadSchema,
     strategy_schema: StrategySchema,
     async_redis_client: Redis,
@@ -388,11 +389,6 @@ async def close_alice_blue_trades(
                             strike_exitprice_dict[strike] = float(order_status["Avgprc"])
                             break
                     except Exception as e:
-                        # capture_exception(
-                        #     Exception(
-                        #         f"sell order for order_id: [ {order_id} ] has order_status: [ {order_status} ]"
-                        #     )
-                        # )
                         logging.error(
                             f"sell order for order_id: [ {order_id} ] has order_status: [ {order_status} ], error: {e}"
                         )
@@ -401,20 +397,10 @@ async def close_alice_blue_trades(
                     logging.error(
                         f"sell order for order_id: [ {order_id} ], could not be closed in 10 seconds and its last order_status: {order_status}"
                     )
-                    # capture_exception(
-                    #     Exception(
-                    #         f"sell order for order_id: [ {order_id} ], could not be closed in 10 seconds and its last order_status: {order_status}"
-                    #     )
-                    # )
                     strike_exitprice_dict[strike] = None
             else:
                 # assing None to strike which is being closed and later its avg price will be fetched from option chain
                 logging.error(f"sell order_id not found for strike: {strike}")
-                # capture_exception(
-                #     Exception(
-                #          f"sell order_id not found for strike: {strike}"
-                #     )
-                # )
                 strike_exitprice_dict[strike] = None
 
         return strike_exitprice_dict

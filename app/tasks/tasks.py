@@ -230,7 +230,7 @@ async def dump_trade_in_db_and_redis(
             symbol=strategy_schema.symbol,
             entry_price=entry_price,
             entry_received_at=signal_payload_schema.received_at,
-            **signal_payload_schema.model_dump(exclude={"premium"}),
+            **signal_payload_schema.model_dump(exclude={"premium"}, exclude_none=True),
         )
 
         trade_model = TradeModel(
@@ -319,6 +319,8 @@ async def task_entry_trade(
                 async_redis_client=async_redis_client,
                 strategy_schema=strategy_schema,
                 expiry_date=futures_expiry_date,
+                signal_payload_schema=signal_payload_schema,
+                async_httpx_client=async_httpx_client,
             )
         )
     ]
@@ -393,6 +395,8 @@ async def compute_trade_data_needed_for_closing_trade(
             async_redis_client=async_redis_client,
             strategy_schema=strategy_schema,
             expiry_date=futures_expiry_date,
+            signal_payload_schema=signal_payload_schema,
+            async_httpx_client=async_httpx_client,
         )
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], Slippage: [ {signal_payload_schema.future_entry_price_received - actual_exit_price } points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
@@ -448,6 +452,8 @@ async def compute_trade_data_needed_for_closing_trade(
                 async_redis_client=async_redis_client,
                 strategy_schema=strategy_schema,
                 expiry_date=futures_expiry_date,
+                signal_payload_schema=signal_payload_schema,
+                async_httpx_client=async_httpx_client,
             ),
         )
         logging.info(
@@ -474,12 +480,10 @@ async def task_exit_trade(
     async_httpx_client: AsyncClient,
     only_futures: bool,
     redis_hash: str,
-    expiry_date: date,
     redis_trade_schema_list: List[RedisTradeSchema],
     futures_expiry_date: date,
     options_expiry_date: date = None,
 ):
-    signal_payload_schema.expiry = expiry_date
     trades_key = f"{signal_payload_schema.strategy_id}"
 
     # TODO: in future decide based on strategy new column, strategy_type:

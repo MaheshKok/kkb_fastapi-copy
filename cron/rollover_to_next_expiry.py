@@ -24,7 +24,7 @@ from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from app.tasks.tasks import task_entry_trade
 from app.tasks.tasks import task_exit_trade
-from app.tasks.utils import get_future_price
+from app.tasks.utils import get_future_price_from_redis
 from app.tasks.utils import get_monthly_expiry_date_from_redis
 from app.utils.constants import OptionType
 
@@ -54,7 +54,6 @@ async def rollover_to_next_expiry():
     Database.init(get_db_url(config))
 
     # use different strategy to make it faster and efficient
-    config = get_config()
     async_redis_client = get_redis_client(config)
     async_httpx_client = AsyncClient()
 
@@ -70,27 +69,27 @@ async def rollover_to_next_expiry():
 
             if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
                 (
-                    current_expiry,
-                    next_expiry,
-                    todays_expiry,
+                    futures_current_expiry,
+                    futures_next_expiry,
+                    is_today_futures_expiry,
                 ) = await get_current_and_next_expiry_from_redis(
                     async_redis_client, strategy_schema
                 )
 
-                if not todays_expiry:
+                if not is_today_futures_expiry:
                     continue
             else:
                 (
-                    current_expiry,
-                    next_expiry,
-                    todays_expiry,
+                    options_current_expiry,
+                    options_next_expiry,
+                    is_today_options_expiry,
                 ) = await get_monthly_expiry_date_from_redis(
                     async_redis_client=async_redis_client,
                     instrument_type=InstrumentTypeEnum.FUTIDX,
                     symbol=strategy_schema.symbol,
                 )
 
-                if not todays_expiry:
+                if not is_today_options_expiry:
                     continue
 
             # fetch redis trades
@@ -105,10 +104,10 @@ async def rollover_to_next_expiry():
             if strategy_schema.symbol in future_price_cache:
                 future_entry_price_received = future_price_cache[strategy_schema.symbol]
             else:
-                future_entry_price_received = await get_future_price(
+                future_entry_price_received = await get_future_price_from_redis(
                     async_redis_client=async_redis_client,
                     strategy_schema=strategy_schema,
-                    expiry_date=current_expiry,
+                    expiry_date=futures_current_expiry,
                 )
                 future_price_cache[strategy_schema.symbol] = future_entry_price_received
 
@@ -126,18 +125,32 @@ async def rollover_to_next_expiry():
                 "strategy_schema": strategy_schema,
                 "async_redis_client": async_redis_client,
                 "async_httpx_client": async_httpx_client,
-                "only_futures": strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX,
+                "only_futures": False,
+                "futures_expiry_date": futures_current_expiry,
             }
+
+            if not strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
+                kwargs.update(
+                    {
+                        "only_futures": True,
+                        "options_next_expiry": options_current_expiry,
+                    }
+                )
 
             sell_task = await task_exit_trade(
                 **kwargs,
                 redis_hash=redis_hash,
-                expiry_date=current_expiry,
+                futures_expiry_date=futures_current_expiry,
+                options_expiry_date=options_next_expiry,
                 redis_trade_schema_list=redis_trade_schema_list,
             )
             tasks.append(sell_task)
 
-            signal_payload_schema.expiry = next_expiry
+            # update expiry in kwargs
+            kwargs["futures_expiry_date"] = futures_next_expiry
+            if not strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
+                kwargs["options_expiry_date"] = options_next_expiry
+
             buy_task = asyncio.create_task(
                 task_entry_trade(
                     **kwargs,

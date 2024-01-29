@@ -162,7 +162,6 @@ async def post_nfo_indian_options(
         lots_to_open = await task_exit_trade(
             **kwargs,
             redis_hash=redis_hash,
-            expiry_date=signal_payload_schema.expiry,
             redis_trade_schema_list=redis_trade_schema_list,
         )
 
