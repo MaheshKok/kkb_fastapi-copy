@@ -93,10 +93,11 @@ class AsyncAPI:
 
 if __name__ == "__main__":
     access_token = "c1a1da5b257e3eb61082d88d6c41108d-3c1a484c1cf2b8ee215bef4e36807aad"
-    account_id = "101-004-28132533-001"
+    account_id = "101-004-28132533-002"
     client = AsyncAPI(access_token=access_token)
-    market_order_request = MarketOrderRequest(instrument="EUR_USD", units=1000)
+    market_order_request = MarketOrderRequest(instrument="EUR_USD", units=-30000)
     response = asyncio.run(
         client.request(OrderCreate(account_id, data=market_order_request.data))
     )
+    # response = asyncio.run(client.request(TradeClose(account_id, 5)))
     pprint(response)
