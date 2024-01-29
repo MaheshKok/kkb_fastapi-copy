@@ -75,7 +75,7 @@ async def test_long_nfo_options_add_to_pyramiding(
     action, test_async_client, test_async_redis_client
 ):
     await create_open_trades(
-        users=1, strategies=1, trades=10, ce_trade=action == SignalTypeEnum.BUY
+        users=1, strategies=1, trades=10, ce_trade=action == SignalTypeEnum.BUY, action=action
     )
 
     async with Database() as async_session:
@@ -141,7 +141,11 @@ async def test_trading_nfo_options_opposite_direction(
     action, test_async_client, test_async_redis_client
 ):
     await create_open_trades(
-        users=1, strategies=1, trades=10, ce_trade=action == SignalTypeEnum.SELL
+        users=1,
+        strategies=1,
+        trades=10,
+        ce_trade=action == SignalTypeEnum.SELL,
+        action=SignalTypeEnum.BUY if action == SignalTypeEnum.SELL else SignalTypeEnum.SELL,
     )
 
     async with Database() as async_session:
@@ -281,6 +285,7 @@ async def test_trading_nfo_options_opposite_direction_for_short_strategy(
         trades=10,
         ce_trade=action == SignalTypeEnum.BUY,
         position=PositionEnum.SHORT,
+        action=SignalTypeEnum.BUY if action == SignalTypeEnum.SELL else SignalTypeEnum.SELL,
     )
 
     async with Database() as async_session:
@@ -445,6 +450,7 @@ async def test_trading_nfo_futures_opposite_direction(
         trades=10,
         position=PositionEnum.LONG,
         instrument_type=InstrumentTypeEnum.FUTIDX,
+        action=SignalTypeEnum.BUY if action == SignalTypeEnum.SELL else SignalTypeEnum.SELL,
     )
 
     async with Database() as async_session:

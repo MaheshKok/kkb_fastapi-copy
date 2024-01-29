@@ -38,6 +38,7 @@ class TradeModel(Base):
     strike = Column(Float, nullable=True)
     option_type = Column(String, nullable=True, index=True)
     expiry = Column(Date, index=True, nullable=False)
+    action = Column(String, nullable=False, index=True)
 
     strategy_id = Column(
         UUID(as_uuid=True),

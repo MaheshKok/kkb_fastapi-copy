@@ -6,6 +6,7 @@ import factory
 
 from app.database.models import TradeModel
 from app.schemas.enums import OptionTypeEnum
+from app.schemas.enums import SignalTypeEnum
 from app.test.factory.base_factory import AsyncSQLAlchemyFactory
 from app.test.factory.create_async_session import async_session
 from app.test.factory.strategy import StrategyFactory
@@ -46,6 +47,7 @@ class LiveTradeFactory(AsyncSQLAlchemyFactory):
 
     strike = 43000.0
     option_type = OptionTypeEnum.CE
+    action = SignalTypeEnum.BUY
     expiry = factory.LazyFunction(generate_expiry_date)
 
     strategy = factory.SubFactory(StrategyFactory)
@@ -79,6 +81,7 @@ class CompletedTradeFactory(AsyncSQLAlchemyFactory):
 
     strike = 43000.0
     option_type = OptionTypeEnum.CE
+    action = SignalTypeEnum.BUY
     expiry = factory.LazyFunction(generate_expiry_date)
 
     strategy = factory.SubFactory(StrategyFactory)

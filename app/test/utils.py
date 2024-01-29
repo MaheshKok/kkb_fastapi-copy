@@ -3,6 +3,7 @@ from datetime import timedelta
 from app.api.utils import get_current_and_next_expiry_from_alice_blue
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import PositionEnum
+from app.schemas.enums import SignalTypeEnum
 from app.tasks.utils import get_monthly_expiry_date_from_alice_blue
 from app.test.factory.strategy import StrategyFactory
 from app.test.factory.take_away_profit import TakeAwayProfitFactory
@@ -20,6 +21,7 @@ async def create_open_trades(
     users=1,
     strategies=1,
     trades=0,
+    action=SignalTypeEnum.BUY,
     take_away_profit=False,
     daily_profit=0,
     ce_trade=True,
@@ -57,6 +59,7 @@ async def create_open_trades(
                         option_type=OptionType.CE if ce_trade else OptionType.PE,
                         expiry=expiry_date,
                         entry_price=option_entry_price,
+                        action=action,
                     )
             else:
                 for _ in range(trades):
@@ -87,6 +90,7 @@ async def create_pre_db_data(
     daily_profit=0,
     strategy_position=PositionEnum.LONG,
     instrument_type=InstrumentTypeEnum.OPTIDX,
+    action=SignalTypeEnum.BUY,
 ):
     expiry_date = None
     for _ in range(users):
@@ -115,7 +119,9 @@ async def create_pre_db_data(
             total_profit = 0
             total_future_profit = 0
             for _ in range(trades):
-                trade = await CompletedTradeFactory(strategy=strategy, expiry=expiry_date)
+                trade = await CompletedTradeFactory(
+                    strategy=strategy, expiry=expiry_date, action=action
+                )
                 total_profit += trade.profit
                 total_future_profit += trade.future_profit
 

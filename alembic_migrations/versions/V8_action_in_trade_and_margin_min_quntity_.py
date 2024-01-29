@@ -28,6 +28,7 @@ def upgrade() -> None:
     op.add_column("strategy", sa.Column("funds_usage_percent", sa.Float(), nullable=False))
     op.drop_index("ix_trade_position", table_name="trade")
     op.drop_column("trade", "position")
+    op.add_column("trade", sa.Column("action", sa.String(), nullable=False))
     # Make Quantity and expiry nullable
     op.alter_column("trade", "quantity", existing_type=sa.INTEGER(), nullable=False)
     op.alter_column("trade", "expiry", existing_type=sa.DATE(), nullable=False)
@@ -40,6 +41,7 @@ def downgrade() -> None:
     op.alter_column("trade", "expiry", existing_type=sa.DATE(), nullable=True)
     op.alter_column("trade", "quantity", existing_type=sa.INTEGER(), nullable=True)
     op.alter_column("trade", "entry_price", existing_type=sa.Float(), nullable=False)
+    op.drop_column("trade", "action")
     op.add_column(
         "trade", sa.Column("position", sa.VARCHAR(), autoincrement=False, nullable=False)
     )

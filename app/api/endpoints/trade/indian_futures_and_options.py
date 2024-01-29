@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import time
@@ -141,7 +140,7 @@ async def post_nfo_indian_options(
 
     signal_payload_schema.expiry = current_expiry_date
     trades_key = f"{signal_payload_schema.strategy_id}"
-    exit_task = None
+    lots_to_open = None
     if exiting_trades_json := await async_redis_client.hget(trades_key, redis_hash):
         # initiate exit_trade
         exiting_trades_json_list = json.loads(exiting_trades_json)
@@ -149,23 +148,19 @@ async def post_nfo_indian_options(
         redis_trade_schema_list = TypeAdapter(List[RedisTradeSchema]).validate_python(
             [json.loads(trade) for trade in exiting_trades_json_list]
         )
-        exit_task = asyncio.create_task(
-            task_exit_trade(
-                **kwargs,
-                redis_hash=redis_hash,
-                expiry_date=current_expiry_date,
-                redis_trade_schema_list=redis_trade_schema_list,
-            )
+        lots_to_open = await task_exit_trade(
+            **kwargs,
+            redis_hash=redis_hash,
+            expiry_date=current_expiry_date,
+            redis_trade_schema_list=redis_trade_schema_list,
         )
 
-    # initiate buy_trade
-    buy_task = asyncio.create_task(
-        task_entry_trade(
+    if lots_to_open:
+        signal_payload_schema.quantity = lots_to_open
+        # initiate buy_trade
+        await task_entry_trade(
             **kwargs,
         )
-    )
-    if exit_task:
-        await asyncio.gather(exit_task, buy_task)
         msg = "successfully closed existing trades and bought a new trade"
     else:
         lots_to_open, ongoing_profit_or_loss = get_lots_to_trade_and_profit_or_loss(
@@ -174,8 +169,9 @@ async def post_nfo_indian_options(
             ongoing_profit_or_loss=0.0,
         )
         signal_payload_schema.quantity = lots_to_open
-
-        await asyncio.gather(buy_task)
+        await task_entry_trade(
+            **kwargs,
+        )
         msg = "successfully bought a new trade"
 
     process_time = time.perf_counter() - start_time
