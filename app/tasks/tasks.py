@@ -220,7 +220,6 @@ async def dump_trade_in_db_and_redis(
     *,
     strategy_schema: StrategySchema,
     entry_price: float,
-    future_entry_price: float,
     signal_payload_schema: SignalPayloadSchema,
     async_redis_client: aioredis.StrictRedis,
 ):
@@ -230,7 +229,6 @@ async def dump_trade_in_db_and_redis(
         trade_schema = EntryTradeSchema(
             symbol=strategy_schema.symbol,
             entry_price=entry_price,
-            future_entry_price=future_entry_price,
             entry_received_at=signal_payload_schema.received_at,
             **signal_payload_schema.model_dump(exclude={"premium"}),
         )
@@ -337,19 +335,12 @@ async def task_entry_trade(
             strategy_schema=strategy_schema,
         )
 
-        strike_and_entry_price, future_entry_price = await asyncio.gather(
-            get_strike_and_entry_price(
-                option_chain=option_chain,
-                signal_payload_schema=signal_payload_schema,
-                strategy_schema=strategy_schema,
-                async_redis_client=async_redis_client,
-                async_httpx_client=async_httpx_client,
-            ),
-            get_future_price(
-                async_redis_client=async_redis_client,
-                strategy_schema=strategy_schema,
-                expiry_date=signal_payload_schema.expiry,
-            ),
+        strike_and_entry_price = await get_strike_and_entry_price(
+            option_chain=option_chain,
+            signal_payload_schema=signal_payload_schema,
+            strategy_schema=strategy_schema,
+            async_redis_client=async_redis_client,
+            async_httpx_client=async_httpx_client,
         )
 
         strike, entry_price = strike_and_entry_price
@@ -364,9 +355,6 @@ async def task_entry_trade(
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], new trade with strike: [ {strike} ] and entry price: [ {entry_price} ] entering into db"
         )
-        logging.info(
-            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
-        )
 
         # this is very important to set strike to signal_payload_schema as it would be used hereafter
         signal_payload_schema.strike = strike
@@ -375,7 +363,6 @@ async def task_entry_trade(
     await dump_trade_in_db_and_redis(
         strategy_schema=strategy_schema,
         entry_price=entry_price,
-        future_entry_price=future_entry_price,
         signal_payload_schema=signal_payload_schema,
         async_redis_client=async_redis_client,
     )
