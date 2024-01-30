@@ -71,9 +71,12 @@ async def post_cfd(
         f"[ {demo_or_live} {cfd_strategy_schema}] [ {lots_to_open} ] trades to be opened"
     )
     # buy new trades
+    # buying lots in decimal is decided by 'tradeUnitsPrecision' if its 1 then upto 1 decimal is allowed
+    # if its 0 then no decimal is allowed
+    # instr_response = await client.request(AccountInstruments(accountID))
     market_order_request = MarketOrderRequest(
         instrument=cfd_strategy_schema.instrument,
-        units=lots_to_open,
+        units=int(lots_to_open),
     )
     response = await client.request(OrderCreate(account_id, data=market_order_request.data))
     long_or_short = "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
