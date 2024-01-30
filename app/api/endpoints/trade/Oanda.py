@@ -5,7 +5,6 @@ from pprint import pprint
 from fastapi import APIRouter
 from fastapi import Depends
 from oandapyV20.contrib.requests import MarketOrderRequest
-from oandapyV20.contrib.requests import TradeCloseRequest
 from oandapyV20.endpoints.orders import OrderCreate
 from oandapyV20.endpoints.trades import TradeClose
 from oandapyV20.endpoints.trades import TradesList
@@ -48,10 +47,12 @@ async def post_cfd(
 
     profit_or_loss = 0
     if trades["trades"]:
-        logging.info(f"[ {demo_or_live} {cfd_strategy_schema}] trades to be closed")
+        logging.info(f"[ {demo_or_live} {cfd_strategy_schema.instrument}] trades to be closed")
         # exit existing trades
-        close_trade_request = TradeCloseRequest()
-        close_trade_response = await client.request(TradeClose(close_trade_request.data))
+        tradeID = trades["trades"][0]["id"]
+        close_trade_response = await client.request(
+            TradeClose(accountID=account_id, tradeID=tradeID)
+        )
         if "orderFillTransaction" in close_trade_response.response:
             trades_closed = close_trade_response["orderFillTransaction"]["trades_closed"]
             profit_or_loss = trades_closed[0]["realizedPL"]
