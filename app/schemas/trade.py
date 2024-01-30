@@ -161,6 +161,7 @@ class CFDPayloadSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     strategy_id: uuid.UUID = Field(description="strategy id")
     direction: SignalTypeEnum = Field(description="buy or sell signal", example="buy")
+    account_id: Optional[str] = Field(description="account id", default=None)
 
 
 class FuturesPayloadSchema(CFDPayloadSchema):

@@ -11,9 +11,10 @@ from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.strategy import strategy_router
 from app.api.endpoints.takeaway_profit import takeaway_profit
 from app.api.endpoints.trade import trading_router
-from app.api.endpoints.trade.cfd import forex_router
+from app.api.endpoints.trade.Capital import forex_router
 from app.api.endpoints.trade.crypto import binance_router
 from app.api.endpoints.trade.indian_futures_and_options import fno_router
+from app.api.endpoints.trade.Oanda import oanda_forex_router
 from app.core.config import get_config
 from app.database.base import engine_kw
 from app.database.base import get_db_url
@@ -37,6 +38,7 @@ def register_routers(app: FastAPI):
     app.include_router(forex_router)
     app.include_router(binance_router)
     app.include_router(cron_api)
+    app.include_router(oanda_forex_router)
 
 
 def register_sentry():
