@@ -60,14 +60,14 @@ async def post_cfd(
                 )
                 if "orderFillTransaction" in close_trade_response:
                     trades_closed = close_trade_response["orderFillTransaction"]["tradesClosed"]
-                    profit_or_loss = trades_closed[0]["realizedPL"]
+                    profit_or_loss = float(trades_closed[0]["realizedPL"])
                     logging.info(
                         f"[ {demo_or_live} {cfd_strategy_schema.instrument}] trades closed with profit [ {profit_or_loss} ]"
                     )
                     await update_capital_funds(
                         cfd_strategy_schema=cfd_strategy_schema,
                         demo_or_live=demo_or_live,
-                        profit_or_loss=float(profit_or_loss),
+                        profit_or_loss=profit_or_loss,
                     )
 
     lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
