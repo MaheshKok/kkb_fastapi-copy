@@ -113,6 +113,9 @@ class EntryTradeSchema(SignalPayloadSchema):
     def populate_instrument(cls, values):
         # it must send symbol
         if isinstance(values, dict):
+            values["future_entry_price_received"] = round(
+                values["future_entry_price_received"], 2
+            )
             if values.get("option_type"):
                 instrument = generate_trading_symbol(
                     symbol=values["symbol"],

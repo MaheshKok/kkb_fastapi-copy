@@ -169,7 +169,9 @@ async def calculate_profits(
 
         mapping = {
             "id": trade.id,
-            "future_exit_price_received": signal_payload_schema.future_entry_price_received,
+            "future_exit_price_received": round(
+                signal_payload_schema.future_entry_price_received, 2
+            ),
             "exit_price": exit_price,
             "exit_received_at": exit_received_at,
             "exit_at": exit_at,
