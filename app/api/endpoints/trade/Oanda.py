@@ -44,7 +44,7 @@ async def post_cfd(
     client = AsyncAPI(access_token=access_token)
 
     account_id = cfd_payload_schema.account_id
-    trades = await client.request(TradesList(account_id=account_id))
+    trades = await client.request(TradesList(accountID=account_id))
 
     profit_or_loss = 0
     if trades["trades"]:
