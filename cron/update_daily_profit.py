@@ -13,6 +13,9 @@ from app.database.models import DailyProfitModel
 from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
+from app.schemas.enums import InstrumentTypeEnum
+from app.schemas.enums import PositionEnum
+from app.schemas.enums import SignalTypeEnum
 from app.tasks.tasks import get_futures_profit
 from app.tasks.tasks import get_options_profit
 from app.tasks.utils import get_monthly_expiry_date_from_redis
@@ -43,9 +46,7 @@ async def update_daily_profit():
                         "future_profit": 0,
                     }
 
-                options_key = f"{live_trade_db.strategy.symbol} {live_trade_db.expiry} {live_trade_db.option_type}"
-                if options_key not in option_chain:
-                    option_chain[options_key] = await async_redis_client.hgetall(options_key)
+                only_futures = live_trade_db.strategy.instrument_type == InstrumentTypeEnum.FUTIDX
 
                 (
                     current_month_expiry,
@@ -53,7 +54,7 @@ async def update_daily_profit():
                     is_today_months_expiry,
                 ) = await get_monthly_expiry_date_from_redis(
                     async_redis_client=async_redis_client,
-                    instrument_type=live_trade_db.strategy.instrument_type,
+                    instrument_type=InstrumentTypeEnum.FUTIDX,
                     symbol=live_trade_db.strategy.symbol,
                 )
 
@@ -61,21 +62,34 @@ async def update_daily_profit():
                 if futures_key not in option_chain:
                     option_chain[futures_key] = await async_redis_client.hgetall(futures_key)
 
-                current_option_price = option_chain[options_key][str(live_trade_db.strike)]
                 current_future_price = option_chain[futures_key]["FUT"]
-
                 profit = get_options_profit(
                     entry_price=live_trade_db.entry_price,
-                    exit_price=float(current_option_price),
-                    quantity=live_trade_db.quantity,
-                    position=live_trade_db.position,
-                )
-                future_profit = get_futures_profit(
-                    entry_price=live_trade_db.future_entry_price,
                     exit_price=float(current_future_price),
                     quantity=live_trade_db.quantity,
-                    position=live_trade_db.position,
+                    position=live_trade_db.strategy.position,
                 )
+                future_profit = get_futures_profit(
+                    entry_price=live_trade_db.future_entry_price_received,
+                    exit_price=float(current_future_price),
+                    quantity=live_trade_db.quantity,
+                    position=PositionEnum.LONG
+                    if live_trade_db.action == SignalTypeEnum.BUY
+                    else PositionEnum.SHORT,
+                )
+
+                if not only_futures:
+                    options_key = f"{live_trade_db.strategy.symbol} {live_trade_db.expiry} {live_trade_db.option_type}"
+                    if options_key not in option_chain:
+                        option_chain[options_key] = await async_redis_client.hgetall(options_key)
+                    current_option_price = option_chain[options_key][str(live_trade_db.strike)]
+
+                    profit = get_options_profit(
+                        entry_price=live_trade_db.entry_price,
+                        exit_price=float(current_option_price),
+                        quantity=live_trade_db.quantity,
+                        position=live_trade_db.strategy.position,
+                    )
 
                 strategy_id_ongoing_profit_dict[live_trade_db.strategy_id]["profit"] += profit
                 strategy_id_ongoing_profit_dict[live_trade_db.strategy_id][
@@ -107,7 +121,7 @@ async def update_daily_profit():
 
             daily_profit_models = []
             for strategy_id, ongoing_profit in strategy_id_ongoing_profit_dict.items():
-                take_away_profit_model = strategy_id_take_away_profit_dict[strategy_id]
+                take_away_profit_model = strategy_id_take_away_profit_dict.get(strategy_id)
                 if take_away_profit_model:
                     take_away_profit = take_away_profit_model.profit
                     take_away_future_profit = take_away_profit_model.future_profit
@@ -115,14 +129,18 @@ async def update_daily_profit():
                     take_away_profit = 0.0
                     take_away_future_profit = 0.0
 
+                profit = round(ongoing_profit["profit"] + take_away_profit, 2) or round(
+                    0.0 - strategy_id_yesterdays_profit_dict[strategy_id].profit, 2
+                )
+                future_profit = round(
+                    ongoing_profit["future_profit"] + take_away_future_profit, 2
+                ) or round(0.0 - strategy_id_yesterdays_profit_dict[strategy_id].future_profit, 2)
+
                 daily_profit_models.append(
                     DailyProfitModel(
                         **{
-                            "profit": ongoing_profit["profit"] + take_away_profit
-                            or 0.0 - strategy_id_yesterdays_profit_dict[strategy_id].profit,
-                            "future_profit": ongoing_profit["future_profit"]
-                            + take_away_future_profit
-                            or 0.0 - take_away_future_profit,
+                            "profit": profit,
+                            "future_profit": future_profit,
                             "date": todays_date,
                             "strategy_id": strategy_id,
                         }
@@ -131,6 +149,7 @@ async def update_daily_profit():
 
             async_session.add_all(daily_profit_models)
             await async_session.commit()
+            logging.info("Daily profit captured")
         else:
             logging.info("Cant capture daily profit on weekends")
 

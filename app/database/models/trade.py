@@ -9,6 +9,7 @@ from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from app.database import Base
 
@@ -45,3 +46,4 @@ class TradeModel(Base):
         nullable=False,
         index=True,
     )
+    strategy = relationship("StrategyModel", back_populates="trades")

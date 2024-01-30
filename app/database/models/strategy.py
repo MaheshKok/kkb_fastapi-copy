@@ -64,4 +64,4 @@ class StrategyModel(Base):
         "TakeAwayProfitModel", backref="strategy", cascade="all, delete"
     )
 
-    trades = relationship("TradeModel", backref="strategy", cascade="all, delete")
+    trades = relationship("TradeModel", back_populates="strategy", cascade="all, delete")
