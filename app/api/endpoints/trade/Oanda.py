@@ -47,23 +47,28 @@ async def post_cfd(
 
     profit_or_loss = 0
     if trades["trades"]:
-        logging.info(f"[ {demo_or_live} {cfd_strategy_schema.instrument}] trades to be closed")
-        # exit existing trades
-        tradeID = trades["trades"][0]["id"]
-        close_trade_response = await client.request(
-            TradeClose(accountID=account_id, tradeID=tradeID)
-        )
-        if "orderFillTransaction" in close_trade_response.response:
-            trades_closed = close_trade_response["orderFillTransaction"]["trades_closed"]
-            profit_or_loss = trades_closed[0]["realizedPL"]
-            logging.info(
-                f"[ {demo_or_live} {cfd_strategy_schema}] trades closed with profit [ {profit_or_loss} ]"
-            )
-            await update_capital_funds(
-                cfd_strategy_schema=cfd_strategy_schema,
-                demo_or_live=demo_or_live,
-                profit_or_loss=profit_or_loss,
-            )
+        for trade in trades["trades"]:
+            trade_instrument = trade["instrument"]
+            if trade_instrument == cfd_strategy_schema.instrument:
+                logging.info(
+                    f"[ {demo_or_live} {cfd_strategy_schema.instrument}] trades to be closed"
+                )
+                # exit existing trades
+                tradeID = trade["id"]
+                close_trade_response = await client.request(
+                    TradeClose(accountID=account_id, tradeID=tradeID)
+                )
+                if "orderFillTransaction" in close_trade_response.response:
+                    trades_closed = close_trade_response["orderFillTransaction"]["trades_closed"]
+                    profit_or_loss = trades_closed[0]["realizedPL"]
+                    logging.info(
+                        f"[ {demo_or_live} {cfd_strategy_schema}] trades closed with profit [ {profit_or_loss} ]"
+                    )
+                    await update_capital_funds(
+                        cfd_strategy_schema=cfd_strategy_schema,
+                        demo_or_live=demo_or_live,
+                        profit_or_loss=profit_or_loss,
+                    )
 
     lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
         0, cfd_strategy_schema, profit_or_loss
