@@ -87,7 +87,9 @@ async def cache_ongoing_trades(async_redis_client):
                         and len(trades_in_redis) != len(trade_models_list)
                     ):
                         redis_trades_schema_json_list = [
-                            RedisTradeSchema.model_validate(trade_model).model_dump_json()
+                            RedisTradeSchema.model_validate(trade_model).model_dump_json(
+                                exclude_none=True
+                            )
                             for trade_model in trade_models_list
                         ]
                         result = await async_redis_client.hset(

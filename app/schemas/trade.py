@@ -47,9 +47,6 @@ class RedisTradeSchema(SignalPayloadSchema):
     id: uuid.UUID = Field(description="Trade ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3")
     strike: Optional[float] = Field(description="Strike", example=42500.0, default=None)
     entry_price: Optional[float] = Field(description="Entry Price", example=350.5, default=None)
-    future_entry_price: Optional[float] = Field(
-        description="Future Entry Price", example=40600.5, default=None
-    )
     expiry: date = Field(description="Expiry", example="2023-06-16")
     instrument: str = Field(description="Instrument", example="BANKNIFTY16JUN2343500CE")
     entry_received_at: datetime = Field(
