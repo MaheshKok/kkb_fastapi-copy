@@ -74,7 +74,7 @@ async def post_cfd(
         0, cfd_strategy_schema, profit_or_loss
     )
     logging.info(
-        f"[ {demo_or_live} {cfd_strategy_schema}] [ {lots_to_open} ] trades to be opened"
+        f"[ {demo_or_live} {cfd_strategy_schema.instrument}] [ {lots_to_open} ] trades to be opened"
     )
     # buy new trades
     # buying lots in decimal is decided by 'tradeUnitsPrecision' if its 1 then upto 1 decimal is allowed

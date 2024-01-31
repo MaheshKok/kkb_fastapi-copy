@@ -24,7 +24,6 @@ from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import CFDPayloadSchema
 from app.utils.constants import REDIS_DATE_FORMAT
-from app.utils.in_memory_cache import current_and_next_expiry_cache
 
 
 async def get_expiry_dict_from_alice_blue():
@@ -53,8 +52,6 @@ async def get_current_and_next_expiry_from_redis(
     async_redis_client, strategy_schema: StrategySchema
 ):
     todays_date = datetime.now().date()
-    if todays_date in current_and_next_expiry_cache:
-        return current_and_next_expiry_cache[todays_date]
 
     is_today_expiry = False
     current_expiry_date = None
@@ -75,19 +72,11 @@ async def get_current_and_next_expiry_from_redis(
             current_expiry_date = expiry_date
             break
 
-    current_and_next_expiry_cache[todays_date] = (
-        current_expiry_date,
-        next_expiry_date,
-        is_today_expiry,
-    )
-
     return current_expiry_date, next_expiry_date, is_today_expiry
 
 
 async def get_current_and_next_expiry_from_alice_blue(symbol: str):
     todays_date = datetime.now().date()
-    if todays_date in current_and_next_expiry_cache:
-        return current_and_next_expiry_cache[todays_date]
 
     is_today_expiry = False
     current_expiry_date = None
@@ -108,12 +97,6 @@ async def get_current_and_next_expiry_from_alice_blue(symbol: str):
         elif todays_date < expiry_date:
             current_expiry_date = expiry_date
             break
-
-    current_and_next_expiry_cache[todays_date] = (
-        current_expiry_date,
-        next_expiry_date,
-        is_today_expiry,
-    )
 
     return current_expiry_date, next_expiry_date, is_today_expiry
 
