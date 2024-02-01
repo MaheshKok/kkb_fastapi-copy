@@ -180,18 +180,21 @@ def get_lots_to_trade_and_profit_or_loss(
         strategy_funds_to_trade = Decimal(
             (strategy_schema.funds + ongoing_profit_or_loss) * strategy_schema.funds_usage_percent
         )
-        logging.info(f"[ {crucial_details} ], strategy_funds_to_trade: {strategy_funds_to_trade}")
+        strategy_funds_to_trade = round(strategy_funds_to_trade, 2)
+        logging.info(
+            f"[ {crucial_details} ] : strategy_funds_to_trade: {strategy_funds_to_trade}"
+        )
 
         if strategy_funds_to_trade < Decimal(strategy_schema.margin_for_min_quantity):
             logging.info(
-                f"[ {crucial_details} ], strategy_funds_to_trade: [ {strategy_funds_to_trade} ] is less than margin for min quantity: {strategy_schema.margin_for_min_quantity}"
+                f"[ {crucial_details} ] : strategy_funds_to_trade: [ {strategy_funds_to_trade} ] is less than margin for min quantity: {strategy_schema.margin_for_min_quantity}"
             )
             strategy_funds_to_trade = Decimal(strategy_schema.margin_for_min_quantity)
 
         to_update_profit_or_loss_in_db = ongoing_profit_or_loss
         if not strategy_schema.compounding:
             logging.info(
-                f"[ {crucial_details} ], Compounding is not enabled, so we will trade fixed contracts: [ {strategy_schema.contracts} ]"
+                f"[ {crucial_details} ] : Compounding is not enabled, so we will trade fixed contracts: [ {strategy_schema.contracts} ]"
             )
             funds_required_for_contracts = Decimal(
                 (strategy_schema.margin_for_min_quantity / strategy_schema.min_quantity)
@@ -201,17 +204,17 @@ def get_lots_to_trade_and_profit_or_loss(
             if funds_required_for_contracts <= available_funds:
                 lots_to_trade = strategy_schema.contracts
                 logging.info(
-                    f"[ {crucial_details} ], Available Funds: [ {available_funds} ] are more than funds required for contracts: [ {funds_required_for_contracts} ]"
+                    f"[ {crucial_details} ] : Available Funds: [ {available_funds} ] are more than funds required for contracts: [ {funds_required_for_contracts} ]"
                 )
             else:
                 lots_to_trade = _get_lots_to_trade(available_funds, strategy_schema)
                 logging.info(
-                    f"[ {crucial_details} ], Available Funds: [ {available_funds} ] are less than funds required for contracts: [ {funds_required_for_contracts} ]. So we will trade [ {lots_to_trade} ] contracts"
+                    f"[ {crucial_details} ] : Available Funds: [ {available_funds} ] are less than funds required for contracts: [ {funds_required_for_contracts} ]. So we will trade [ {lots_to_trade} ] contracts"
                 )
         else:
             lots_to_trade = _get_lots_to_trade(strategy_funds_to_trade, strategy_schema)
             logging.info(
-                f"[ {crucial_details} ], Compounding is enabled and we can trade [ {lots_to_trade} ] contracts in [ {strategy_funds_to_trade} ] funds"
+                f"[ {crucial_details} ] : Compounding is enabled and we can trade [ {lots_to_trade} ] contracts in [ {strategy_funds_to_trade} ] funds"
             )
 
         if isinstance(strategy_schema, CFDStrategySchema):
