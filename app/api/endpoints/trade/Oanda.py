@@ -14,6 +14,7 @@ from app.api.endpoints.trade import trading_router
 from app.api.utils import get_lots_to_trade_and_profit_or_loss
 from app.api.utils import update_capital_funds
 from app.broker.Async_PyOanda import AsyncAPI
+from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.trade import CFDPayloadSchema
 
@@ -82,12 +83,14 @@ async def post_oanda_cfd(
     # buying lots in decimal is decided by 'tradeUnitsPrecision' if its 1 then upto 1 decimal is allowed
     # if its 0 then no decimal is allowed
     # instr_response = await client.request(AccountInstruments(accountID))
+
+    is_buy_signal = cfd_payload_schema.direction == SignalTypeEnum.BUY
     market_order_request = MarketOrderRequest(
         instrument=cfd_strategy_schema.instrument,
-        units=int(lots_to_open),
+        units=(int(lots_to_open) if is_buy_signal else -int(lots_to_open)),
     )
     response = await client.request(OrderCreate(account_id, data=market_order_request.data))
-    long_or_short = "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
+    long_or_short = "LONG" if is_buy_signal else "SHORT"
     if "orderFillTransaction" in response:
         msg = f"[ {crucial_details} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
         logging.info(msg)
