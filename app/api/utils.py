@@ -123,7 +123,10 @@ async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redi
 
 
 def get_lots_to_trade_and_profit_or_loss(
-    funds_to_use, strategy_schema: CFDStrategySchema | StrategySchema, ongoing_profit_or_loss
+    funds_to_use,
+    strategy_schema: CFDStrategySchema | StrategySchema,
+    ongoing_profit_or_loss,
+    crucial_details: str = None,
 ):
     def _get_lots_to_trade(strategy_funds_to_trade, strategy_schema):
         # below is the core of this function do not mendle with it
@@ -177,12 +180,19 @@ def get_lots_to_trade_and_profit_or_loss(
         strategy_funds_to_trade = Decimal(
             (strategy_schema.funds + ongoing_profit_or_loss) * strategy_schema.funds_usage_percent
         )
+        logging.info(f"[ {crucial_details} ], strategy_funds_to_trade: {strategy_funds_to_trade}")
 
         if strategy_funds_to_trade < Decimal(strategy_schema.margin_for_min_quantity):
+            logging.info(
+                f"[ {crucial_details} ], strategy_funds_to_trade: [ {strategy_funds_to_trade} ] is less than margin for min quantity: {strategy_schema.margin_for_min_quantity}"
+            )
             strategy_funds_to_trade = Decimal(strategy_schema.margin_for_min_quantity)
 
         to_update_profit_or_loss_in_db = ongoing_profit_or_loss
         if not strategy_schema.compounding:
+            logging.info(
+                f"[ {crucial_details} ], Compounding is not enabled, so we will trade fixed contracts: [ {strategy_schema.contracts} ]"
+            )
             funds_required_for_contracts = Decimal(
                 (strategy_schema.margin_for_min_quantity / strategy_schema.min_quantity)
                 * strategy_schema.contracts
@@ -190,10 +200,19 @@ def get_lots_to_trade_and_profit_or_loss(
             available_funds = Decimal(strategy_schema.funds + ongoing_profit_or_loss)
             if funds_required_for_contracts <= available_funds:
                 lots_to_trade = strategy_schema.contracts
+                logging.info(
+                    f"[ {crucial_details} ], Available Funds: [ {available_funds} ] are more than funds required for contracts: [ {funds_required_for_contracts} ]"
+                )
             else:
                 lots_to_trade = _get_lots_to_trade(available_funds, strategy_schema)
+                logging.info(
+                    f"[ {crucial_details} ], Available Funds: [ {available_funds} ] are less than funds required for contracts: [ {funds_required_for_contracts} ]. So we will trade [ {lots_to_trade} ] contracts"
+                )
         else:
             lots_to_trade = _get_lots_to_trade(strategy_funds_to_trade, strategy_schema)
+            logging.info(
+                f"[ {crucial_details} ], Compounding is enabled and we can trade [ {lots_to_trade} ] contracts in [ {strategy_funds_to_trade} ] funds"
+            )
 
         if isinstance(strategy_schema, CFDStrategySchema):
             demo_or_live = "DEMO" if strategy_schema.is_demo else "LIVE"
@@ -214,10 +233,8 @@ def get_lots_to_trade_and_profit_or_loss(
 
 
 async def get_all_positions(
-    client: AsyncCapitalClient, cfd_strategy_schema: CFDStrategySchema
+    client: AsyncCapitalClient, cfd_strategy_schema: CFDStrategySchema, crucial_details: str
 ) -> dict:
-    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
-
     get_all_positions_attempt = 1
     error = None
     while get_all_positions_attempt < 10:
@@ -232,7 +249,7 @@ async def get_all_positions(
             response = http_status_error.response
             status_code, error = response.status_code, response.text
             logging.warning(
-                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] HTTPStatusError occured while getting all positions {status_code} {error}"
+                f"[ {crucial_details} ] : Attempt [ {get_all_positions_attempt} ] HTTPStatusError occured while getting all positions {status_code} {error}"
             )
             await client.__log_out__()
             get_all_positions_attempt += 1
@@ -240,24 +257,20 @@ async def get_all_positions(
         except Exception as exception_error:
             error = exception_error
             logging.warning(
-                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_positions_attempt} ] Exception Error occured while getting all positions {error}"
+                f"[ {crucial_details} ] : Attempt [ {get_all_positions_attempt} ] Exception Error occured while getting all positions {error}"
             )
             get_all_positions_attempt += 1
             await asyncio.sleep(1)
     else:
         logging.error(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : All attemps exhausted in getting all positions, Error: {error}"
+            f"[ {crucial_details} ] : All attemps exhausted in getting all positions, Error: {error}"
         )
         raise HTTPException(
             status_code=400, detail="All attemps exhausted in getting all positions"
         )
 
 
-async def get_all_open_orders(
-    client: AsyncCapitalClient, cfd_strategy_schema: CFDStrategySchema
-) -> list:
-    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
-
+async def get_all_open_orders(client: AsyncCapitalClient, crucial_details: str) -> list:
     get_all_orders_attempt = 1
     while get_all_orders_attempt < 10:
         try:
@@ -270,52 +283,52 @@ async def get_all_open_orders(
             status_code, text = response.status_code, response.text
             if status_code == 429:
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
+                    f"[ {crucial_details} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
                 )
                 await client.__log_out__()
                 get_all_orders_attempt += 1
                 await asyncio.sleep(2)
             elif status_code == 400:
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
+                    f"[ {crucial_details} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
                 )
                 await client.__log_out__()
                 get_all_orders_attempt += 1
                 await asyncio.sleep(2)
             else:
                 logging.error(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
+                    f"[ {crucial_details} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
                 )
                 break
     else:
         logging.error(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : All attemps exhausted in getting all orders, Error {status_code} {text}"
+            f"[ {crucial_details} ] : All attemps exhausted in getting all orders, Error {status_code} {text}"
         )
 
 
 async def get_capital_cfd_existing_profit_or_loss(
-    client: AsyncCapitalClient, cfd_strategy_schema: CFDStrategySchema
+    client: AsyncCapitalClient, cfd_strategy_schema: CFDStrategySchema, crucial_details: str
 ) -> tuple[int, int, str | None]:
-    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
     direction = None
-    profit_or_loss = 0
+    profit_or_loss_value = 0
     existing_lot = 0
-    positions = await get_all_positions(client, cfd_strategy_schema)
+    positions = await get_all_positions(client, cfd_strategy_schema, crucial_details)
     for position in positions["positions"]:
         if position["market"]["epic"] == cfd_strategy_schema.instrument:
-            profit_or_loss += position["position"]["upl"]
+            profit_or_loss_value += position["position"]["upl"]
             existing_lot += position["position"]["size"]
             direction = position["position"]["direction"]
 
+    profit_or_loss_str = "profit" if profit_or_loss_value > 0 else "loss"
     logging.info(
-        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : existing position - profit: [ {profit_or_loss} ], lot: [ {existing_lot} ], direction: [ {direction} ]"
+        f"[ {crucial_details} ] : current lots: [ {existing_lot} ] {profit_or_loss_str}: [ {profit_or_loss_value} ], direction: [ {direction} ] to be closed"
     )
-    return round(profit_or_loss, 2), existing_lot, direction
+    return round(profit_or_loss_value, 2), existing_lot, direction
 
 
-async def get_funds_to_use(client, cfd_strategy_schema: CFDStrategySchema) -> float:
-    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
-
+async def get_funds_to_use(
+    client, cfd_strategy_schema: CFDStrategySchema, crucial_details: str
+) -> float:
     get_all_accounts_attempt = 1
     while get_all_accounts_attempt < 10:
         try:
@@ -333,16 +346,16 @@ async def get_funds_to_use(client, cfd_strategy_schema: CFDStrategySchema) -> fl
             get_all_accounts_attempt += 1
             await asyncio.sleep(1)
             logging.warning(
-                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attemp [ {get_all_accounts_attempt} ] HTTPStatusError occured while getting all accounts {status_code} {text}"
+                f"[ {crucial_details} ] : Attemp [ {get_all_accounts_attempt} ] HTTPStatusError occured while getting all accounts {status_code} {text}"
             )
     else:
         logging.error(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while getting all accounts {status_code} {text}"
+            f"[ {crucial_details} ] : Error occured while getting all accounts {status_code} {text}"
         )
 
 
 async def update_capital_funds(
-    *, cfd_strategy_schema: CFDStrategySchema, profit_or_loss: float, demo_or_live: str
+    *, cfd_strategy_schema: CFDStrategySchema, profit_or_loss: float, crucial_details: str
 ):
     log_profit_or_loss = "profit" if profit_or_loss > 0 else "loss"
 
@@ -355,20 +368,20 @@ async def update_capital_funds(
         )
         await async_session.commit()
         logging.info(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : updated funds balance to [ {updated_funds} ] after {log_profit_or_loss}: {profit_or_loss} "
+            f"[ {crucial_details} ] : funds balance [ {cfd_strategy_schema.funds} ] got updated to [ {updated_funds} ] after {log_profit_or_loss}: {profit_or_loss} "
         )
 
 
 async def open_order_found(
     *,
     client: AsyncCapitalClient,
-    demo_or_live: str,
     cfd_strategy_schema: CFDStrategySchema,
     cfd_payload_schema: CFDPayloadSchema,
     lots_size: float,
+    crucial_details: str,
 ):
-    logging.info(f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : getting open order.")
-    if open_orders := await get_all_open_orders(client, cfd_strategy_schema):
+    logging.info(f"[ {crucial_details} ] : getting open order.")
+    if open_orders := await get_all_open_orders(client, crucial_details):
         for open_order in open_orders:
             instrument, direction = (
                 open_order["workingOrderData"]["epic"],
@@ -379,10 +392,10 @@ async def open_order_found(
                 and direction != cfd_payload_schema.direction
             ):
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Open order detected for [ {lots_size} ] Lots in [ {direction} ] direction"
+                    f"[ {crucial_details} ] : Open order detected for [ {lots_size} ] Lots in [ {direction} ] direction"
                 )
                 return True
-    logging.info(f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : open order not found")
+    logging.info(f"[ {crucial_details} ] : open order not found")
     return False
 
 
@@ -393,19 +406,20 @@ async def find_position(
     cfd_strategy_schema: CFDStrategySchema,
     current_open_lots: float,
     action: str,
+    crucial_details: str,
 ):
-    if positions := await get_all_positions(client, cfd_strategy_schema):
+    if positions := await get_all_positions(client, cfd_strategy_schema, crucial_details):
         for position in positions["positions"]:
             if position["market"]["epic"] == cfd_strategy_schema.instrument:
                 return position
         else:
             logging.warning(
-                f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots [ {current_open_lots} ] are {action} as no existing position found."
+                f"[ {crucial_details} ] : lots [ {current_open_lots} ] are {action} as no existing position found."
             )
             return False
     else:
         logging.warning(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Assuming lots are {action} as no existing position found."
+            f"[ {crucial_details} ] : Assuming lots are {action} as no existing position found."
         )
         return False
 
@@ -418,6 +432,7 @@ async def close_capital_lots(
     cfd_payload_schema: CFDPayloadSchema,
     demo_or_live: str,
     profit_or_loss: float,
+    crucial_details: str,
 ):
     close_lots_attempt = 1
     while close_lots_attempt <= 10:
@@ -430,40 +445,40 @@ async def close_capital_lots(
 
             response_json = response.json()
             if response_json["dealStatus"] == "ACCEPTED":
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully closed [  {lots_to_close} ] trades."
+                msg = f"[ {crucial_details} ] : successfully closed [  {lots_to_close} ] trades."
                 logging.info(msg)
                 return False
             elif response_json["dealStatus"] == "REJECTED":
                 if response_json["rejectReason"] == "THROTTLING":
-                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] throttled while closing open lots [ {lots_to_close} ] response:  {response_json}"
+                    msg = f"[ {crucial_details} ] : Attempt [ {close_lots_attempt} ] throttled while closing open lots [ {lots_to_close} ] response:  {response_json}"
                     logging.warning(msg)
                     close_lots_attempt += 1
                     await asyncio.sleep(2)
                     continue
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ], rejected closing open lots [ {lots_to_close} ] response:  {response_json}. Attempting again to close"
+                    f"[ {crucial_details} ] : Attempt [ {close_lots_attempt} ], rejected closing open lots [ {lots_to_close} ] response:  {response_json}. Attempting again to close"
                 )
             else:
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] deal status: {response_json}"
+                msg = f"[ {crucial_details} ] : Attempt [ {close_lots_attempt} ] deal status: {response_json}"
                 logging.error(msg)
         except httpx.HTTPStatusError as error:
             response_json = error.response
             status_code, text = response_json.status_code, response_json.text
             if status_code in [400, 404, 429]:
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] while closing lots {status_code} {text}"
+                    f"[ {crucial_details} ] : Attempt [ {close_lots_attempt} ] while closing lots {status_code} {text}"
                 )
                 await asyncio.sleep(3)
                 logging.info(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] may be lots are closed , so fetching all positions again and verifying the same"
+                    f"[ {crucial_details} ] : may be lots are closed , so fetching all positions again and verifying the same"
                 )
 
                 _open_order_found = await open_order_found(
                     client=client,
-                    demo_or_live=demo_or_live,
                     cfd_strategy_schema=cfd_strategy_schema,
                     cfd_payload_schema=cfd_payload_schema,
                     lots_size=lots_to_close,
+                    crucial_details=crucial_details,
                 )
 
                 if _open_order_found:
@@ -476,6 +491,7 @@ async def close_capital_lots(
                     cfd_strategy_schema=cfd_strategy_schema,
                     current_open_lots=lots_to_close,
                     action="closed",
+                    crucial_details=crucial_details,
                 )
 
                 if position_found:
@@ -484,28 +500,28 @@ async def close_capital_lots(
                         == cfd_payload_schema.direction.upper()
                     ):
                         logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Lots [ {lots_to_close} ] are reversed in [ {cfd_payload_schema.direction} ] direction. so NO need to open lots again"
+                            f"[ {crucial_details} ] : Lots [ {lots_to_close} ] are reversed in [ {cfd_payload_schema.direction} ] direction. so NO need to open lots again"
                         )
                         await update_capital_funds(
                             cfd_strategy_schema=cfd_strategy_schema,
-                            demo_or_live=demo_or_live,
+                            crucial_details=crucial_details,
                             profit_or_loss=profit_or_loss,
                         )
                         # TODO: try to open lots with the profit gained
                         break
                     else:
                         logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Lots [ {lots_to_close} ] are not closed. Hence trying again to close them"
+                            f"[ {crucial_details} ] : Lots [ {lots_to_close} ] are not closed. Hence trying again to close them"
                         )
                         close_lots_attempt += 1
                         await asyncio.sleep(3)
                 else:
                     logging.warning(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Lots [ {lots_to_close} ] are closed as no position found."
+                        f"[ {crucial_details} ] : Lots [ {lots_to_close} ] are closed as no position found."
                     )
                     break
             else:
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {close_lots_attempt} ] Error occured while closing open lots, Error: {text}"
+                msg = f"[ {crucial_details} ] : Attempt [ {close_lots_attempt} ] Error occured while closing open lots, Error: {text}"
                 logging.error(msg)
                 return False
 
@@ -518,9 +534,10 @@ async def open_capital_lots(
     demo_or_live: str,
     profit_or_loss: float,
     funds_to_use=float,
+    crucial_details: str,
 ):
     lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
-        funds_to_use, cfd_strategy_schema, profit_or_loss
+        funds_to_use, cfd_strategy_schema, profit_or_loss, crucial_details
     )
 
     place_order_attempt = 1
@@ -536,7 +553,7 @@ async def open_capital_lots(
             if response_json["dealStatus"] == "REJECTED":
                 if response_json["rejectReason"] == "THROTTLING":
                     # handled rejectReason: 'THROTTLING' i.e. try again
-                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] response:  {response_json}"
+                    msg = f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] response:  {response_json}"
                     logging.warning(msg)
                     logging.info(
                         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] attempting again to open lots"
@@ -548,7 +565,7 @@ async def open_capital_lots(
                 elif response_json["rejectReason"] == "RISK_CHECK":
                     # handle rejectReason: RISK_CHECK i.e. calculate lots to open again as available funds are updated
                     # calculate lots to open again as available funds are updated
-                    msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] RISK_CHECK while opening lots [ {lots_to_open} ] response:  {response_json}"
+                    msg = f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] RISK_CHECK while opening lots [ {lots_to_open} ] response:  {response_json}"
                     logging.warning(msg)
                     logging.info(
                         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] calculating lots to open again as available funds are updated"
@@ -559,7 +576,7 @@ async def open_capital_lots(
                         lots_to_open,
                         update_profit_or_loss_in_db,
                     ) = get_lots_to_trade_and_profit_or_loss(
-                        0.0, cfd_strategy_schema, profit_or_loss
+                        0.0, cfd_strategy_schema, profit_or_loss, crucial_details
                     )
                     place_order_attempt += 1
                     await client.__log_out__()
@@ -567,39 +584,35 @@ async def open_capital_lots(
                     continue
                 else:
                     logging.error(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] rejected, deal status: {response_json['dealStatus']}, reason: {response_json['rejectReason']}, status: {response_json['status']}"
+                        f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] rejected, deal status: {response_json['dealStatus']}, reason: {response_json['rejectReason']}, status: {response_json['status']}"
                     )
                     return response_json
             elif response_json["dealStatus"] == "ACCEPTED":
                 long_or_short = "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
+                msg = f"[ {crucial_details} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
                 logging.info(msg)
             else:
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] Error in placing open lots, deal status: {response_json}"
+                msg = f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] Error in placing open lots, deal status: {response_json}"
                 logging.error(msg)
 
             if update_profit_or_loss_in_db:
                 # update funds balance
                 await update_capital_funds(
                     cfd_strategy_schema=cfd_strategy_schema,
-                    demo_or_live=demo_or_live,
+                    crucial_details=crucial_details,
                     profit_or_loss=update_profit_or_loss_in_db,
                 )
             else:
-                logging.info(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : No profit or loss to update in db"
-                )
+                logging.info(f"[ {crucial_details} ] : No profit or loss to update in db")
             return msg
         except httpx.HTTPStatusError as error:
             response_json = error.response
             status_code, text = response_json.status_code, response_json.text
             if status_code == 429:
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] {status_code} {text}"
+                    f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] {status_code} {text}"
                 )
-                logging.info(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : attempting again to open lots"
-                )
+                logging.info(f"[ {crucial_details} ] : attempting again to open lots")
                 # too many requests
                 place_order_attempt += 1
                 await client.__log_out__()
@@ -608,7 +621,7 @@ async def open_capital_lots(
                 # # if it throws 404 exception saying dealreference not found then try to fetch all positions
                 # # and see if order is placed and if not then try it again and if it is placed then skip it
                 logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt [ {place_order_attempt} ] while opening lots {status_code} {text}"
+                    f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] while opening lots {status_code} {text}"
                 )
                 await asyncio.sleep(2)
                 logging.info(
@@ -617,10 +630,10 @@ async def open_capital_lots(
 
                 _open_order_found = await open_order_found(
                     client=client,
-                    demo_or_live=demo_or_live,
                     cfd_strategy_schema=cfd_strategy_schema,
                     cfd_payload_schema=cfd_payload_schema,
                     lots_size=lots_to_open,
+                    crucial_details=crucial_details,
                 )
 
                 if _open_order_found:
@@ -632,6 +645,7 @@ async def open_capital_lots(
                     cfd_strategy_schema=cfd_strategy_schema,
                     current_open_lots=lots_to_open,
                     action="open",
+                    crucial_details=crucial_details,
                 )
 
                 if position_found:
@@ -644,12 +658,12 @@ async def open_capital_lots(
                         long_or_short = (
                             "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
                         )
-                        msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
+                        msg = f"[ {crucial_details} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
                         logging.info(msg)
 
                         await update_capital_funds(
                             cfd_strategy_schema=cfd_strategy_schema,
-                            demo_or_live=demo_or_live,
+                            crucial_details=crucial_details,
                             profit_or_loss=profit_or_loss,
                         )
                         # TODO: try to open lots with the profit gained
@@ -658,7 +672,7 @@ async def open_capital_lots(
                         # very rare case where lots are still in current direction.
                         # trying to close them by updating "lots_to_open" to the lots from position response
                         logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots are still in current [ {response_direction} ] direction. trying to close [ {response_lots} ] lots."
+                            f"[ {crucial_details} ] : lots are still in current [ {response_direction} ] direction. trying to close [ {response_lots} ] lots."
                         )
                         lots_to_open = response_lots
                         place_order_attempt += 1
@@ -667,71 +681,6 @@ async def open_capital_lots(
                     place_order_attempt += 1
                     await asyncio.sleep(1)
             else:
-                msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Error occured while opening lots, Error: {text}"
+                msg = f"[ {crucial_details} ] : Error occured while opening lots, Error: {text}"
                 logging.error(msg)
                 return msg
-
-
-async def handle_exception(
-    client,
-    status_code,
-    demo_or_live,
-    cfd_strategy_schema,
-    cfd_payload_schema,
-    lots_to_manage,
-    is_opening,
-    profit_or_loss,
-):
-    logging.warning(
-        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Attempt while {( 'opening' if is_opening else 'closing' )} lots {status_code}"
-    )
-
-    # Check for open orders
-    open_order_found = False
-    if open_orders := await get_all_open_orders(client, cfd_strategy_schema):
-        for open_order in open_orders:
-            instrument, direction = (
-                open_order["workingOrderData"]["epic"],
-                open_order["workingOrder"]["direction"],
-            )
-            if (
-                instrument == cfd_strategy_schema.instrument
-                and direction != cfd_payload_schema.direction
-            ):
-                logging.warning(
-                    f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : open order found for lots [ {lots_to_manage} ] in [ {direction} ] direction."
-                )
-                open_order_found = True
-                break
-
-    if open_order_found:
-        return
-
-    # Check for existing positions
-    if positions := await get_all_positions(client, cfd_strategy_schema):
-        for position in positions["positions"]:
-            if position["market"]["epic"] == cfd_strategy_schema.instrument:
-                response_position_direction = position["position"]["direction"]
-                if response_position_direction == cfd_payload_schema.direction.upper():
-                    if is_opening:
-                        msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : successfully [ {response_position_direction} ] {position['position']['size']} trades"
-                        logging.info(msg)
-                        return msg
-                    elif not is_opening:
-                        logging.warning(
-                            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Lots [ {lots_to_manage} ] are reversed in [ {cfd_payload_schema.direction} ] direction. So no need to open lots again"
-                        )
-                        await update_capital_funds(
-                            cfd_strategy_schema=cfd_strategy_schema,
-                            demo_or_live=demo_or_live,
-                            profit_or_loss=profit_or_loss,
-                        )
-                        return True
-                else:
-                    logging.warning(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots are not closed, hence trying to close lots [ {lots_to_manage} ] again"
-                    )
-    else:
-        logging.warning(
-            f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : Assuming lots [ {lots_to_manage} ] are {( 'opened' if is_opening else 'closed' )}"
-        )

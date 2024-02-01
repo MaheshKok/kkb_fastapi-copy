@@ -21,16 +21,18 @@ forex_router = APIRouter(
 
 
 @forex_router.post("/", status_code=200)
-async def post_cfd(
+async def post_capital_cfd(
     cfd_payload_schema: CFDPayloadSchema,
     cfd_strategy_schema: CFDStrategySchema = Depends(get_cfd_strategy_schema),
 ):
     start_time = time.perf_counter()
 
     demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
-    logging.info(
-        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] received"
+    crucial_details = (
+        f"Capital {demo_or_live} {cfd_strategy_schema.instrument} {cfd_payload_schema.direction}"
     )
+
+    logging.info(f"[ {crucial_details} ] : signal received")
 
     client = AsyncCapitalClient(
         username="maheshkokare100@gmail.com",
@@ -40,7 +42,7 @@ async def post_cfd(
     )
 
     profit_or_loss, current_open_lots, direction = await get_capital_cfd_existing_profit_or_loss(
-        client, cfd_strategy_schema
+        client, cfd_strategy_schema, crucial_details
     )
 
     if current_open_lots:
@@ -51,14 +53,15 @@ async def post_cfd(
             demo_or_live=demo_or_live,
             lots_to_close=current_open_lots,
             profit_or_loss=profit_or_loss,
+            crucial_details=crucial_details,
         )
 
         if position_reversed:
-            msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : lots [ {current_open_lots} ] are reversed in [ {direction} ] direction,  hence skipping opening new positions"
+            msg = f"[ {crucial_details} ] : lots [ {current_open_lots} ] are reversed in [ {direction} ] direction, hence skipped opening new positions"
             logging.info(msg)
             process_time = time.perf_counter() - start_time
             logging.info(
-                f" API: [ post_capital_cfd ] request processing time: {process_time} seconds"
+                f"[ {crucial_details} ] : request processing time: {process_time} seconds"
             )
             return msg
 
@@ -72,12 +75,11 @@ async def post_cfd(
             demo_or_live=demo_or_live,
             profit_or_loss=profit_or_loss,
             funds_to_use=0.0,
+            crucial_details=crucial_details,
         )
         process_time = time.perf_counter() - start_time
-        logging.info(
-            f" API: [ post_capital_cfd ] request processing time: {process_time} seconds"
-        )
+        logging.info(f"[ {crucial_details} ] : request processing time: {process_time} seconds")
     else:
-        msg = f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] : signal [ {cfd_payload_schema.direction} ] is same as current direction, hence skipping opening new positions"
+        msg = f"[ {crucial_details} ] : signal [ {cfd_payload_schema.direction} ] is same as current direction, hence skipping opening new positions"
         logging.info(msg)
         return msg
