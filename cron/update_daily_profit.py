@@ -14,8 +14,6 @@ from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.enums import PositionEnum
-from app.schemas.enums import SignalTypeEnum
 from app.tasks.tasks import get_futures_profit
 from app.tasks.tasks import get_options_profit
 from app.tasks.utils import get_monthly_expiry_date_from_redis
@@ -73,9 +71,7 @@ async def update_daily_profit():
                     entry_price=live_trade_db.future_entry_price_received,
                     exit_price=float(current_future_price),
                     quantity=live_trade_db.quantity,
-                    position=PositionEnum.LONG
-                    if live_trade_db.action == SignalTypeEnum.BUY
-                    else PositionEnum.SHORT,
+                    signal=live_trade_db.action,
                 )
 
                 if not only_futures:

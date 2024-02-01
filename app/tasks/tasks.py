@@ -18,7 +18,6 @@ from app.api.utils import get_lots_to_trade_and_profit_or_loss
 from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
-from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
@@ -84,10 +83,10 @@ def get_options_profit(
 
 
 def get_futures_profit(
-    *, entry_price: float, exit_price: float, quantity: int, position: PositionEnum
+    *, entry_price: float, exit_price: float, quantity: int, signal: SignalTypeEnum
 ):
     total_charges = calculate_futures_charges(entry_price, exit_price, quantity)
-    if position == PositionEnum.LONG:
+    if signal == SignalTypeEnum.BUY:
         profit = (exit_price - entry_price) * quantity - total_charges
     else:
         profit = (entry_price - exit_price) * quantity - total_charges
@@ -156,15 +155,11 @@ async def calculate_profits(
             entry_price=entry_price, exit_price=exit_price, quantity=quantity, position=position
         )
         future_entry_price_received = trade.future_entry_price_received
-        # if option_type is PE then position is SHORT and for CE its LONG
-        future_position = (
-            PositionEnum.SHORT if trade.option_type == OptionTypeEnum.PE else PositionEnum.LONG
-        )
         future_profit = get_futures_profit(
             entry_price=future_entry_price_received,
             exit_price=future_exit_price,
             quantity=quantity,
-            position=future_position,
+            signal=signal_payload_schema.action,
         )
 
         mapping = {
@@ -408,23 +403,18 @@ async def compute_trade_data_needed_for_closing_trade(
         total_actual_profit = 0
         total_expected_profit = 0
         for trade_schema in redis_trade_schema_list:
-            future_position = (
-                PositionEnum.SHORT
-                if trade_schema.option_type == OptionTypeEnum.PE
-                else PositionEnum.LONG
-            )
             actual_profit = get_futures_profit(
                 entry_price=trade_schema.entry_price,
                 exit_price=actual_exit_price,
                 quantity=trade_schema.quantity,
-                position=future_position,
+                signal=signal_payload_schema.action,
             )
 
             expected_profit = get_futures_profit(
                 entry_price=trade_schema.future_entry_price_received,
                 exit_price=signal_payload_schema.future_entry_price_received,
                 quantity=trade_schema.quantity,
-                position=future_position,
+                signal=signal_payload_schema.action,
             )
 
             updated_data[trade_schema.id] = {
