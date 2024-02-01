@@ -92,7 +92,7 @@ class EntryTradeSchema(SignalPayloadSchema):
     future_entry_price: Optional[float] = Field(
         description="Future Entry Price", example=40600.5, default=None
     )
-
+    quantity: int = Field(description="Quantity", example=15)
     entry_at: datetime = Field(
         description="Placed At",
         default_factory=datetime.utcnow,

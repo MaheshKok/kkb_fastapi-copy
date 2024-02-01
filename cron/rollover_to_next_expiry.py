@@ -166,6 +166,9 @@ async def rollover_to_next_expiry():
                 kwargs["options_expiry_date"] = options_next_expiry
                 signal_payload_schema.expiry = futures_next_expiry
 
+            signal_payload_schema.quantity = int(
+                len(exiting_trades_json_list) * trade_schema.quantity
+            )
             buy_task = asyncio.create_task(
                 task_entry_trade(
                     **kwargs,
