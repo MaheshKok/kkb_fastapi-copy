@@ -148,10 +148,12 @@ async def rollover_to_next_expiry():
                     }
                 )
 
-            sell_task = await task_exit_trade(
-                **kwargs,
-                redis_hash=redis_hash,
-                redis_trade_schema_list=redis_trade_schema_list,
+            sell_task = asyncio.create_task(
+                task_exit_trade(
+                    **kwargs,
+                    redis_hash=redis_hash,
+                    redis_trade_schema_list=redis_trade_schema_list,
+                )
             )
             tasks.append(sell_task)
 

@@ -92,7 +92,7 @@ async def post_oanda_cfd(
         msg = f"[ {crucial_details} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
         logging.info(msg)
     else:
-        msg = f"[ {crucial_details} ] : Error occured while [ {long_or_short}  {lots_to_open} ] trades"
+        msg = f"[ {crucial_details} ] : Error occured while [ {long_or_short}  {lots_to_open} ] trades, Error: {response}"
         logging.error(msg)
         pprint(response)
 
