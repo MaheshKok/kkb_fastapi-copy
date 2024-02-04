@@ -37,24 +37,26 @@ async def task_update_session_token():
 
     async with Database() as async_session:
         # get broker model from db filtered by username
-        fetch_broker_query = await async_session.execute(select(BrokerModel))
+        fetch_broker_query = await async_session.execute(
+            select(BrokerModel).filter_by(name="ALICEBLUE")
+        )
         broker_models = fetch_broker_query.scalars().all()
-        async_httpx_client = httpx.AsyncClient()
 
-        tasks = []
-        for broker_model in broker_models:
-            pya3_obj = await get_pya3_obj(
-                async_redis_client, str(broker_model.id), async_httpx_client
-            )
+        async with httpx.AsyncClient() as httpx_client:
+            tasks = []
+            for broker_model in broker_models:
+                pya3_obj = await get_pya3_obj(
+                    async_redis_client, str(broker_model.id), httpx_client
+                )
 
-            # create a Task for each update operation
-            task = asyncio.create_task(
-                update_session_token_with_logging(pya3_obj, async_redis_client, broker_model)
-            )
-            tasks.append(task)
+                # create a Task for each update operation
+                task = asyncio.create_task(
+                    update_session_token_with_logging(pya3_obj, async_redis_client, broker_model)
+                )
+                tasks.append(task)
 
-        # wait for all tasks to complete
-        await asyncio.gather(*tasks)
+            # wait for all tasks to complete
+            await asyncio.gather(*tasks)
 
 
 if __name__ == "__main__":
