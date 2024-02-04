@@ -97,6 +97,11 @@ class CFDStrategySchema(BaseModel):
     contracts: Optional[float] = Field(description="Contracts", example=15, default=None)
     funds_usage_percent: float = Field(description="Funds Usage Percent", example=0.25)
 
+    broker_id: Optional[uuid.UUID] = Field(
+        description="Broker on which strategy will be executed",
+        example="6b38655e-0e28-471d-aefb-dd7ce2f6a825",
+        default=None,
+    )
     user_id: uuid.UUID = Field(
         description="User to which strategy belongs",
         example="fb90dd9c-9e16-4043-b5a5-18aacb42f726",

@@ -6,20 +6,25 @@ from pprint import pprint
 import httpx
 from fastapi import APIRouter
 from fastapi import Depends
+from fastapi import HTTPException
 from oandapyV20.contrib.requests import MarketOrderRequest
 from oandapyV20.endpoints.accounts import AccountInstruments
 from oandapyV20.endpoints.orders import OrderCreate
 from oandapyV20.endpoints.pricing import PricingInfo
 from oandapyV20.endpoints.trades import TradeClose
 from oandapyV20.endpoints.trades import TradesList
+from sqlalchemy import select
 
 from app.api.dependency import get_cfd_strategy_schema
 from app.api.endpoints.trade import trading_router
 from app.api.utils import update_capital_funds
 from app.broker.Async_PyOanda import AsyncAPI
+from app.database.models import BrokerModel
+from app.database.session_manager.db_session import Database
 from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.trade import CFDPayloadSchema
+from app.utils.in_memory_cache import oanda_access_token_cache
 
 
 oanda_forex_router = APIRouter(
@@ -290,6 +295,26 @@ async def get_lots_to_open(
     return lots_to_trade
 
 
+async def get_oanda_access_token(cfd_strategy_schema: CFDStrategySchema, crucial_details: str):
+    if cfd_strategy_schema.broker_id in oanda_access_token_cache:
+        return oanda_access_token_cache[cfd_strategy_schema.broker_id]
+
+    async with Database() as async_session:
+        # fetch broker model from database
+        stmt = select(BrokerModel).filter_by(id=cfd_strategy_schema.broker_id)
+        _query = await async_session.execute(stmt)
+        broker_model = _query.scalars().one_or_none()
+        if not broker_model:
+            msg = f"[ {crucial_details} ] : Broker model not found for broker_id: [ {cfd_strategy_schema.broker_id} ]"
+            logging.error(msg)
+            raise HTTPException(status_code=404, detail=msg)
+
+        # set access token into oanda_access_token_cache
+        oanda_access_token_cache[cfd_strategy_schema.broker_id] = broker_model.access_token
+        return broker_model.access_token
+        # access_token = "c1a1da5b257e3eb61082d88d6c41108d-3c1a484c1cf2b8ee215bef4e36807aad"
+
+
 @oanda_forex_router.post("/cfd", status_code=200)
 async def post_oanda_cfd(
     cfd_payload_schema: CFDPayloadSchema,
@@ -303,7 +328,9 @@ async def post_oanda_cfd(
     )
     logging.info(f"[ {crucial_details} ] : signal received")
 
-    access_token = "c1a1da5b257e3eb61082d88d6c41108d-3c1a484c1cf2b8ee215bef4e36807aad"
+    access_token = await get_oanda_access_token(
+        cfd_strategy_schema=cfd_strategy_schema, crucial_details=crucial_details
+    )
     client = AsyncAPI(access_token=access_token)
 
     account_id = cfd_payload_schema.account_id
