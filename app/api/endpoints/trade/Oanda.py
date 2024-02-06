@@ -270,7 +270,7 @@ async def get_lots_to_open(
         return None
 
     margin_required = float(instrument["marginRate"])
-    logging.info(f"[ {crucial_details} ] : Margin required is [ {margin_required} ]")
+    logging.info(f"[ {crucial_details} ] : Margin required is [ {margin_required * 100}% ]")
     tradeUnitsPrecision = int(instrument["tradeUnitsPrecision"])
 
     if strategy_schema.compounding:
