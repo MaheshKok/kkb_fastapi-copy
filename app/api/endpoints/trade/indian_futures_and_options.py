@@ -167,6 +167,7 @@ async def post_nfo_indian_options(
 
     trades_key = f"{signal_payload_schema.strategy_id}"
     lots_to_open = None
+    msg = "successfully"
     if exiting_trades_json := await async_redis_client.hget(trades_key, redis_hash):
         # initiate exit_trade
         exiting_trades_json_list = json.loads(exiting_trades_json)
@@ -180,28 +181,25 @@ async def post_nfo_indian_options(
             redis_trade_schema_list=redis_trade_schema_list,
         )
 
-    if lots_to_open:
-        set_quantity(
-            strategy_schema=strategy_schema,
-            signal_payload_schema=signal_payload_schema,
-            lots_to_open=lots_to_open,
-        )
-        # initiate buy_trade
-        await task_entry_trade(
-            **kwargs,
-        )
-        msg = "successfully closed existing trades and bought a new trade"
-    else:
+        msg += " closed existing trades and"
+
+    if not lots_to_open:
         lots_to_open, ongoing_profit_or_loss = get_lots_to_trade_and_profit_or_loss(
             funds_to_use=strategy_schema.funds,
             strategy_schema=strategy_schema,
             ongoing_profit_or_loss=0.0,
         )
-        signal_payload_schema.quantity = lots_to_open
-        await task_entry_trade(
-            **kwargs,
-        )
-        msg = "successfully bought a new trade"
+
+    set_quantity(
+        strategy_schema=strategy_schema,
+        signal_payload_schema=signal_payload_schema,
+        lots_to_open=lots_to_open,
+    )
+    # initiate buy_trade
+    await task_entry_trade(
+        **kwargs,
+    )
+    msg += " bought a new trade"
 
     process_time = time.perf_counter() - start_time
     logging.info(f" API: [ post_nfo ] request processing time: {process_time} seconds")
