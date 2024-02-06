@@ -179,24 +179,10 @@ logging.basicConfig(
 
 @pytest.fixture(scope="session", autouse=True)
 def event_loop(request):
-    """Create an instance of the default event loop for each test case."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    logging.info("loop created")
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     yield loop
-    logging.info("loop closed")
     loop.close()
-
-
-# @pytest_asyncio.fixture(scope="function", autouse=True)  # (scope="session")
-# async def db_session() -> AsyncSession:
-#     async with engine.begin() as connection:
-#         await connection.run_sync(Base.metadata.drop_all)
-#         await connection.run_sync(Base.metadata.create_all)
-#
-#         async with async_session(bind=connection) as session:
-#             yield session
-#             await session.flush()
-#             await session.rollback()
 
 
 @pytest.fixture(scope="session")
@@ -262,7 +248,7 @@ async def db_cleanup(test_async_engine):
     async with test_async_engine.begin() as conn:
         logging.info("tables dropping")
         await conn.run_sync(Base.metadata.drop_all)
-        logging.info("tables created")
+        logging.info("tables dropped")
 
 
 @pytest.fixture(autouse=True)

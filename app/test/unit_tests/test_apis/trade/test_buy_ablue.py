@@ -9,12 +9,16 @@ from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.models import User
 from app.database.session_manager.db_session import Database
+from app.schemas.enums import InstrumentTypeEnum
+from app.schemas.enums import PositionEnum
+from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.test.factory.broker import BrokerFactory
 from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_open_trades
+from app.utils.constants import FUT
 from app.utils.constants import STRATEGY
 from app.utils.constants import OptionType
 from app.utils.constants import Status
@@ -22,12 +26,19 @@ from app.utils.constants import Status
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "option_type", [OptionType.CE, OptionType.PE], ids=["CE Options", "PE Options"]
+    "instrument_type,action",
+    [
+        (InstrumentTypeEnum.OPTIDX, SignalTypeEnum.BUY),
+        (InstrumentTypeEnum.FUTIDX, SignalTypeEnum.BUY),
+        (InstrumentTypeEnum.OPTIDX, SignalTypeEnum.SELL),
+        (InstrumentTypeEnum.FUTIDX, SignalTypeEnum.SELL),
+    ],
+    ids=["Options Buy", "Futures Buy", "Options Sell", "Futures Sell"],
 )
 async def test_buy_alice_blue_trade(
-    option_type, test_async_client, test_async_redis_client, monkeypatch
+    instrument_type, action, test_async_client, test_async_redis_client, monkeypatch
 ):
-    await create_open_trades(users=1, strategies=1)
+    await create_open_trades(users=1, strategies=1, instrument_type=instrument_type)
 
     async with Database() as async_session:
         user_model = await async_session.scalar(select(User))
@@ -36,11 +47,8 @@ async def test_buy_alice_blue_trade(
         strategy_model.broker_id = broker_model.id
         await async_session.flush()
 
-        payload = get_test_post_trade_payload()
+        payload = get_test_post_trade_payload(action=action)
         payload["strategy_id"] = str(strategy_model.id)
-
-        if option_type == OptionType.PE:
-            payload["option_type"] = OptionType.PE
 
         # set strategy in redis
         await test_async_redis_client.hset(
@@ -91,10 +99,11 @@ async def test_buy_alice_blue_trade(
         assert len(trade_models) == 1
 
         # assert trade in redis
-        redis_trade_json = await test_async_redis_client.hget(
-            f"{strategy_model.id}",
-            f"{trade_models[0].expiry} {trade_models[0].option_type}",
-        )
+        if instrument_type == InstrumentTypeEnum.OPTIDX:
+            redis_hash = f"{trade_models[0].expiry} {trade_models[0].option_type}"
+        else:
+            redis_hash = f"{trade_models[0].expiry} {PositionEnum.LONG if payload['action'] == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
+        redis_trade_json = await test_async_redis_client.hget(f"{strategy_model.id}", redis_hash)
         redis_trade_json_list = json.loads(redis_trade_json)
         assert len(redis_trade_json_list) == 1
 
