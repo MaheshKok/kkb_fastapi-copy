@@ -25,6 +25,7 @@ from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.trade import CFDPayloadSchema
 from app.utils.in_memory_cache import oanda_access_token_cache
+from app.utils.in_memory_cache import usd_to_gbp_conversion_cache
 
 
 oanda_forex_router = APIRouter(
@@ -90,12 +91,24 @@ async def get_gbp_to_usd_conversion_rate():
             "ZAR": 18.6435724181,
         }
     }
+
+    # In case needed in future
+    #         response = await client.get(url="https://api.frankfurter.app/latest?to=USD,GBP")
+    #         conversion_data = response.json()
+    #         usd_to_gbp = conversion_data["rates"]["USD"] / conversion_data["rates"]["GBP"]
+
     """
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url="https://api.frankfurter.app/latest?to=USD,GBP")
-        conversion_data = response.json()
-        usd_to_gbp = conversion_data["rates"]["USD"] / conversion_data["rates"]["GBP"]
-        return usd_to_gbp
+    if "data" in usd_to_gbp_conversion_cache:
+        conversion_data = usd_to_gbp_conversion_cache["data"]
+    else:
+        async with httpx.AsyncClient() as client:
+            url = "https://api.freecurrencyapi.com/v1/latest?apikey=fca_live_ZH1BMAFdskOCtoOBuHo24UczlkYnrBuahfvpnVTn"
+            response = await client.get(url=url)
+            conversion_data = response.json()["data"]
+            usd_to_gbp_conversion_cache["data"] = conversion_data
+
+    gbp_to_usd = conversion_data["USD"] / conversion_data["GBP"]
+    return gbp_to_usd
 
 
 async def get_available_funds(
@@ -397,6 +410,6 @@ async def post_oanda_cfd(
         logging.error(msg)
         pprint(response)
 
-    process_time = time.perf_counter() - start_time
+    process_time = round(time.perf_counter() - start_time, 2)
     logging.info(f"[ {crucial_details} ] : request processing time: {process_time} seconds")
     return response
