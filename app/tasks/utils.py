@@ -145,29 +145,37 @@ async def get_future_price(
     async_httpx_client: AsyncClient,
     redis_trade_schema_list: Optional[List[RedisTradeSchema]] = None,
 ) -> float:
-    if strategy_schema.broker_id:
-        if signal_payload_schema.action == SignalTypeEnum.BUY:
-            future_price = await buy_alice_blue_trades(
-                strike=None,
-                signal_payload_schema=signal_payload_schema,
-                async_redis_client=async_redis_client,
-                strategy_schema=strategy_schema,
-                async_httpx_client=async_httpx_client,
-            )
-            return future_price
-        else:
-            future_price_dict = await close_alice_blue_trades(
-                redis_trade_schema_list, strategy_schema, async_redis_client, async_httpx_client
-            )
-            future_price = future_price_dict[None]
-            return future_price
-    else:
-        future_price = await get_future_price_from_redis(
-            async_redis_client=async_redis_client,
-            strategy_schema=strategy_schema,
-            expiry_date=expiry_date,
-        )
-        return future_price
+    # fetch future price from alice blue only when
+    # strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX and
+    # strategy_schema.broker_id is not None
+    # for all the other scenario fetch it from redis
+    if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
+        if strategy_schema.broker_id:
+            if signal_payload_schema.action == SignalTypeEnum.BUY:
+                future_price = await buy_alice_blue_trades(
+                    strike=None,
+                    signal_payload_schema=signal_payload_schema,
+                    async_redis_client=async_redis_client,
+                    strategy_schema=strategy_schema,
+                    async_httpx_client=async_httpx_client,
+                )
+                return future_price
+            else:
+                future_price_dict = await close_alice_blue_trades(
+                    redis_trade_schema_list,
+                    strategy_schema,
+                    async_redis_client,
+                    async_httpx_client,
+                )
+                future_price = future_price_dict[None]
+                return future_price
+
+    future_price = await get_future_price_from_redis(
+        async_redis_client=async_redis_client,
+        strategy_schema=strategy_schema,
+        expiry_date=expiry_date,
+    )
+    return future_price
 
 
 async def get_strike_and_exit_price_dict(
