@@ -90,6 +90,21 @@ def get_opposite_trade_option_type(strategy_position, signal_action) -> OptionTy
     return opposite_trade_option_type
 
 
+def set_quantity(
+    strategy_schema: StrategySchema, signal_payload_schema: SignalPayloadSchema, lots_to_open: int
+) -> None:
+    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
+        if strategy_schema.position == PositionEnum.LONG:
+            signal_payload_schema.quantity = lots_to_open
+        else:
+            signal_payload_schema.quantity = -lots_to_open
+    else:
+        if signal_payload_schema.action == SignalTypeEnum.BUY:
+            signal_payload_schema.quantity = lots_to_open
+        else:
+            signal_payload_schema.quantity = -lots_to_open
+
+
 @fno_router.post("/nfo", status_code=200)
 async def post_nfo_indian_options(
     signal_payload_schema: SignalPayloadSchema,
@@ -166,7 +181,11 @@ async def post_nfo_indian_options(
         )
 
     if lots_to_open:
-        signal_payload_schema.quantity = lots_to_open
+        set_quantity(
+            strategy_schema=strategy_schema,
+            signal_payload_schema=signal_payload_schema,
+            lots_to_open=lots_to_open,
+        )
         # initiate buy_trade
         await task_entry_trade(
             **kwargs,

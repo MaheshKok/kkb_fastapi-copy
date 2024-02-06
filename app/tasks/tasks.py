@@ -73,6 +73,7 @@ def calculate_options_charges(buy_price, sell_price, total_trades):
 def get_options_profit(
     *, entry_price: float, exit_price: float, quantity: int, position: PositionEnum
 ):
+    quantity = abs(quantity)
     total_charges = calculate_options_charges(entry_price, exit_price, quantity)
     if position == PositionEnum.LONG:
         profit = (exit_price - entry_price) * quantity - total_charges
@@ -85,6 +86,7 @@ def get_options_profit(
 def get_futures_profit(
     *, entry_price: float, exit_price: float, quantity: int, signal: SignalTypeEnum
 ):
+    quantity = abs(quantity)
     total_charges = calculate_futures_charges(entry_price, exit_price, quantity)
     if signal == SignalTypeEnum.BUY:
         profit = (exit_price - entry_price) * quantity - total_charges
@@ -407,14 +409,14 @@ async def compute_trade_data_needed_for_closing_trade(
                 entry_price=trade_schema.entry_price,
                 exit_price=actual_exit_price,
                 quantity=trade_schema.quantity,
-                signal=signal_payload_schema.action,
+                signal=trade_schema.action,
             )
 
             expected_profit = get_futures_profit(
                 entry_price=trade_schema.future_entry_price_received,
                 exit_price=signal_payload_schema.future_entry_price_received,
                 quantity=trade_schema.quantity,
-                signal=signal_payload_schema.action,
+                signal=trade_schema.action,
             )
 
             updated_data[trade_schema.id] = {

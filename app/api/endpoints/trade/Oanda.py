@@ -398,7 +398,7 @@ async def post_oanda_cfd(
     is_buy_signal = cfd_payload_schema.direction == SignalTypeEnum.BUY
     market_order_request = MarketOrderRequest(
         instrument=cfd_strategy_schema.instrument,
-        units=(int(lots_to_open) if is_buy_signal else -int(lots_to_open)),
+        units=lots_to_open if is_buy_signal else -lots_to_open,
     )
     response = await client.request(OrderCreate(account_id, data=market_order_request.data))
     long_or_short = "LONG" if is_buy_signal else "SHORT"
