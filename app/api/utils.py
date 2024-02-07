@@ -350,7 +350,7 @@ async def get_funds_to_use(
         )
 
 
-async def update_capital_funds(
+async def update_cfd_strategy_funds(
     *, cfd_strategy_schema: CFDStrategySchema, profit_or_loss: float, crucial_details: str
 ):
     log_profit_or_loss = "profit" if profit_or_loss > 0 else "loss"
@@ -498,7 +498,7 @@ async def close_capital_lots(
                         logging.warning(
                             f"[ {crucial_details} ] - Lots [ {lots_to_close} ] are reversed in [ {cfd_payload_schema.direction} ] direction. so NO need to open lots again"
                         )
-                        await update_capital_funds(
+                        await update_cfd_strategy_funds(
                             cfd_strategy_schema=cfd_strategy_schema,
                             crucial_details=crucial_details,
                             profit_or_loss=profit_or_loss,
@@ -593,7 +593,7 @@ async def open_capital_lots(
 
             if update_profit_or_loss_in_db:
                 # update funds balance
-                await update_capital_funds(
+                await update_cfd_strategy_funds(
                     cfd_strategy_schema=cfd_strategy_schema,
                     crucial_details=crucial_details,
                     profit_or_loss=update_profit_or_loss_in_db,
@@ -657,7 +657,7 @@ async def open_capital_lots(
                         msg = f"[ {crucial_details} ] - successfully [ {long_or_short}  {lots_to_open} ] trades."
                         logging.info(msg)
 
-                        await update_capital_funds(
+                        await update_cfd_strategy_funds(
                             cfd_strategy_schema=cfd_strategy_schema,
                             crucial_details=crucial_details,
                             profit_or_loss=profit_or_loss,

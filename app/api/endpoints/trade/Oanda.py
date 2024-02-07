@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from app.api.dependency import get_cfd_strategy_schema
 from app.api.endpoints.trade import trading_router
-from app.api.utils import update_capital_funds
+from app.api.utils import update_cfd_strategy_funds
 from app.broker.Async_PyOanda import AsyncAPI
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
@@ -116,7 +116,7 @@ async def get_available_funds(
 ):
     conversion_rate = await get_gbp_to_usd_conversion_rate()
     available_funds = round((strategy_schema.funds + profit_or_loss) * conversion_rate, 2)
-    logging.info(f"[ {crucial_details} ] : Available funds are [ {available_funds} ]")
+    logging.info(f"[ {crucial_details} ] : Available funds are [ {available_funds} $]")
     return available_funds
 
 
@@ -372,7 +372,7 @@ async def post_oanda_cfd(
                     logging.info(
                         f"[ {crucial_details} ] - current open lots: [ {current_open_lots} ] {profit_or_loss_str}: [ {profit_or_loss_value} ] closed"
                     )
-                    await update_capital_funds(
+                    await update_cfd_strategy_funds(
                         cfd_strategy_schema=cfd_strategy_schema,
                         profit_or_loss=profit_or_loss_value,
                         crucial_details=crucial_details,
