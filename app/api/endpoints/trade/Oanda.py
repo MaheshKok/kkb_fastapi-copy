@@ -116,7 +116,7 @@ async def get_available_funds(
 ):
     conversion_rate = await get_gbp_to_usd_conversion_rate()
     available_funds = round((strategy_schema.funds + profit_or_loss) * conversion_rate, 2)
-    logging.info(f"[ {crucial_details} ] : Available funds are [ {available_funds} $]")
+    logging.info(f"[ {crucial_details} ] - Available funds are [ {available_funds} $]")
     return available_funds
 
 
@@ -244,7 +244,7 @@ async def get_lots_to_open(
     client: AsyncAPI,
     crucial_details: str,
 ):
-    logging.info(f"[ {crucial_details} ] : Getting lots to open")
+    logging.info(f"[ {crucial_details} ] - Getting lots to open")
 
     available_funds, current_instrument_price, instrument = await asyncio.gather(
         get_available_funds(
@@ -270,19 +270,19 @@ async def get_lots_to_open(
         return None
 
     margin_required = float(instrument["marginRate"])
-    logging.info(f"[ {crucial_details} ] : Margin required is [ {margin_required * 100}% ]")
+    logging.info(f"[ {crucial_details} ] - Margin required is [ {margin_required * 100}% ]")
     tradeUnitsPrecision = int(instrument["tradeUnitsPrecision"])
 
     if strategy_schema.compounding:
-        logging.info(f"[ {crucial_details} ] : Compounding is enabled")
+        logging.info(f"[ {crucial_details} ] - Compounding is enabled")
         # contracts worth that can be traded
         total_worth_of_contracts_to_trade = available_funds / margin_required
         lots_to_trade = round(
             total_worth_of_contracts_to_trade / current_instrument_price, tradeUnitsPrecision
         )
-        logging.info(f"[ {crucial_details} ] : Lots : [ {lots_to_trade} ] to trade")
+        logging.info(f"[ {crucial_details} ] - Lots : [ {lots_to_trade} ] to trade")
     else:
-        logging.info(f"[ {crucial_details} ] : Compounding is disabled")
+        logging.info(f"[ {crucial_details} ] - Compounding is disabled")
         fixed_lots_to_trade = strategy_schema.contracts
         funds_required_to_trade = current_instrument_price / margin_required * fixed_lots_to_trade
 
@@ -291,7 +291,7 @@ async def get_lots_to_open(
                 f"[ {crucial_details} ] - available funds : [ {available_funds} ] are greater than funds_required_to_trade : [ {funds_required_to_trade}], contracts : [ {fixed_lots_to_trade} ]"
             )
             lots_to_trade = round(fixed_lots_to_trade, tradeUnitsPrecision)
-            logging.info(f"[ {crucial_details} ] : Hence we can trade Lots : [ {lots_to_trade} ]")
+            logging.info(f"[ {crucial_details} ] - Hence we can trade Lots : [ {lots_to_trade} ]")
         else:
             # contracts worth that can be traded
             total_worth_of_contracts_to_trade = available_funds / margin_required
@@ -339,7 +339,7 @@ async def post_oanda_cfd(
     crucial_details = (
         f"Oanda {demo_or_live} {cfd_strategy_schema.instrument} {cfd_payload_schema.direction}"
     )
-    logging.info(f"[ {crucial_details} ] : signal received")
+    logging.info(f"[ {crucial_details} ] - signal received")
 
     access_token = await get_oanda_access_token(
         cfd_strategy_schema=cfd_strategy_schema, crucial_details=crucial_details
@@ -411,5 +411,5 @@ async def post_oanda_cfd(
         pprint(response)
 
     process_time = round(time.perf_counter() - start_time, 2)
-    logging.info(f"[ {crucial_details} ] : request processing time: {process_time} seconds")
+    logging.info(f"[ {crucial_details} ] - request processing time: {process_time} seconds")
     return response
