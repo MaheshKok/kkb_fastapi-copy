@@ -115,7 +115,7 @@ async def get_available_funds(
     strategy_schema: CFDStrategySchema, profit_or_loss: float, crucial_details: str
 ):
     conversion_rate = await get_gbp_to_usd_conversion_rate()
-    available_funds = (strategy_schema.funds + profit_or_loss) * conversion_rate
+    available_funds = round((strategy_schema.funds + profit_or_loss) * conversion_rate, 2)
     logging.info(f"[ {crucial_details} ] : Available funds are [ {available_funds} ]")
     return available_funds
 
