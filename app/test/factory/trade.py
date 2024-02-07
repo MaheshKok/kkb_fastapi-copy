@@ -34,7 +34,7 @@ class LiveTradeFactory(AsyncSQLAlchemyFactory):
 
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)
-    quantity = 25
+    quantity = 15
     entry_price = 400.0
 
     future_entry_price_received = 44300.0
@@ -59,7 +59,7 @@ class CompletedTradeFactory(AsyncSQLAlchemyFactory):
 
     id = factory.LazyFunction(uuid.uuid4)
     instrument = factory.LazyFunction(generate_instrument)
-    quantity = 25
+    quantity = 15
 
     entry_price = 400.0
     exit_price = 500.0

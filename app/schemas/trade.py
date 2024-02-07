@@ -59,6 +59,7 @@ class RedisTradeSchema(SignalPayloadSchema):
         description="Received At", example="2023-05-22 05:11:01.117358", default=None
     )
     action: SignalTypeEnum = Field(description="buy or sell signal", example="buy")
+    quantity: int = Field(description="Quantity", example=15)
 
     class Config(BaseConfig):
         exclude = {"symbol", "receive_at"}

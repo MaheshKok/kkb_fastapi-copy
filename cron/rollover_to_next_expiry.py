@@ -126,7 +126,7 @@ async def rollover_to_next_expiry():
             signal_payload = {
                 "future_entry_price_received": future_entry_price_received,
                 "strategy_id": strategy_schema.id,
-                "action": get_action(strategy_schema, trade_schema),
+                "action": trade_schema.action,
                 "received_at": str(datetime.utcnow().isoformat()),
             }
 
@@ -157,13 +157,15 @@ async def rollover_to_next_expiry():
             )
             tasks.append(sell_task)
 
-            # update expiry in kwargs
-            kwargs["futures_expiry_date"] = futures_next_expiry
             # set option_type
             set_option_type(strategy_schema, signal_payload_schema)
-            signal_payload_schema.expiry = futures_next_expiry
+
             if not strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
                 kwargs["options_expiry_date"] = options_next_expiry
+                signal_payload_schema.expiry = options_next_expiry
+            else:
+                # update expiry in kwargs
+                kwargs["futures_expiry_date"] = futures_next_expiry
                 signal_payload_schema.expiry = futures_next_expiry
 
             signal_payload_schema.quantity = int(
