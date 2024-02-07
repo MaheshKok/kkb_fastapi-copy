@@ -70,6 +70,7 @@ async def create_open_trades(
                         strike=None,
                         option_type=None,
                         future_entry_price_received=future_entry_price,
+                        action=action,
                     )
 
             if take_away_profit:

@@ -26,6 +26,7 @@ from app.schemas.trade import ExitTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from app.tasks.utils import get_future_price
+from app.tasks.utils import get_future_price_from_redis
 from app.tasks.utils import get_strike_and_entry_price
 from app.tasks.utils import get_strike_and_exit_price_dict
 from app.utils.constants import FUT
@@ -314,12 +315,10 @@ async def task_entry_trade(
 ):
     tasks = [
         asyncio.create_task(
-            get_future_price(
+            get_future_price_from_redis(
                 async_redis_client=async_redis_client,
                 strategy_schema=strategy_schema,
                 expiry_date=futures_expiry_date,
-                signal_payload_schema=signal_payload_schema,
-                async_httpx_client=async_httpx_client,
             )
         )
     ]
@@ -396,6 +395,7 @@ async def compute_trade_data_needed_for_closing_trade(
             expiry_date=futures_expiry_date,
             signal_payload_schema=signal_payload_schema,
             async_httpx_client=async_httpx_client,
+            redis_trade_schema_list=redis_trade_schema_list,
         )
         logging.info(
             f"Strategy: [ {strategy_schema.name} ], Slippage: [ {signal_payload_schema.future_entry_price_received - actual_exit_price } points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
