@@ -182,19 +182,19 @@ def get_lots_to_trade_and_profit_or_loss(
         )
         strategy_funds_to_trade = round(strategy_funds_to_trade, 2)
         logging.info(
-            f"[ {crucial_details} ] : strategy_funds_to_trade: {strategy_funds_to_trade}"
+            f"[ {crucial_details} ] - strategy_funds_to_trade: {strategy_funds_to_trade}"
         )
 
         if strategy_funds_to_trade < Decimal(strategy_schema.margin_for_min_quantity):
             logging.info(
-                f"[ {crucial_details} ] : strategy_funds_to_trade: [ {strategy_funds_to_trade} ] is less than margin for min quantity: {strategy_schema.margin_for_min_quantity}"
+                f"[ {crucial_details} ] - strategy_funds_to_trade: [ {strategy_funds_to_trade} ] is less than margin for min quantity: {strategy_schema.margin_for_min_quantity}"
             )
             strategy_funds_to_trade = Decimal(strategy_schema.margin_for_min_quantity)
 
         to_update_profit_or_loss_in_db = ongoing_profit_or_loss
         if not strategy_schema.compounding:
             logging.info(
-                f"[ {crucial_details} ] : Compounding is not enabled, so we will trade fixed contracts: [ {strategy_schema.contracts} ]"
+                f"[ {crucial_details} ] - Compounding is not enabled, so we will trade fixed contracts: [ {strategy_schema.contracts} ]"
             )
             funds_required_for_contracts = Decimal(
                 (strategy_schema.margin_for_min_quantity / strategy_schema.min_quantity)
@@ -204,28 +204,21 @@ def get_lots_to_trade_and_profit_or_loss(
             if funds_required_for_contracts <= available_funds:
                 lots_to_trade = strategy_schema.contracts
                 logging.info(
-                    f"[ {crucial_details} ] : Available Funds: [ {available_funds} ] are more than funds required for contracts: [ {funds_required_for_contracts} ]"
+                    f"[ {crucial_details} ] - Available Funds: [ {available_funds} ] are more than funds required for contracts: [ {funds_required_for_contracts} ]"
                 )
             else:
                 lots_to_trade = _get_lots_to_trade(available_funds, strategy_schema)
                 logging.info(
-                    f"[ {crucial_details} ] : Available Funds: [ {available_funds} ] are less than funds required for contracts: [ {funds_required_for_contracts} ]. So we will trade [ {lots_to_trade} ] contracts"
+                    f"[ {crucial_details} ] - Available Funds: [ {available_funds} ] are less than funds required for contracts: [ {funds_required_for_contracts} ]. So we will trade [ {lots_to_trade} ] contracts"
                 )
         else:
             lots_to_trade = _get_lots_to_trade(strategy_funds_to_trade, strategy_schema)
             logging.info(
-                f"[ {crucial_details} ] : Compounding is enabled and we can trade [ {lots_to_trade} ] contracts in [ {strategy_funds_to_trade} ] funds"
+                f"[ {crucial_details} ] - Compounding is enabled and we can trade [ {lots_to_trade} ] contracts in [ {strategy_funds_to_trade} ] funds"
             )
 
-        if isinstance(strategy_schema, CFDStrategySchema):
-            demo_or_live = "DEMO" if strategy_schema.is_demo else "LIVE"
-            symbol = strategy_schema.instrument
-        else:
-            demo_or_live = "DEMO" if strategy_schema.broker_id else "LIVE"
-            symbol = strategy_schema.symbol
-
         logging.info(
-            f"[ {demo_or_live} {symbol} ] : lots to open [ {lots_to_trade} ], to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db} ]"
+            f"[ {crucial_details} ] - lots to open [ {lots_to_trade} ], to_update_profit_or_loss_in_db [ {to_update_profit_or_loss_in_db} ]"
         )
         return lots_to_trade, to_update_profit_or_loss_in_db
 
@@ -252,7 +245,7 @@ async def get_all_positions(
             response = http_status_error.response
             status_code, error = response.status_code, response.text
             logging.warning(
-                f"[ {crucial_details} ] : Attempt [ {get_all_positions_attempt} ] HTTPStatusError occured while getting all positions {status_code} {error}"
+                f"[ {crucial_details} ] - Attempt [ {get_all_positions_attempt} ] HTTPStatusError occured while getting all positions {status_code} {error}"
             )
             await client.__log_out__()
             get_all_positions_attempt += 1
@@ -260,13 +253,13 @@ async def get_all_positions(
         except Exception as exception_error:
             error = exception_error
             logging.warning(
-                f"[ {crucial_details} ] : Attempt [ {get_all_positions_attempt} ] Exception Error occured while getting all positions {error}"
+                f"[ {crucial_details} ] - Attempt [ {get_all_positions_attempt} ] Exception Error occured while getting all positions {error}"
             )
             get_all_positions_attempt += 1
             await asyncio.sleep(1)
     else:
         logging.error(
-            f"[ {crucial_details} ] : All attemps exhausted in getting all positions, Error: {error}"
+            f"[ {crucial_details} ] - All attemps exhausted in getting all positions, Error: {error}"
         )
         raise HTTPException(
             status_code=400, detail="All attemps exhausted in getting all positions"
@@ -286,26 +279,26 @@ async def get_all_open_orders(client: AsyncCapitalClient, crucial_details: str) 
             status_code, text = response.status_code, response.text
             if status_code == 429:
                 logging.warning(
-                    f"[ {crucial_details} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
+                    f"[ {crucial_details} ] - Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
                 )
                 await client.__log_out__()
                 get_all_orders_attempt += 1
                 await asyncio.sleep(2)
             elif status_code == 400:
                 logging.warning(
-                    f"[ {crucial_details} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
+                    f"[ {crucial_details} ] - Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
                 )
                 await client.__log_out__()
                 get_all_orders_attempt += 1
                 await asyncio.sleep(2)
             else:
                 logging.error(
-                    f"[ {crucial_details} ] : Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
+                    f"[ {crucial_details} ] - Attempt [ {get_all_orders_attempt} ] Error occured while getting all orders {status_code} {text}"
                 )
                 break
     else:
         logging.error(
-            f"[ {crucial_details} ] : All attemps exhausted in getting all orders, Error {status_code} {text}"
+            f"[ {crucial_details} ] - All attemps exhausted in getting all orders, Error {status_code} {text}"
         )
 
 
@@ -324,7 +317,7 @@ async def get_capital_cfd_existing_profit_or_loss(
 
     profit_or_loss_str = "profit" if profit_or_loss_value > 0 else "loss"
     logging.info(
-        f"[ {crucial_details} ] : current lots: [ {existing_lot} ] {profit_or_loss_str}: [ {profit_or_loss_value} ], direction: [ {direction} ] to be closed"
+        f"[ {crucial_details} ] - current lots: [ {existing_lot} ] {profit_or_loss_str}: [ {profit_or_loss_value} ], direction: [ {direction} ] to be closed"
     )
     return round(profit_or_loss_value, 2), existing_lot, direction
 
@@ -349,11 +342,11 @@ async def get_funds_to_use(
             get_all_accounts_attempt += 1
             await asyncio.sleep(1)
             logging.warning(
-                f"[ {crucial_details} ] : Attemp [ {get_all_accounts_attempt} ] HTTPStatusError occured while getting all accounts {status_code} {text}"
+                f"[ {crucial_details} ] - Attemp [ {get_all_accounts_attempt} ] HTTPStatusError occured while getting all accounts {status_code} {text}"
             )
     else:
         logging.error(
-            f"[ {crucial_details} ] : Error occured while getting all accounts {status_code} {text}"
+            f"[ {crucial_details} ] - Error occured while getting all accounts {status_code} {text}"
         )
 
 
@@ -371,7 +364,7 @@ async def update_capital_funds(
         )
         await async_session.commit()
         logging.info(
-            f"[ {crucial_details} ] : funds balance [ {cfd_strategy_schema.funds} ] got updated to [ {updated_funds} ] after {log_profit_or_loss}: {profit_or_loss} "
+            f"[ {crucial_details} ] - funds balance [ {cfd_strategy_schema.funds} ] got updated to [ {updated_funds} ] after {log_profit_or_loss}: {profit_or_loss} "
         )
 
 
@@ -395,7 +388,7 @@ async def open_order_found(
                 and direction != cfd_payload_schema.direction
             ):
                 logging.warning(
-                    f"[ {crucial_details} ] : Open order detected for [ {lots_size} ] Lots in [ {direction} ] direction"
+                    f"[ {crucial_details} ] - Open order detected for [ {lots_size} ] Lots in [ {direction} ] direction"
                 )
                 return True
     logging.info(f"[ {crucial_details} ] : open order not found")
@@ -417,12 +410,12 @@ async def find_position(
                 return position
         else:
             logging.warning(
-                f"[ {crucial_details} ] : lots [ {current_open_lots} ] are {action} as no existing position found."
+                f"[ {crucial_details} ] - lots [ {current_open_lots} ] are {action} as no existing position found."
             )
             return False
     else:
         logging.warning(
-            f"[ {crucial_details} ] : Assuming lots are {action} as no existing position found."
+            f"[ {crucial_details} ] - Assuming lots are {action} as no existing position found."
         )
         return False
 
@@ -448,32 +441,32 @@ async def close_capital_lots(
 
             response_json = response.json()
             if response_json["dealStatus"] == "ACCEPTED":
-                msg = f"[ {crucial_details} ] : successfully closed [  {lots_to_close} ] trades."
+                msg = f"[ {crucial_details} ] - successfully closed [  {lots_to_close} ] trades."
                 logging.info(msg)
                 return False
             elif response_json["dealStatus"] == "REJECTED":
                 if response_json["rejectReason"] == "THROTTLING":
-                    msg = f"[ {crucial_details} ] : Attempt [ {close_lots_attempt} ] throttled while closing open lots [ {lots_to_close} ] response:  {response_json}"
+                    msg = f"[ {crucial_details} ] - Attempt [ {close_lots_attempt} ] throttled while closing open lots [ {lots_to_close} ] response:  {response_json}"
                     logging.warning(msg)
                     close_lots_attempt += 1
                     await asyncio.sleep(2)
                     continue
                 logging.warning(
-                    f"[ {crucial_details} ] : Attempt [ {close_lots_attempt} ], rejected closing open lots [ {lots_to_close} ] response:  {response_json}. Attempting again to close"
+                    f"[ {crucial_details} ] - Attempt [ {close_lots_attempt} ], rejected closing open lots [ {lots_to_close} ] response:  {response_json}. Attempting again to close"
                 )
             else:
-                msg = f"[ {crucial_details} ] : Attempt [ {close_lots_attempt} ] deal status: {response_json}"
+                msg = f"[ {crucial_details} ] - Attempt [ {close_lots_attempt} ] deal status: {response_json}"
                 logging.error(msg)
         except httpx.HTTPStatusError as error:
             response_json = error.response
             status_code, text = response_json.status_code, response_json.text
             if status_code in [400, 404, 429]:
                 logging.warning(
-                    f"[ {crucial_details} ] : Attempt [ {close_lots_attempt} ] while closing lots {status_code} {text}"
+                    f"[ {crucial_details} ] - Attempt [ {close_lots_attempt} ] while closing lots {status_code} {text}"
                 )
                 await asyncio.sleep(3)
                 logging.info(
-                    f"[ {crucial_details} ] : may be lots are closed , so fetching all positions again and verifying the same"
+                    f"[ {crucial_details} ] - may be lots are closed , so fetching all positions again and verifying the same"
                 )
 
                 _open_order_found = await open_order_found(
@@ -503,7 +496,7 @@ async def close_capital_lots(
                         == cfd_payload_schema.direction.upper()
                     ):
                         logging.warning(
-                            f"[ {crucial_details} ] : Lots [ {lots_to_close} ] are reversed in [ {cfd_payload_schema.direction} ] direction. so NO need to open lots again"
+                            f"[ {crucial_details} ] - Lots [ {lots_to_close} ] are reversed in [ {cfd_payload_schema.direction} ] direction. so NO need to open lots again"
                         )
                         await update_capital_funds(
                             cfd_strategy_schema=cfd_strategy_schema,
@@ -514,17 +507,17 @@ async def close_capital_lots(
                         break
                     else:
                         logging.warning(
-                            f"[ {crucial_details} ] : Lots [ {lots_to_close} ] are not closed. Hence trying again to close them"
+                            f"[ {crucial_details} ] - Lots [ {lots_to_close} ] are not closed. Hence trying again to close them"
                         )
                         close_lots_attempt += 1
                         await asyncio.sleep(3)
                 else:
                     logging.warning(
-                        f"[ {crucial_details} ] : Lots [ {lots_to_close} ] are closed as no position found."
+                        f"[ {crucial_details} ] - Lots [ {lots_to_close} ] are closed as no position found."
                     )
                     break
             else:
-                msg = f"[ {crucial_details} ] : Attempt [ {close_lots_attempt} ] Error occured while closing open lots, Error: {text}"
+                msg = f"[ {crucial_details} ] - Attempt [ {close_lots_attempt} ] Error occured while closing open lots, Error: {text}"
                 logging.error(msg)
                 return False
 
@@ -556,7 +549,7 @@ async def open_capital_lots(
             if response_json["dealStatus"] == "REJECTED":
                 if response_json["rejectReason"] == "THROTTLING":
                     # handled rejectReason: 'THROTTLING' i.e. try again
-                    msg = f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] response:  {response_json}"
+                    msg = f"[ {crucial_details} ] - Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] response:  {response_json}"
                     logging.warning(msg)
                     logging.info(
                         f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] attempting again to open lots"
@@ -568,10 +561,10 @@ async def open_capital_lots(
                 elif response_json["rejectReason"] == "RISK_CHECK":
                     # handle rejectReason: RISK_CHECK i.e. calculate lots to open again as available funds are updated
                     # calculate lots to open again as available funds are updated
-                    msg = f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] RISK_CHECK while opening lots [ {lots_to_open} ] response:  {response_json}"
+                    msg = f"[ {crucial_details} ] - Attempt [ {place_order_attempt} ] RISK_CHECK while opening lots [ {lots_to_open} ] response:  {response_json}"
                     logging.warning(msg)
                     logging.info(
-                        f"[ {demo_or_live} {cfd_strategy_schema.instrument} ] calculating lots to open again as available funds are updated"
+                        f"[ {crucial_details} ] calculating lots to open again as available funds are updated"
                     )
                     # funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
 
@@ -587,15 +580,15 @@ async def open_capital_lots(
                     continue
                 else:
                     logging.error(
-                        f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] rejected, deal status: {response_json['dealStatus']}, reason: {response_json['rejectReason']}, status: {response_json['status']}"
+                        f"[ {crucial_details} ] - Attempt [ {place_order_attempt} ] rejected, deal status: {response_json['dealStatus']}, reason: {response_json['rejectReason']}, status: {response_json['status']}"
                     )
                     return response_json
             elif response_json["dealStatus"] == "ACCEPTED":
                 long_or_short = "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
-                msg = f"[ {crucial_details} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
+                msg = f"[ {crucial_details} ] - successfully [ {long_or_short}  {lots_to_open} ] trades."
                 logging.info(msg)
             else:
-                msg = f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] Error in placing open lots, deal status: {response_json}"
+                msg = f"[ {crucial_details} ] - Attempt [ {place_order_attempt} ] Error in placing open lots, deal status: {response_json}"
                 logging.error(msg)
 
             if update_profit_or_loss_in_db:
@@ -613,7 +606,7 @@ async def open_capital_lots(
             status_code, text = response_json.status_code, response_json.text
             if status_code == 429:
                 logging.warning(
-                    f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] {status_code} {text}"
+                    f"[ {crucial_details} ] - Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] {status_code} {text}"
                 )
                 logging.info(f"[ {crucial_details} ] : attempting again to open lots")
                 # too many requests
@@ -624,7 +617,7 @@ async def open_capital_lots(
                 # # if it throws 404 exception saying dealreference not found then try to fetch all positions
                 # # and see if order is placed and if not then try it again and if it is placed then skip it
                 logging.warning(
-                    f"[ {crucial_details} ] : Attempt [ {place_order_attempt} ] while opening lots {status_code} {text}"
+                    f"[ {crucial_details} ] - Attempt [ {place_order_attempt} ] while opening lots {status_code} {text}"
                 )
                 await asyncio.sleep(2)
                 logging.info(
@@ -661,7 +654,7 @@ async def open_capital_lots(
                         long_or_short = (
                             "LONG" if cfd_payload_schema.direction == "buy" else "SHORT"
                         )
-                        msg = f"[ {crucial_details} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
+                        msg = f"[ {crucial_details} ] - successfully [ {long_or_short}  {lots_to_open} ] trades."
                         logging.info(msg)
 
                         await update_capital_funds(
@@ -675,7 +668,7 @@ async def open_capital_lots(
                         # very rare case where lots are still in current direction.
                         # trying to close them by updating "lots_to_open" to the lots from position response
                         logging.warning(
-                            f"[ {crucial_details} ] : lots are still in current [ {response_direction} ] direction. trying to close [ {response_lots} ] lots."
+                            f"[ {crucial_details} ] - lots are still in current [ {response_direction} ] direction. trying to close [ {response_lots} ] lots."
                         )
                         lots_to_open = response_lots
                         place_order_attempt += 1
@@ -684,6 +677,6 @@ async def open_capital_lots(
                     place_order_attempt += 1
                     await asyncio.sleep(1)
             else:
-                msg = f"[ {crucial_details} ] : Error occured while opening lots, Error: {text}"
+                msg = f"[ {crucial_details} ] - Error occured while opening lots, Error: {text}"
                 logging.error(msg)
                 return msg

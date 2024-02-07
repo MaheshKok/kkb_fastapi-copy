@@ -203,7 +203,8 @@ async def test_async_redis_client():
     )
     logging.info("test redis client created")
     yield _test_async_redis_client
-    logging.info("test redis client created")
+    await _test_async_redis_client.close()
+    logging.info("test redis client closed")
 
 
 @pytest_asyncio.fixture(scope="function")

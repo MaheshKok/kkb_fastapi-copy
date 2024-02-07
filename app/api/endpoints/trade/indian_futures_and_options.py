@@ -112,16 +112,16 @@ async def post_nfo_indian_options(
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
 ):
+    crucial_details = f"{ strategy_schema.symbol} {strategy_schema.id} {strategy_schema.instrument_type} {signal_payload_schema.action}"
     start_time = time.perf_counter()
-    logging.info(
-        f"Received [ {signal_payload_schema.action} ] signal for strategy: {strategy_schema.name}"
-    )
+    logging.info(f"[ {crucial_details} ] signal received")
 
     kwargs = {
         "signal_payload_schema": signal_payload_schema,
         "strategy_schema": strategy_schema,
         "async_redis_client": async_redis_client,
         "async_httpx_client": async_httpx_client,
+        "crucial_details": crucial_details,
     }
 
     # hardcoded instrument_type because i want to explicitly get expiry for futures
@@ -171,7 +171,9 @@ async def post_nfo_indian_options(
     if exiting_trades_json := await async_redis_client.hget(trades_key, redis_hash):
         # initiate exit_trade
         exiting_trades_json_list = json.loads(exiting_trades_json)
-        logging.info(f"Existing total: {len(exiting_trades_json_list)} trades to be closed")
+        logging.info(
+            f"[ {crucial_details} ] - Existing total: {len(exiting_trades_json_list)} trades to be closed"
+        )
         redis_trade_schema_list = TypeAdapter(List[RedisTradeSchema]).validate_python(
             [json.loads(trade) for trade in exiting_trades_json_list]
         )
@@ -188,6 +190,7 @@ async def post_nfo_indian_options(
             funds_to_use=strategy_schema.funds,
             strategy_schema=strategy_schema,
             ongoing_profit_or_loss=0.0,
+            crucial_details=crucial_details,
         )
 
     set_quantity(
@@ -201,6 +204,6 @@ async def post_nfo_indian_options(
     )
     msg += " bought a new trade"
 
-    process_time = time.perf_counter() - start_time
-    logging.info(f" API: [ post_nfo ] request processing time: {process_time} seconds")
+    process_time = round(time.perf_counter() - start_time, 2)
+    logging.info(f" [ {crucial_details} ] - request processing time: {process_time} seconds")
     return msg

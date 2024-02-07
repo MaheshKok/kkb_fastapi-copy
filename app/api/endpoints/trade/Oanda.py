@@ -157,7 +157,7 @@ async def get_current_instrument_price(
         )
     except Exception as e:
         logging.error(
-            f"[ {crucial_details} ] : Failed to get current instrument price. Error: {e}"
+            f"[ {crucial_details} ] - Failed to get current instrument price. Error: {e}"
         )
         return None
 
@@ -167,7 +167,7 @@ async def get_current_instrument_price(
         current_instrument_price = float(pricing_details["prices"][0]["closeoutBid"])
 
     logging.info(
-        f"[ {crucial_details} ] : Current instrument price is [ {current_instrument_price} ]"
+        f"[ {crucial_details} ] - Current instrument price is [ {current_instrument_price} ]"
     )
     return current_instrument_price
 
@@ -225,13 +225,13 @@ async def get_instrument(
     )
     if not instrument_list:
         logging.error(
-            f"[ {crucial_details} ] : No Instrument: [ {strategy_schema.instrument} ] found in the account: [ {cfd_payload_schema.account_id} ]"
+            f"[ {crucial_details} ] - No Instrument: [ {strategy_schema.instrument} ] found in the account: [ {cfd_payload_schema.account_id} ]"
         )
         return None
     else:
         instrument = instrument_list[0]
         logging.info(
-            f"[ {crucial_details} ] : Instrument: [ {strategy_schema.instrument}] found in the account: [ {cfd_payload_schema.account_id} ]"
+            f"[ {crucial_details} ] - Instrument: [ {strategy_schema.instrument}] found in the account: [ {cfd_payload_schema.account_id} ]"
         )
         return instrument
 
@@ -288,7 +288,7 @@ async def get_lots_to_open(
 
         if available_funds > funds_required_to_trade:
             logging.info(
-                f"[ {crucial_details} ] : available funds : [ {available_funds} ] are greater than funds_required_to_trade : [ {funds_required_to_trade}], contracts : [ {fixed_lots_to_trade} ]"
+                f"[ {crucial_details} ] - available funds : [ {available_funds} ] are greater than funds_required_to_trade : [ {funds_required_to_trade}], contracts : [ {fixed_lots_to_trade} ]"
             )
             lots_to_trade = round(fixed_lots_to_trade, tradeUnitsPrecision)
             logging.info(f"[ {crucial_details} ] : Hence we can trade Lots : [ {lots_to_trade} ]")
@@ -318,7 +318,7 @@ async def get_oanda_access_token(cfd_strategy_schema: CFDStrategySchema, crucial
         _query = await async_session.execute(stmt)
         broker_model = _query.scalars().one_or_none()
         if not broker_model:
-            msg = f"[ {crucial_details} ] : Broker model not found for broker_id: [ {cfd_strategy_schema.broker_id} ]"
+            msg = f"[ {crucial_details} ] - Broker model not found for broker_id: [ {cfd_strategy_schema.broker_id} ]"
             logging.error(msg)
             raise HTTPException(status_code=404, detail=msg)
 
@@ -358,7 +358,7 @@ async def post_oanda_cfd(
                 profit_or_loss_value = float(trade["unrealizedPL"])
                 profit_or_loss_str = "profit" if profit_or_loss_value > 0 else "loss"
                 logging.info(
-                    f"[ {crucial_details} ] : current open lots: [ {current_open_lots} ] {profit_or_loss_str}: [ {profit_or_loss_value} ] to be closed"
+                    f"[ {crucial_details} ] - current open lots: [ {current_open_lots} ] {profit_or_loss_str}: [ {profit_or_loss_value} ] to be closed"
                 )
                 # exit existing trades
                 tradeID = trade["id"]
@@ -370,7 +370,7 @@ async def post_oanda_cfd(
                     profit_or_loss_value = float(trades_closed[0]["realizedPL"])
                     profit_or_loss_str = "profit" if profit_or_loss_value > 0 else "loss"
                     logging.info(
-                        f"[ {crucial_details} ] : current open lots: [ {current_open_lots} ] {profit_or_loss_str}: [ {profit_or_loss_value} ] closed"
+                        f"[ {crucial_details} ] - current open lots: [ {current_open_lots} ] {profit_or_loss_str}: [ {profit_or_loss_value} ] closed"
                     )
                     await update_capital_funds(
                         cfd_strategy_schema=cfd_strategy_schema,
@@ -379,7 +379,7 @@ async def post_oanda_cfd(
                     )
                 else:
                     logging.error(
-                        f"[ {crucial_details} ] : Error occured while closing existing trade, Error: {close_trade_response}"
+                        f"[ {crucial_details} ] - Error occured while closing existing trade, Error: {close_trade_response}"
                     )
                     pprint(close_trade_response)
 
@@ -403,10 +403,10 @@ async def post_oanda_cfd(
     response = await client.request(OrderCreate(account_id, data=market_order_request.data))
     long_or_short = "LONG" if is_buy_signal else "SHORT"
     if "orderFillTransaction" in response:
-        msg = f"[ {crucial_details} ] : successfully [ {long_or_short}  {lots_to_open} ] trades."
+        msg = f"[ {crucial_details} ] - successfully [ {long_or_short}  {lots_to_open} ] trades."
         logging.info(msg)
     else:
-        msg = f"[ {crucial_details} ] : Error occured while [ {long_or_short}  {lots_to_open} ] trades, Error: {response}"
+        msg = f"[ {crucial_details} ] - Error occured while [ {long_or_short}  {lots_to_open} ] trades, Error: {response}"
         logging.error(msg)
         pprint(response)
 

@@ -138,6 +138,7 @@ async def rollover_to_next_expiry():
                 "async_httpx_client": async_httpx_client,
                 "only_futures": True,
                 "futures_expiry_date": futures_current_expiry,
+                "crucial_details": f"{strategy_schema.symbol} {strategy_schema.id} {strategy_schema.instrument_type} {trade_schema.action}",
             }
 
             if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:

@@ -57,11 +57,11 @@ async def post_capital_cfd(
         )
 
         if position_reversed:
-            msg = f"[ {crucial_details} ] : lots [ {current_open_lots} ] are reversed in [ {direction} ] direction, hence skipped opening new positions"
+            msg = f"[ {crucial_details} ] - lots [ {current_open_lots} ] are reversed in [ {direction} ] direction, hence skipped opening new positions"
             logging.info(msg)
             process_time = time.perf_counter() - start_time
             logging.info(
-                f"[ {crucial_details} ] : request processing time: {process_time} seconds"
+                f"[ {crucial_details} ] - request processing time: {process_time} seconds"
             )
             return msg
 
@@ -80,6 +80,6 @@ async def post_capital_cfd(
         process_time = time.perf_counter() - start_time
         logging.info(f"[ {crucial_details} ] : request processing time: {process_time} seconds")
     else:
-        msg = f"[ {crucial_details} ] : signal [ {cfd_payload_schema.direction} ] is same as current direction, hence skipping opening new positions"
+        msg = f"[ {crucial_details} ] - signal [ {cfd_payload_schema.direction} ] is same as current direction, hence skipping opening new positions"
         logging.info(msg)
         return msg

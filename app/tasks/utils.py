@@ -246,6 +246,7 @@ async def get_strike_and_entry_price(
     signal_payload_schema: SignalPayloadSchema,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
+    crucial_details: str,
 ) -> tuple[float, float]:
     strike, premium = await get_strike_and_entry_price_from_option_chain(
         option_chain=option_chain,
@@ -262,16 +263,18 @@ async def get_strike_and_entry_price(
                 async_redis_client=async_redis_client,
                 async_httpx_client=async_httpx_client,
             )
+            logging.info(f"[ {crucial_details} ] - entry_price: {entry_price} from alice blue")
             return strike, entry_price
         except HTTPException as e:
-            logging.error(f"error while buying trade {e}")
+            logging.error(f"[ {crucial_details} ] - error while buying trade {e}")
             traceback.print_exc()
             raise HTTPException(status_code=e.status_code, detail=e.detail)
         except BaseException as e:
-            logging.error(f"error while buying trade {e}")
+            logging.error(f"[ {crucial_details} ] - error while buying trade {e}")
             traceback.print_exc()
             raise HTTPException(status_code=500, detail=json.dumps(e))
 
+    logging.info(f"[ {crucial_details} ] - entry_price: {premium} from redis option chain")
     return strike, premium
 
 

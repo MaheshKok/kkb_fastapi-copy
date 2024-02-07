@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy import text
 
 from app.api.utils import get_lots_to_trade_and_profit_or_loss
+from app.broker.utils import buy_alice_blue_trades
 from app.database.models import TakeAwayProfitModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
@@ -193,6 +194,7 @@ async def push_trade_to_redis(
     async_redis_client: aioredis.StrictRedis,
     trade_model: TradeModel,
     signal_type: SignalTypeEnum,
+    crucial_details: str,
 ):
     # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
     # it works i confirmed this with python_console with dummy data,
@@ -211,9 +213,7 @@ async def push_trade_to_redis(
         redis_trades_list = json.loads(redis_trades_json)
     redis_trades_list.append(new_trade_json)
     await async_redis_client.hset(redis_key, redis_hash, json.dumps(redis_trades_list))
-    logging.info(
-        f"Strategy: [ {trade_model.strategy_id} ], new trade: [{trade_model.id}] added to Redis"
-    )
+    logging.info(f"[ {crucial_details} ] - new trade: [{trade_model.id}] added to Redis")
 
 
 async def dump_trade_in_db_and_redis(
@@ -222,6 +222,7 @@ async def dump_trade_in_db_and_redis(
     entry_price: float,
     signal_payload_schema: SignalPayloadSchema,
     async_redis_client: aioredis.StrictRedis,
+    crucial_details: str,
 ):
     async with Database() as async_session:
         # Use the AsyncSession to perform database operations
@@ -241,13 +242,12 @@ async def dump_trade_in_db_and_redis(
         )
         async_session.add(trade_model)
         await async_session.commit()
-        logging.info(
-            f"Strategy: [ {strategy_schema.name} ], new trade: [{trade_model.id}] added to DB"
-        )
+        logging.info(f"[ {crucial_details} ] - new trade: [{trade_model.id}] added to DB")
         await push_trade_to_redis(
             async_redis_client=async_redis_client,
             trade_model=trade_model,
             signal_type=signal_payload_schema.action,
+            crucial_details=crucial_details,
         )
 
 
@@ -260,6 +260,7 @@ async def close_trades_in_db_and_remove_from_redis(
     total_redis_trades: int,
     async_redis_client: aioredis.StrictRedis,
     redis_strategy_key_hash: str,
+    crucial_details: str,
 ):
     async with Database() as async_session:
         query_ = construct_update_query(updated_data)
@@ -287,18 +288,18 @@ async def close_trades_in_db_and_remove_from_redis(
 
         await async_session.commit()
         logging.info(
-            f"Total Trade: [ {total_redis_trades} ] closed successfully for strategy: [ {strategy_schema.name} ]"
+            f"[ {crucial_details} ] - Total Trade : [ {total_redis_trades} ] closed successfully."
         )
         redis_strategy_key = redis_strategy_key_hash.split()[0]
         redis_strategy_hash = " ".join(redis_strategy_key_hash.split()[1:])
         result = await async_redis_client.hdel(redis_strategy_key, redis_strategy_hash)
         if result == 1:
             logging.info(
-                f"Redis Key: [ {redis_strategy_key_hash} ] deleted from redis successfully for strategy: [ {strategy_schema.name} ]"
+                f"[ {crucial_details} ] - Redis Key: [ {redis_strategy_key_hash} ] deleted from redis successfully"
             )
         else:
             logging.error(
-                f"Redis Key: [ {redis_strategy_key_hash} ] not deleted from redis for strategy: [ {strategy_schema.name} ]"
+                f"[ {crucial_details} ] - Redis Key: [ {redis_strategy_key_hash} ] not deleted from redis for strategy: [ {strategy_schema.name} ]"
             )
 
 
@@ -309,19 +310,11 @@ async def task_entry_trade(
     async_redis_client: aioredis.StrictRedis,
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
+    crucial_details: str,
     futures_expiry_date: date,
     options_expiry_date: date = None,
     only_futures: bool = False,
 ):
-    tasks = [
-        asyncio.create_task(
-            get_future_price_from_redis(
-                async_redis_client=async_redis_client,
-                strategy_schema=strategy_schema,
-                expiry_date=futures_expiry_date,
-            )
-        )
-    ]
     if not only_futures:
         option_chain = await get_option_chain(
             async_redis_client=async_redis_client,
@@ -330,48 +323,66 @@ async def task_entry_trade(
             strategy_schema=strategy_schema,
         )
 
-        tasks.append(
-            asyncio.create_task(
-                get_strike_and_entry_price(
-                    option_chain=option_chain,
-                    signal_payload_schema=signal_payload_schema,
-                    strategy_schema=strategy_schema,
-                    async_redis_client=async_redis_client,
-                    async_httpx_client=async_httpx_client,
-                )
-            )
+        future_entry_price, strike_and_entry_price = await asyncio.gather(
+            get_future_price_from_redis(
+                async_redis_client=async_redis_client,
+                strategy_schema=strategy_schema,
+                expiry_date=futures_expiry_date,
+            ),
+            get_strike_and_entry_price(
+                option_chain=option_chain,
+                signal_payload_schema=signal_payload_schema,
+                strategy_schema=strategy_schema,
+                async_redis_client=async_redis_client,
+                async_httpx_client=async_httpx_client,
+                crucial_details=crucial_details,
+            ),
+        )
+        logging.info(
+            f"[ {crucial_details} ] - new trade with future entry price : [ {future_entry_price} ] fetched from redis entering into db"
         )
 
-    if not only_futures:
-        future_entry_price, strike_and_entry_price = await asyncio.gather(*tasks)
         strike, entry_price = strike_and_entry_price
         if not strike:
             logging.info(
-                f"Strategy: [ {strategy_schema.name} ], skipping entry of new tradde as strike is Null: {entry_price}"
+                f"[ {crucial_details} ] - skipping entry of new tradde as strike is Null: {entry_price}"
             )
             return None
 
         signal_payload_schema.strike = strike
-        logging.info(
-            f"Strategy: [ {strategy_schema.name} ], new trade with strike: [ {strike} ] and entry price: [ {entry_price} ] entering into db"
-        )
 
     else:
-        result = await asyncio.gather(*tasks)
-        future_entry_price = result[0]
+        if strategy_schema.broker_id:
+            entry_price = await buy_alice_blue_trades(
+                strike=None,
+                signal_payload_schema=signal_payload_schema,
+                async_redis_client=async_redis_client,
+                strategy_schema=strategy_schema,
+                async_httpx_client=async_httpx_client,
+            )
+            logging.info(
+                f"[ {crucial_details} ] - entry price: [ {entry_price} ] from alice blue"
+            )
+        else:
+            entry_price = await get_future_price_from_redis(
+                async_redis_client=async_redis_client,
+                strategy_schema=strategy_schema,
+                expiry_date=futures_expiry_date,
+            )
+            logging.info(
+                f"[ {crucial_details} ] - entry price: [ {entry_price} ] from redis option chain"
+            )
+
         logging.info(
-            f"Strategy: [ {strategy_schema.name} ], new trade with future entry price: [ {future_entry_price} ] entering into db"
+            f"[ {crucial_details} ] - Slippage: [ {entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
         )
-        logging.info(
-            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
-        )
-        entry_price = future_entry_price
 
     await dump_trade_in_db_and_redis(
         strategy_schema=strategy_schema,
         entry_price=entry_price,
         signal_payload_schema=signal_payload_schema,
         async_redis_client=async_redis_client,
+        crucial_details=crucial_details,
     )
 
     return "successfully added trade to db"
@@ -384,6 +395,7 @@ async def compute_trade_data_needed_for_closing_trade(
     async_redis_client: Redis,
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
+    crucial_details: str,
     futures_expiry_date: date,
     options_expiry_date: date = None,
     only_futures: bool = False,
@@ -398,7 +410,7 @@ async def compute_trade_data_needed_for_closing_trade(
             redis_trade_schema_list=redis_trade_schema_list,
         )
         logging.info(
-            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {signal_payload_schema.future_entry_price_received - actual_exit_price } points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
+            f"[ {crucial_details} ], Slippage: [ {signal_payload_schema.future_entry_price_received - actual_exit_price } points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
         )
 
         updated_data = {}
@@ -451,7 +463,7 @@ async def compute_trade_data_needed_for_closing_trade(
             ),
         )
         logging.info(
-            f"Strategy: [ {strategy_schema.name} ], Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
+            f"[ {crucial_details} ] - Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
         )
         updated_data, total_profit, total_actual_profit = await calculate_profits(
             strike_exit_price_dict=strike_exit_price_dict,
@@ -461,7 +473,7 @@ async def compute_trade_data_needed_for_closing_trade(
             strategy_schema=strategy_schema,
         )
         logging.info(
-            f"Strategy: [ {strategy_schema.name} ], adding profit: [ {total_profit} ] and future profit: [ {total_actual_profit} ]"
+            f" [ {crucial_details} ] - adding profit: [ {total_profit} ] and future profit: [ {total_actual_profit} ]"
         )
         return updated_data, total_profit, total_actual_profit
 
@@ -475,6 +487,7 @@ async def task_exit_trade(
     only_futures: bool,
     redis_hash: str,
     redis_trade_schema_list: List[RedisTradeSchema],
+    crucial_details: str,
     futures_expiry_date: date,
     options_expiry_date: date = None,
 ):
@@ -500,12 +513,14 @@ async def task_exit_trade(
             only_futures=only_futures,
             futures_expiry_date=futures_expiry_date,
             options_expiry_date=options_expiry_date,
+            crucial_details=crucial_details,
         )
 
         lots_to_open, ongoing_profit_or_loss = get_lots_to_trade_and_profit_or_loss(
             funds_to_use=strategy_schema.funds,
             strategy_schema=strategy_schema,
             ongoing_profit_or_loss=total_profit,
+            crucial_details=crucial_details,
         )
 
         # update database with the updated data
@@ -517,9 +532,10 @@ async def task_exit_trade(
             total_redis_trades=len(redis_trade_schema_list),
             async_redis_client=async_redis_client,
             redis_strategy_key_hash=f"{trades_key} {redis_hash}",
+            crucial_details=crucial_details,
         )
         return lots_to_open
 
     except Exception as e:
-        logging.error(f"Exception while exiting trade: {e}")
+        logging.error(f"[ {crucial_details} ] - Exception while exiting trade: {e}")
         traceback.print_exc()
