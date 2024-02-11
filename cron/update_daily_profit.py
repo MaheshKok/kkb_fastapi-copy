@@ -1,8 +1,9 @@
 import asyncio
+import datetime
+import json
 import logging
-from datetime import datetime
-from datetime import timedelta
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -19,16 +20,77 @@ from app.tasks.tasks import get_options_profit
 from app.tasks.utils import get_monthly_expiry_date_from_redis
 
 
+async def get_holidays_list(async_redis_client, market, http_client):
+    holidays_list_raw = await async_redis_client.get("indian_stock_market_holidays")
+    if not holidays_list_raw:
+        headers = {
+            "Connection": "keep-alive",
+            "Cache-Control": "max-age=0",
+            "DNT": "1",
+            "Upgrade-Insecure-Requests": "1",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.79 Safari/537.36",
+            "Sec-Fetch-User": "?1",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-Mode": "navigate",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+        }
+
+        response = await http_client.get(
+            "https://www.nseindia.com/api/holiday-master?type=trading", headers=headers
+        )
+        await async_redis_client.set("indian_stock_market_holidays", response.text)
+        holidays_list_str = [holiday["tradingDate"] for holiday in response.json()[market]]
+    else:
+        holidays_list_str = [
+            holiday["tradingDate"] for holiday in json.loads(holidays_list_raw)[market]
+        ]
+
+    holidays_list_dt_obj = [
+        datetime.datetime.strptime(holiday, "%d-%b-%Y").date() for holiday in holidays_list_str
+    ]
+    return holidays_list_dt_obj
+
+
+def get_last_working_date(holidays_list_dt_obj):
+    # Get today's date
+    current_day = datetime.date.today()
+
+    # Find out what day of the week it is
+    current_day_of_week = current_day.weekday()
+
+    if current_day_of_week == 0:  # Monday
+        wanted_day = current_day - datetime.timedelta(days=3)
+    elif current_day_of_week == 1:  # Tuesday
+        wanted_day = current_day - datetime.timedelta(days=1)
+    elif current_day_of_week == 2:  # Wednesday
+        wanted_day = current_day - datetime.timedelta(days=2)
+    elif current_day_of_week == 3:  # Thursday
+        wanted_day = current_day - datetime.timedelta(days=3)
+    elif current_day_of_week == 4:  # Friday
+        wanted_day = current_day - datetime.timedelta(days=4)
+    elif current_day_of_week in [5, 6]:  # Saturday & Sunday
+        wanted_day = current_day - datetime.timedelta(days=(current_day_of_week - 4))
+
+    # Keep checking previous day until it's not a weekend or a holiday
+    while wanted_day.weekday() >= 5 or wanted_day in holidays_list_dt_obj:
+        wanted_day = wanted_day - datetime.timedelta(days=1)
+
+    return wanted_day
+
+
 async def update_daily_profit():
     config = get_config()
     Database.init(get_db_url(config))
 
     async_redis_client = await get_redis_client(config)
     option_chain = {}
-    todays_date = datetime.now().date()
+    todays_date = datetime.datetime.now().date()
 
+    holidays_list = await get_holidays_list(async_redis_client, "FO", httpx.AsyncClient())
     async with Database() as async_session:
-        if todays_date.weekday() < 5:
+        if todays_date.weekday() < 5 and todays_date not in holidays_list:
             # fetch live trades from db
             strategy_id_ongoing_profit_dict = {}
             fetch_live_trades_query = await async_session.execute(
@@ -92,10 +154,10 @@ async def update_daily_profit():
                     "future_profit"
                 ] += future_profit
 
-            # fetch yesterdays daily profit from db
+            # fetch last working dat profit from db
             fetch_yesterdays_profit_query = await async_session.execute(
                 select(DailyProfitModel).filter(
-                    DailyProfitModel.date == todays_date - timedelta(days=1)
+                    DailyProfitModel.date == get_last_working_date(holidays_list)
                 )
             )
             yesterdays_profit_models = fetch_yesterdays_profit_query.scalars().all()
