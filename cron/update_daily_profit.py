@@ -10,7 +10,7 @@ from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
 from app.database.models import DailyProfitModel
-from app.database.models import TakeAwayProfitModel
+from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum
@@ -28,7 +28,7 @@ async def update_daily_profit():
     todays_date = datetime.now().date()
 
     async with Database() as async_session:
-        if todays_date.weekday() < 7:
+        if todays_date.weekday() < 5:
             # fetch live trades from db
             strategy_id_ongoing_profit_dict = {}
             fetch_live_trades_query = await async_session.execute(
@@ -99,44 +99,82 @@ async def update_daily_profit():
                 )
             )
             yesterdays_profit_models = fetch_yesterdays_profit_query.scalars().all()
-            strategy_id_yesterdays_profit_dict = {
+            strategy_id_yesterdays_profit_model_dict = {
                 yesterdays_profit_model.strategy_id: yesterdays_profit_model
                 for yesterdays_profit_model in yesterdays_profit_models
             }
 
-            # fetch take away profit from db
-            fetch_take_away_profit_query = await async_session.execute(
-                select(TakeAwayProfitModel)
-            )
-            take_away_profit_models = fetch_take_away_profit_query.scalars().all()
-
-            strategy_id_take_away_profit_dict = {
-                take_away_profit_model.strategy_id: take_away_profit_model
-                for take_away_profit_model in take_away_profit_models
+            strategy_query = await async_session.execute(select(StrategyModel))
+            strategy_models = strategy_query.scalars().all()
+            strategy_id_funds_dict = {
+                strategy_model.id: {
+                    "funds": strategy_model.funds,
+                    "future_funds": strategy_model.future_funds,
+                }
+                for strategy_model in strategy_models
             }
 
             daily_profit_models = []
             for strategy_id, ongoing_profit in strategy_id_ongoing_profit_dict.items():
-                take_away_profit_model = strategy_id_take_away_profit_dict.get(strategy_id)
-                if take_away_profit_model:
-                    take_away_profit = take_away_profit_model.profit
-                    take_away_future_profit = take_away_profit_model.future_profit
-                else:
-                    take_away_profit = 0.0
-                    take_away_future_profit = 0.0
-
-                profit = round(ongoing_profit["profit"] + take_away_profit, 2) or round(
-                    0.0 - strategy_id_yesterdays_profit_dict[strategy_id].profit, 2
+                till_yesterdays_profit_model = strategy_id_yesterdays_profit_model_dict.get(
+                    strategy_id
                 )
-                future_profit = round(
-                    ongoing_profit["future_profit"] + take_away_future_profit, 2
-                ) or round(0.0 - strategy_id_yesterdays_profit_dict[strategy_id].future_profit, 2)
+                if till_yesterdays_profit_model:
+                    total_profit = round(
+                        ongoing_profit["profit"]
+                        + strategy_id_funds_dict.get(strategy_id)["funds"],
+                        2,
+                    )
+                    todays_profit = round(
+                        total_profit - till_yesterdays_profit_model.total_profit,
+                        2,
+                    )
+                    total_future_profit = round(
+                        ongoing_profit["future_profit"]
+                        + strategy_id_funds_dict.get(strategy_id)["future_funds"],
+                        2,
+                    )
+                    todays_future_profit = round(
+                        total_future_profit - till_yesterdays_profit_model.total_future_profit,
+                        2,
+                    )
+                else:
+                    trade_query = await async_session.execute(
+                        select(TradeModel).filter_by(
+                            strategy_id=strategy_id,
+                        )
+                    )
+                    trade_models = trade_query.scalars().all()
+                    closed_profit = sum(
+                        trade_model.profit for trade_model in trade_models if trade_model.profit
+                    )
+                    closed_future_profit = sum(
+                        trade_model.future_profit
+                        for trade_model in trade_models
+                        if trade_model.future_profit
+                    )
+
+                    todays_profit = round(closed_profit + ongoing_profit["profit"], 2)
+                    todays_future_profit = round(
+                        closed_future_profit + ongoing_profit["future_profit"], 2
+                    )
+
+                    total_profit = round(
+                        strategy_id_funds_dict.get(strategy_id)["funds"] + todays_profit, 2
+                    )
+                    total_future_profit = round(
+                        strategy_id_funds_dict.get(strategy_id)["future_funds"]
+                        + todays_future_profit,
+                        2,
+                    )
 
                 daily_profit_models.append(
                     DailyProfitModel(
                         **{
-                            "profit": profit,
-                            "future_profit": future_profit,
+                            "todays_profit": todays_profit,
+                            "todays_future_profit": todays_future_profit,
+                            "total_profit": total_profit,
+                            "total_future_profit": total_future_profit,
                             "date": todays_date,
                             "strategy_id": strategy_id,
                         }
