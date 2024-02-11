@@ -20,35 +20,56 @@ from app.tasks.tasks import get_options_profit
 from app.tasks.utils import get_monthly_expiry_date_from_redis
 
 
+nse_headers = {
+    "Connection": "keep-alive",
+    "Cache-Control": "max-age=0",
+    "DNT": "1",
+    "Upgrade-Insecure-Requests": "1",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.79 Safari/537.36",
+    "Sec-Fetch-User": "?1",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-Mode": "navigate",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
+}
+
+
 async def get_holidays_list(async_redis_client, market, http_client):
-    holidays_list_raw = await async_redis_client.get("indian_stock_market_holidays")
-    if not holidays_list_raw:
-        headers = {
-            "Connection": "keep-alive",
-            "Cache-Control": "max-age=0",
-            "DNT": "1",
-            "Upgrade-Insecure-Requests": "1",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.79 Safari/537.36",
-            "Sec-Fetch-User": "?1",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-Mode": "navigate",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Accept-Language": "en-US,en;q=0.9,hi;q=0.8",
-        }
-
+    trading_holidays_list_raw = await async_redis_client.get(
+        "indian_stock_market_trading_holidays"
+    )
+    if not trading_holidays_list_raw:
         response = await http_client.get(
-            "https://www.nseindia.com/api/holiday-master?type=trading", headers=headers
+            "https://www.nseindia.com/api/holiday-master?type=trading", headers=nse_headers
         )
-        await async_redis_client.set("indian_stock_market_holidays", response.text)
-        holidays_list_str = [holiday["tradingDate"] for holiday in response.json()[market]]
-    else:
-        holidays_list_str = [
-            holiday["tradingDate"] for holiday in json.loads(holidays_list_raw)[market]
-        ]
+        await async_redis_client.set("indian_stock_market_trading_holidays", response.text)
+        trading_holidays_list_raw = response.text
 
+    clearing_holidays_list_raw = await async_redis_client.get(
+        "indian_stock_market_clearing_holidays"
+    )
+    if not clearing_holidays_list_raw:
+        response = await http_client.get(
+            "https://www.nseindia.com/api/holiday-master?type=clearing", headers=nse_headers
+        )
+        await async_redis_client.set("indian_stock_market_clearing_holidays", response.text)
+        clearing_holidays_list_raw = response.text
+
+    holidays_list_dt_str = [
+        holiday["tradingDate"]
+        for holiday in json.loads(trading_holidays_list_raw).get(market, [])
+    ]
+    holidays_list_dt_str.extend(
+        [
+            holiday["tradingDate"]
+            for holiday in json.loads(clearing_holidays_list_raw).get(market, [])
+        ]
+    )
+    # remove duplicates
+    holidays_list_dt_str = set(holidays_list_dt_str)
     holidays_list_dt_obj = [
-        datetime.datetime.strptime(holiday, "%d-%b-%Y").date() for holiday in holidays_list_str
+        datetime.datetime.strptime(holiday, "%d-%b-%Y").date() for holiday in holidays_list_dt_str
     ]
     return holidays_list_dt_obj
 
