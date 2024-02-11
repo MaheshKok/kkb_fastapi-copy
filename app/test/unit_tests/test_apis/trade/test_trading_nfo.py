@@ -267,6 +267,7 @@ async def test_trading_nfo_options_opposite_direction(
         )
         strategy_model = strategy_query.scalars().one_or_none()
         assert strategy_model.funds != 200000.0
+        assert strategy_model.future_funds != 200000.0
 
 
 @pytest.mark.asyncio

@@ -33,7 +33,8 @@ class StrategyFactory(AsyncSQLAlchemyFactory):
     created_at = factory.Sequence(lambda n: datetime.utcnow() - timedelta(days=n))
 
     premium = 350.0
-    funds = 200000
+    funds = 200000.0
+    future_funds = 200000.0
     min_quantity = 15
     margin_for_min_quantity = 95000
     incremental_step_size = 15

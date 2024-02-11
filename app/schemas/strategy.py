@@ -25,6 +25,7 @@ class StrategyCreateSchema(BaseModel):
     premium: Optional[float] = Field(description="Premium", example=350.0, default=None)
 
     funds: float = Field(description="Funds", example=1000000.0)
+    future_funds: float = Field(description="Strategy Funds", example=100000.0)
     min_quantity: float = Field(description="Min Quantity", example=10)
     margin_for_min_quantity: float = Field(description="Margin for Min Quantity", example=2.65)
     incremental_step_size: float = Field(description="Incremental Step Size", example=0.1)
