@@ -22,7 +22,7 @@ from app.api.endpoints.trade.utils import generate_trading_symbol
 from app.utils.constants import OptionType
 
 
-logging = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 
 class CryptoJsAES:
@@ -75,7 +75,7 @@ class CryptoJsAES:
         )
 
 
-class Pya3Aliceblue(Aliceblue):
+class AsyncPya3Aliceblue(Aliceblue):
     host = "https://ant.aliceblueonline.com/rest/AliceBlueAPIService"
 
     _sub_urls = {
@@ -142,7 +142,9 @@ class Pya3Aliceblue(Aliceblue):
         get_enc_key_response = await self._post("getEncKey", data=data)
 
         if get_enc_key_response.get("stat") == "Not_Ok":
-            logging.info(f"Error while retrieving Encryption Key: {get_enc_key_response}")
+            logging.info(
+                f"User: [ {self.user_id} ] - Error while retrieving Encryption Key: {get_enc_key_response}"
+            )
             raise HTTPException(
                 status_code=400,
                 detail=f"Error while retrieving Encryption Key: {get_enc_key_response}",
@@ -150,7 +152,9 @@ class Pya3Aliceblue(Aliceblue):
         encKey = get_enc_key_response["encKey"]
 
         if not encKey:
-            logging.info(f"Error while retrieving Encryption Key: {get_enc_key_response}")
+            logging.info(
+                f"User: [ {self.user_id} ] - Error while retrieving Encryption Key: {get_enc_key_response}"
+            )
             raise HTTPException(
                 status_code=400,
                 detail=f"Error while retrieving Encryption Key: {get_enc_key_response['emsg']}",
@@ -160,7 +164,7 @@ class Pya3Aliceblue(Aliceblue):
         checksum = checksum.decode("utf-8")
         data = {"userId": self.user_id, "userData": checksum}
         web_login_response = await self._post("webLogin", data=data)
-        logging.info(f"Web Login response {web_login_response}")
+        logging.info(f"User: [ {self.user_id} ] - Web Login response {web_login_response}")
 
         # Web Login 2FA
         data = {
@@ -171,11 +175,13 @@ class Pya3Aliceblue(Aliceblue):
             "vendor": self.app_id,
         }
         two_fa_response = await self._post("twoFA", data=data)
-        logging.info(f"Web Login 2FA response {two_fa_response}")
         try:
             auth_us = two_fa_response["us"]
+            logging.info(f"User: [ {self.user_id} ] - Web Login 2FA response")
         except KeyError:
-            logging.info(f"Error while retrieving us: {two_fa_response}")
+            logging.info(
+                f"User: [ {self.user_id} ] - Error while Web Login 2FA error: {two_fa_response}"
+            )
             raise HTTPException(
                 status_code=400, detail=f"Error while Login 2FA: {two_fa_response}"
             )
@@ -187,10 +193,10 @@ class Pya3Aliceblue(Aliceblue):
         verify_totp_response = await self.async_httpx_client.post(
             self._sub_urls["verifyTotp"], data=json.dumps(data), headers=header
         )
-        logging.info(f"Totp Login response {verify_totp_response}")
-
         # Web Login Api Key
         userSessionID = verify_totp_response.json()["userSessionID"]
+        logging.info(f"User: [ {self.user_id} ] - Web Login via Totp successfull")
+
         header["Authorization"] = f"Bearer {self.user_id} {userSessionID}"
 
         # Get API Encryption Key
@@ -200,8 +206,8 @@ class Pya3Aliceblue(Aliceblue):
             headers=header,
             data=json.dumps(data),
         )
-        logging.info(f"Get API Encryption Key response {api_enc_key_response.text}")
         encKey = api_enc_key_response.json()["encKey"]
+        logging.info(f"User: [ {self.user_id} ] - Get API Encryption Key successfull")
 
         # Get User Details/Session ID
         checksum = hashlib.sha256(f"{self.user_id}{self.api_key}{encKey}".encode()).hexdigest()
@@ -211,25 +217,27 @@ class Pya3Aliceblue(Aliceblue):
             headers=header,
             data=json.dumps(data),
         )
-        logging.info(f"Session ID response {session_id_response.text}")
         session_id = session_id_response.json()["sessionID"]
-        logging.info(f"Session ID is {session_id}")
+        logging.info(f"User: [ {self.user_id} ] - Session ID successfull")
 
         return session_id
 
     async def _get(self, sub_url, data=None):
         """Get method declaration"""
         url = self._sub_urls[sub_url]
-        return await self._request(url, "GET", data=data)
+        response = await self._request(url, "GET", data=data)
+        return response
 
     async def _post(self, sub_url, data=None):
         """Post method declaration"""
         url = self._sub_urls[sub_url]
-        return await self._request(url, "POST", data=data)
+        response = await self._request(url, "POST", data=data)
+        return response
 
     async def _dummypost(self, url, data=None):
         """Post method declaration"""
-        return await self._request(url, "POST", data=data)
+        response = await self._request(url, "POST", data=data)
+        return response
 
     async def _request(self, method, req_type, data=None):
         """

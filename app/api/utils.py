@@ -13,8 +13,8 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy import update
 
-from app.broker.AliceBlue import Pya3Aliceblue
 from app.broker.AsyncCapital import AsyncCapitalClient
+from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
 from app.database.models import BrokerModel
 from app.database.models import CFDStrategyModel
 from app.database.session_manager.db_session import Database
@@ -101,7 +101,7 @@ async def get_current_and_next_expiry_from_alice_blue(symbol: str):
     return current_expiry_date, next_expiry_date, is_today_expiry
 
 
-async def update_session_token(pya3_obj: Pya3Aliceblue, async_redis_client: Redis):
+async def update_session_token(pya3_obj: AsyncPya3Aliceblue, async_redis_client: Redis):
     session_id = await pya3_obj.login_and_get_session_id()
 
     async with Database() as async_session:

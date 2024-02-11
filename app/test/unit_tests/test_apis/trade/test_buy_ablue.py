@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy import select
 
-from app.broker.AliceBlue import Pya3Aliceblue
+from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.models import User
@@ -79,9 +79,11 @@ async def test_buy_alice_blue_trade(
         return {"Avgprc": 410.5, "Status": Status.COMPLETE}
 
     # Use monkeypatch to patch the method
-    monkeypatch.setattr(Pya3Aliceblue, "place_order", AsyncMock(side_effect=mock_place_order))
     monkeypatch.setattr(
-        Pya3Aliceblue, "get_order_history", AsyncMock(side_effect=mock_get_order_history)
+        AsyncPya3Aliceblue, "place_order", AsyncMock(side_effect=mock_place_order)
+    )
+    monkeypatch.setattr(
+        AsyncPya3Aliceblue, "get_order_history", AsyncMock(side_effect=mock_get_order_history)
     )
 
     response = await test_async_client.post(trading_options_url, json=payload)
@@ -160,7 +162,7 @@ async def test_buy_alice_blue_trade_raise_401(
 
     # Use monkeypatch to patch the method
     monkeypatch.setattr(
-        Pya3Aliceblue,
+        AsyncPya3Aliceblue,
         "place_order",
         AsyncMock(
             side_effect=[
@@ -175,7 +177,7 @@ async def test_buy_alice_blue_trade_raise_401(
 
     # Use monkeypatch to patch the method
     monkeypatch.setattr(
-        Pya3Aliceblue, "get_order_history", AsyncMock(side_effect=mock_get_order_history)
+        AsyncPya3Aliceblue, "get_order_history", AsyncMock(side_effect=mock_get_order_history)
     )
 
     async def mock_update_session_token(*args, **kwargs):

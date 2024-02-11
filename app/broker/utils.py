@@ -20,8 +20,8 @@ from pya3 import TransactionType
 from sqlalchemy import select
 
 from app.api.utils import update_session_token
-from app.broker.AliceBlue import Pya3Aliceblue
-from app.broker.AliceBlue import logging
+from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
+from app.broker.AsyncPya3AliceBlue import logging
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema
@@ -83,7 +83,7 @@ class CryptoJsAES:
         )
 
 
-async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya3Aliceblue:
+async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> AsyncPya3Aliceblue:
     broker_json = await async_redis_client.get(broker_id)
 
     if broker_json:
@@ -107,7 +107,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Pya
             await async_redis_client.set(broker_id, broker_schema.model_dump_json())
 
     # TODO: update cron updating alice blue access token to update redis as well with the latest access token
-    pya3_obj = Pya3Aliceblue(
+    pya3_obj = AsyncPya3Aliceblue(
         user_id=broker_schema.username,
         password=broker_schema.password,
         api_key=broker_schema.api_key,
@@ -225,7 +225,7 @@ def get_exiting_trades_insights(redis_trade_schema_list: list[RedisTradeSchema])
 
 async def place_ablue_order(
     *,
-    pya3_obj: Pya3Aliceblue,
+    pya3_obj: AsyncPya3Aliceblue,
     strategy_schema: StrategySchema,
     async_redis_client: Redis,
     strike: float,
