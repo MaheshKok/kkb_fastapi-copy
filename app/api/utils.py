@@ -114,10 +114,9 @@ async def update_session_token(pya3_obj: AsyncPya3Aliceblue, async_redis_client:
         await async_session.flush()
 
         # update redis cache with new session_id
-        redis_set_result = await async_redis_client.set(
+        await async_redis_client.set(
             str(broker_model.id), BrokerSchema.model_validate(broker_model).json()
         )
-        logging.info(f"Redis set result: {redis_set_result}")
         logging.info(f"session updated for user: {pya3_obj.user_id} in db and redis")
         return session_id
 

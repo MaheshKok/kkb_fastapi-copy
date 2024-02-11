@@ -6,6 +6,7 @@ import aiocron
 import httpx
 from cron.download_master_contracts import download_master_contract
 from cron.update_fno_expiry import sync_expiry_dates_from_alice_blue_to_redis
+from cron.update_session_token import cron_update_session_token
 
 
 logging.basicConfig(level=logging.INFO)
@@ -55,6 +56,8 @@ async def task_update_session_token():
     for app in base_urls:
         if app == "flaskstockpi":
             tasks.append(get_api(f"{base_urls[app]}/update_ablue_session_token"))
+        elif app == "kokobrothers-be":
+            tasks.append(cron_update_session_token())
     await asyncio.gather(*tasks)
 
 

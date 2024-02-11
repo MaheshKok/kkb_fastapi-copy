@@ -29,7 +29,7 @@ async def update_session_token_with_logging(pya3_obj, async_redis_client, broker
         )
 
 
-async def task_update_session_token():
+async def cron_update_session_token():
     config = get_config()
     async_redis_client = await get_redis_client(config)
 
@@ -45,6 +45,10 @@ async def task_update_session_token():
         async with httpx.AsyncClient() as httpx_client:
             tasks = []
             for broker_model in broker_models:
+                if broker_model.username != "921977":
+                    continue
+
+                # fetch pya3 object
                 pya3_obj = await get_pya3_obj(
                     async_redis_client, str(broker_model.id), httpx_client
                 )
@@ -60,4 +64,4 @@ async def task_update_session_token():
 
 
 if __name__ == "__main__":
-    asyncio.run(task_update_session_token())
+    asyncio.run(cron_update_session_token())

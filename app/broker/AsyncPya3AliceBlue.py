@@ -163,8 +163,7 @@ class AsyncPya3Aliceblue(Aliceblue):
         checksum = CryptoJsAES.encrypt(self.password.encode(), encKey.encode())
         checksum = checksum.decode("utf-8")
         data = {"userId": self.user_id, "userData": checksum}
-        web_login_response = await self._post("webLogin", data=data)
-        logging.info(f"User: [ {self.user_id} ] - Web Login response {web_login_response}")
+        await self._post("webLogin", data=data)
 
         # Web Login 2FA
         data = {
@@ -177,14 +176,11 @@ class AsyncPya3Aliceblue(Aliceblue):
         two_fa_response = await self._post("twoFA", data=data)
         try:
             auth_us = two_fa_response["us"]
-            logging.info(f"User: [ {self.user_id} ] - Web Login 2FA response")
+            logging.info(f"User: [ {self.user_id} ] - Step 1 - Web Login 2FA successfull")
         except KeyError:
-            logging.info(
-                f"User: [ {self.user_id} ] - Error while Web Login 2FA error: {two_fa_response}"
-            )
-            raise HTTPException(
-                status_code=400, detail=f"Error while Login 2FA: {two_fa_response}"
-            )
+            msg = f"User: [ {self.user_id} ] - Step 1 - Error while Web Login 2FA, error: {two_fa_response}"
+            logging.error(msg)
+            raise HTTPException(status_code=400, detail=msg)
 
         # Web Login Totp
         totp = str(pyotp.TOTP(self.totp).now())
@@ -193,12 +189,16 @@ class AsyncPya3Aliceblue(Aliceblue):
         verify_totp_response = await self.async_httpx_client.post(
             self._sub_urls["verifyTotp"], data=json.dumps(data), headers=header
         )
-        # Web Login Api Key
-        userSessionID = verify_totp_response.json()["userSessionID"]
-        logging.info(f"User: [ {self.user_id} ] - Web Login via Totp successfull")
+        try:
+            # Web Login Api Key
+            userSessionID = verify_totp_response.json()["userSessionID"]
+            logging.info(f"User: [ {self.user_id} ] - Step 2 - Web Login via Totp successfull")
+        except KeyError:
+            msg = f"User: [ {self.user_id} ] - Step 2 - Error while Web Login via Totp, error: {verify_totp_response.json()}"
+            logging.error(msg)
+            raise HTTPException(status_code=400, detail=msg)
 
         header["Authorization"] = f"Bearer {self.user_id} {userSessionID}"
-
         # Get API Encryption Key
         data = {"userId": self.user_id}
         api_enc_key_response = await self.async_httpx_client.post(
@@ -206,8 +206,15 @@ class AsyncPya3Aliceblue(Aliceblue):
             headers=header,
             data=json.dumps(data),
         )
-        encKey = api_enc_key_response.json()["encKey"]
-        logging.info(f"User: [ {self.user_id} ] - Get API Encryption Key successfull")
+        try:
+            encKey = api_enc_key_response.json()["encKey"]
+            logging.info(
+                f"User: [ {self.user_id} ] - Step 3 - Get API Encryption Key successfull"
+            )
+        except KeyError:
+            msg = f"User: [ {self.user_id} ] - Step 3 - Error while Get API Encryption Key, error: {api_enc_key_response.json()}"
+            logging.error(msg)
+            raise HTTPException(status_code=400, detail=msg)
 
         # Get User Details/Session ID
         checksum = hashlib.sha256(f"{self.user_id}{self.api_key}{encKey}".encode()).hexdigest()
@@ -217,8 +224,13 @@ class AsyncPya3Aliceblue(Aliceblue):
             headers=header,
             data=json.dumps(data),
         )
-        session_id = session_id_response.json()["sessionID"]
-        logging.info(f"User: [ {self.user_id} ] - Session ID successfull")
+        try:
+            session_id = session_id_response.json()["sessionID"]
+            logging.info(f"User: [ {self.user_id} ] - Step 4 - Session ID successfull")
+        except KeyError:
+            msg = f"User: [ {self.user_id} ] - Step 4 - Error while retrieving Session ID, error: {session_id_response.json()}"
+            logging.error(msg)
+            raise HTTPException(status_code=400, detail=msg)
 
         return session_id
 
