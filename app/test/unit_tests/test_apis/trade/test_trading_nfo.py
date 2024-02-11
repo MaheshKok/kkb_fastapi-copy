@@ -261,6 +261,12 @@ async def test_trading_nfo_options_opposite_direction(
             f"{exited_trade_models[0].expiry} {OptionType.CE if action == SignalTypeEnum.BUY else OptionType.PE}",
         )
         assert len(json.loads(redis_trade_list_json)) == 1
+        # assert strategy funds are updated
+        strategy_query = await async_session.execute(
+            select(StrategyModel).filter_by(id=strategy_model.id)
+        )
+        strategy_model = strategy_query.scalars().one_or_none()
+        assert strategy_model.funds != 200000.0
 
 
 @pytest.mark.asyncio

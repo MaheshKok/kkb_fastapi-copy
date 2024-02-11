@@ -11,12 +11,12 @@ from aioredis import Redis
 from httpx import AsyncClient
 from line_profiler import profile  # noqa
 from pydantic import TypeAdapter
-from sqlalchemy import select
 from sqlalchemy import text
+from sqlalchemy import update
 
 from app.api.utils import get_lots_to_trade_and_profit_or_loss
 from app.broker.utils import buy_alice_blue_trades
-from app.database.models import TakeAwayProfitModel
+from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import PositionEnum
@@ -267,26 +267,16 @@ async def close_trades_in_db_and_remove_from_redis(
         await async_session.execute(query_)
         await async_session.flush()
 
-        fetch_take_away_profit_query_ = await async_session.execute(
-            select(TakeAwayProfitModel).filter_by(strategy_id=strategy_schema.id)
+        # rather update strategy_schema funds in redis
+        updated_funds = strategy_schema.funds + total_profit
+        stmt = (
+            update(StrategyModel)
+            .where(StrategyModel.id == strategy_schema.id)
+            .values(funds=updated_funds)
         )
-        take_away_profit_model = fetch_take_away_profit_query_.scalars().one_or_none()
-
-        if take_away_profit_model:
-            take_away_profit_model.profit += total_profit
-            take_away_profit_model.future_profit += total_future_profit
-            take_away_profit_model.total_trades += total_redis_trades
-            take_away_profit_model.updated_at = datetime.now()
-        else:
-            take_away_profit_model = TakeAwayProfitModel(
-                profit=total_profit,
-                future_profit=total_future_profit,
-                strategy_id=strategy_schema.id,
-                total_trades=total_redis_trades,
-            )
-            async_session.add(take_away_profit_model)
-
+        await async_session.execute(stmt)
         await async_session.commit()
+
         logging.info(
             f"[ {crucial_details} ] - Total Trade : [ {total_redis_trades} ] closed successfully."
         )
