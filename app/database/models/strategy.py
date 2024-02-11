@@ -41,8 +41,8 @@ class StrategyModel(Base):
 
     premium = Column(Float, nullable=True, default=350.0)
 
-    funds = Column(Float, nullable=True)
-
+    funds = Column(Float, nullable=False)
+    future_funds = Column(Float, nullable=True)
     min_quantity = Column(Float, nullable=False)
     margin_for_min_quantity = Column(Float, nullable=False)
     incremental_step_size = Column(Float, nullable=False)
