@@ -146,11 +146,11 @@ async def calculate_profits(
     exit_at = datetime.utcnow()
     exit_received_at = signal_payload_schema.received_at
 
-    for trade in redis_trade_schema_list:
-        entry_price = trade.entry_price
-        quantity = trade.quantity
+    for redis_trade_schema in redis_trade_schema_list:
+        entry_price = redis_trade_schema.entry_price
+        quantity = redis_trade_schema.quantity
         position = strategy_schema.position
-        exit_price = strike_exit_price_dict.get(trade.strike) or 0.0
+        exit_price = strike_exit_price_dict.get(redis_trade_schema.strike) or 0.0
         if not exit_price:
             # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker
             continue
@@ -158,16 +158,16 @@ async def calculate_profits(
         profit = get_options_profit(
             entry_price=entry_price, exit_price=exit_price, quantity=quantity, position=position
         )
-        future_entry_price_received = trade.future_entry_price_received
+        future_entry_price_received = redis_trade_schema.future_entry_price_received
         future_profit = get_futures_profit(
             entry_price=future_entry_price_received,
             exit_price=future_exit_price,
             quantity=quantity,
-            signal=signal_payload_schema.action,
+            signal=redis_trade_schema.action,
         )
 
         mapping = {
-            "id": trade.id,
+            "id": redis_trade_schema.id,
             "future_exit_price_received": round(
                 signal_payload_schema.future_entry_price_received, 2
             ),
@@ -178,7 +178,7 @@ async def calculate_profits(
             "future_profit": future_profit,
         }
 
-        updated_data[trade.id] = mapping
+        updated_data[redis_trade_schema.id] = mapping
         total_profit += profit
         total_future_profit += future_profit
 

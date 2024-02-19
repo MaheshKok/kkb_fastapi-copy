@@ -10,6 +10,7 @@ strategy_payload = {
     "position": "SHORT",
     "premium": 700.0,
     "funds": 200000.0,
+    "future_funds": 200000.0,
     "min_quantity": 15.0,
     "margin_for_min_quantity": 95000,
     "incremental_step_size": 15,

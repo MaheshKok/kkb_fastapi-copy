@@ -604,7 +604,7 @@ async def test_trading_nfo_futures_opposite_direction(
             entry_price=future_entry_price,
             exit_price=future_exit_price,
             quantity=trade_model.quantity,
-            signal=action,
+            signal=trade_model.action,
         )
 
         # when we short a trade then we make profit when exit price is lesser than 44315.0

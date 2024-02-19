@@ -110,6 +110,7 @@ class AsyncPya3Aliceblue(Aliceblue):
         "history": f"{host}/api/chart/history",
         "master_contract": "https://v2api.aliceblueonline.com/restpy/contract_master?exch={exchange}",
         "ws": "wss://ws1.aliceblueonline.com/NorenWS/",
+        "getmargin": f"{host}/api/info/getmargin",
     }
 
     def __init__(
@@ -599,6 +600,45 @@ class AsyncPya3Aliceblue(Aliceblue):
         # print(data)
         placeorderresp = await self._post("placeOrder", data)
         return placeorderresp
+
+    @staticmethod
+    async def get_margin(
+        self,
+        *,
+        exchange: str,
+        tradingSymbol,
+        qty: float,
+        product: str,
+        priceType: str,
+        token: str,
+        transType: str,
+    ):
+        """
+        example:
+        payload = {
+            "exchange": "NSE", (NSE or BSE or NFO or MCX)
+            "tradingSymbol": "INFY-EQ",
+            "price": "1475.20",
+            "qty": "122",
+            "product": "MIS", (MIS or CO or CNC or BO or NRML)
+            "priceType": "L", (L or MKT or SL or SL-M)
+            "token": "1594",
+            "transType": "B", ("Buy" or "Sell")
+        }
+        """
+        payload = {
+            "exchange": exchange,
+            "tradingSymbol": tradingSymbol,
+            "price": priceType,
+            "qty": qty,
+            "product": product,
+            "priceType": priceType,
+            "token": token,
+            # it means transaction type Buy or Sell
+            "transType": transType,
+        }
+        response = await self._post("getMargin", payload)
+        return response
 
     @staticmethod
     async def get_fno_instrument_from_redis(

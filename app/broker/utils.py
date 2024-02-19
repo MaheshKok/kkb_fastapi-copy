@@ -3,6 +3,7 @@ import base64
 import bisect
 import datetime
 import hashlib
+import logging
 import os
 from collections import defaultdict
 from typing import Optional
@@ -21,7 +22,6 @@ from sqlalchemy import select
 
 from app.api.utils import update_session_token
 from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
-from app.broker.AsyncPya3AliceBlue import logging
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
 from app.schemas.broker import BrokerSchema

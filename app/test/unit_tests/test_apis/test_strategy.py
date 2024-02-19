@@ -52,6 +52,7 @@ async def test_post_strategys(test_async_client):
             position=PositionEnum.LONG,
             premium=350.0,
             funds=1000000.0,
+            future_funds=1000000.0,
             min_quantity=10,
             margin_for_min_quantity=2.65,
             incremental_step_size=0.1,
