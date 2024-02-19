@@ -423,7 +423,9 @@ async def compute_trade_data_needed_for_closing_trade(
 
             updated_data[trade_schema.id] = {
                 "id": trade_schema.id,
-                "future_exit_price_received": signal_payload_schema.future_entry_price_received,
+                "future_exit_price_received": round(
+                    signal_payload_schema.future_entry_price_received, 2
+                ),
                 "exit_price": actual_exit_price,
                 "exit_received_at": signal_payload_schema.received_at,
                 "exit_at": datetime.utcnow(),
