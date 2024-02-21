@@ -68,6 +68,17 @@ async def rollover_to_next_expiry():
         for strategy_model in strategy_models:
             strategy_schema = StrategySchema.model_validate(strategy_model)
 
+            # TODO: consider caching this expiry in local memory
+            (
+                futures_current_expiry,
+                futures_next_expiry,
+                is_today_futures_expiry,
+            ) = await get_monthly_expiry_date_from_redis(
+                async_redis_client=async_redis_client,
+                instrument_type=InstrumentTypeEnum.FUTIDX,
+                symbol=strategy_schema.symbol,
+            )
+
             if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
                 (
                     options_current_expiry,
@@ -80,16 +91,6 @@ async def rollover_to_next_expiry():
                 if not is_today_options_expiry:
                     continue
             else:
-                (
-                    futures_current_expiry,
-                    futures_next_expiry,
-                    is_today_futures_expiry,
-                ) = await get_monthly_expiry_date_from_redis(
-                    async_redis_client=async_redis_client,
-                    instrument_type=InstrumentTypeEnum.FUTIDX,
-                    symbol=strategy_schema.symbol,
-                )
-
                 if not is_today_futures_expiry:
                     continue
 
