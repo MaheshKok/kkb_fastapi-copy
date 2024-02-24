@@ -305,7 +305,7 @@ async def test_async_client(test_app):
 
 
 @pytest_asyncio.fixture(scope="function")
-async def buy_task_payload_dict(test_async_redis_client):
+async def buy_task_payload_dict(test_async_redis_client: aioredis.Redis):
     post_trade_payload = get_test_post_trade_payload()
 
     await create_pre_db_data(users=1, strategies=1, trades=10)
@@ -314,13 +314,15 @@ async def buy_task_payload_dict(test_async_redis_client):
     async with Database() as async_session:
         fetch_strategy_query_ = await async_session.execute(select(StrategyModel))
         strategy_model = fetch_strategy_query_.scalars().one_or_none()
-
+        strategy_schema = StrategySchema.model_validate(strategy_model)
         (
             current_expiry_date,
             next_expiry_date,
             is_today_expiry,
         ) = await get_current_and_next_expiry_from_redis(
-            test_async_redis_client, StrategySchema.model_validate(strategy_model)
+            async_redis_client=test_async_redis_client,
+            instrument_type=strategy_schema.instrument_type,
+            symbol=strategy_schema.symbol,
         )
 
         post_trade_payload["strategy_id"] = strategy_model.id

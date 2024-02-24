@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.trade.IndianFNO.tasks import get_futures_profit
 from app.api.trade.IndianFNO.tasks import get_options_profit
-from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_redis
+from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
@@ -133,7 +133,7 @@ async def update_daily_profit():
                     current_month_expiry,
                     next_month_expiry,
                     is_today_months_expiry,
-                ) = await get_monthly_expiry_date_from_redis(
+                ) = await get_current_and_next_expiry_from_redis(
                     async_redis_client=async_redis_client,
                     instrument_type=InstrumentTypeEnum.FUTIDX,
                     symbol=live_trade_db.strategy.symbol,

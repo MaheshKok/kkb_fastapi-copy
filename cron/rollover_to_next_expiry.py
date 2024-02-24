@@ -14,7 +14,6 @@ from app.api.trade.IndianFNO.tasks import task_entry_trade
 from app.api.trade.IndianFNO.tasks import task_exit_trade
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.IndianFNO.utils import get_future_price_from_redis
-from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_redis
 from app.api.trade.IndianFNO.utils import set_option_type
 from app.core.config import get_config
 from app.database.base import get_db_url
@@ -87,7 +86,7 @@ async def rollover_to_next_expiry(
                 futures_current_expiry,
                 futures_next_expiry,
                 is_today_futures_expiry,
-            ) = await get_monthly_expiry_date_from_redis(
+            ) = await get_current_and_next_expiry_from_redis(
                 async_redis_client=async_redis_client,
                 instrument_type=InstrumentTypeEnum.FUTIDX,
                 symbol=strategy_schema.symbol,
@@ -99,7 +98,9 @@ async def rollover_to_next_expiry(
                     options_next_expiry,
                     is_today_options_expiry,
                 ) = await get_current_and_next_expiry_from_redis(
-                    async_redis_client, strategy_schema
+                    async_redis_client=async_redis_client,
+                    instrument_type=InstrumentTypeEnum.OPTIDX,
+                    symbol=strategy_schema.symbol,
                 )
 
                 if not is_today_options_expiry:

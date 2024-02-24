@@ -104,7 +104,11 @@ async def post_nfo_indian_options(
         current_futures_expiry_date,
         next_futures_expiry_date,
         is_today_futures_expiry,
-    ) = await get_current_and_next_expiry_from_redis(async_redis_client, strategy_schema)
+    ) = await get_current_and_next_expiry_from_redis(
+        async_redis_client=async_redis_client,
+        instrument_type=InstrumentTypeEnum.FUTIDX,
+        symbol=strategy_schema.symbol,
+    )
 
     futures_expiry_date = get_expiry_date_to_trade(
         current_expiry_date=current_futures_expiry_date,
@@ -129,7 +133,11 @@ async def post_nfo_indian_options(
             current_options_expiry_date,
             next_options_expiry_date,
             is_today_options_expiry,
-        ) = await get_current_and_next_expiry_from_redis(async_redis_client, strategy_schema)
+        ) = await get_current_and_next_expiry_from_redis(
+            async_redis_client=async_redis_client,
+            instrument_type=InstrumentTypeEnum.OPTIDX,
+            symbol=strategy_schema.symbol,
+        )
         options_expiry_date = get_expiry_date_to_trade(
             current_expiry_date=current_options_expiry_date,
             next_expiry_date=next_options_expiry_date,

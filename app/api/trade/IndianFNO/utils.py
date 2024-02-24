@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import List
 from typing import Optional
 
+import aioredis
 import httpx
 import pandas as pd
 from aioredis import Redis
@@ -304,16 +305,14 @@ async def get_expiry_list_from_redis(async_redis_client, instrument_type, symbol
 
 
 async def get_current_and_next_expiry_from_redis(
-    async_redis_client, strategy_schema: StrategySchema
+    *, async_redis_client: aioredis.Redis, instrument_type: InstrumentTypeEnum, symbol: str
 ):
     todays_date = datetime.now().date()
 
     is_today_expiry = False
     current_expiry_date = None
     next_expiry_date = None
-    expiry_list = await get_expiry_list_from_redis(
-        async_redis_client, strategy_schema.instrument_type, strategy_schema.symbol
-    )
+    expiry_list = await get_expiry_list_from_redis(async_redis_client, instrument_type, symbol)
 
     for index, expiry_date in enumerate(expiry_list):
         if todays_date > expiry_date:

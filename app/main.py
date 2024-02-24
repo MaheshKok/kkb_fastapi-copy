@@ -28,9 +28,7 @@ async def http_exception_handler(request, exc):
 if __name__ == "__main__":
     try:
         uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=int(os.environ.get("PORT", 8000)),
+            app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), log_level="debug"
         )
     except BaseException as e:
         logging.error(f"Error running fastapi: {e}")
