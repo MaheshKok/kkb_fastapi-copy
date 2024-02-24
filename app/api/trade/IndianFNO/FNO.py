@@ -16,6 +16,13 @@ from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_strategy_schema
 from app.api.trade import trading_router
 from app.api.trade.Capital.utils import get_lots_to_trade_and_profit_or_loss
+from app.api.trade.IndianFNO.tasks import task_entry_trade
+from app.api.trade.IndianFNO.tasks import task_exit_trade
+from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
+from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_redis
+from app.api.trade.IndianFNO.utils import get_opposite_trade_option_type
+from app.api.trade.IndianFNO.utils import set_option_type
+from app.api.trade.IndianFNO.utils import set_quantity
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum
@@ -25,13 +32,6 @@ from app.schemas.strategy import StrategySchema
 from app.schemas.trade import DBEntryTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
-from app.tasks.tasks import task_entry_trade
-from app.tasks.tasks import task_exit_trade
-from app.tasks.utils import get_current_and_next_expiry_from_redis
-from app.tasks.utils import get_monthly_expiry_date_from_redis
-from app.tasks.utils import get_opposite_trade_option_type
-from app.tasks.utils import set_option_type
-from app.tasks.utils import set_quantity
 from app.utils.constants import FUT
 
 

@@ -15,6 +15,10 @@ from sqlalchemy import text
 from sqlalchemy import update
 
 from app.api.trade.Capital.utils import get_lots_to_trade_and_profit_or_loss
+from app.api.trade.IndianFNO.utils import get_future_price
+from app.api.trade.IndianFNO.utils import get_future_price_from_redis
+from app.api.trade.IndianFNO.utils import get_strike_and_entry_price
+from app.api.trade.IndianFNO.utils import get_strike_and_exit_price_dict
 from app.broker.utils import buy_alice_blue_trades
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
@@ -26,10 +30,6 @@ from app.schemas.trade import EntryTradeSchema
 from app.schemas.trade import ExitTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
-from app.tasks.utils import get_future_price
-from app.tasks.utils import get_future_price_from_redis
-from app.tasks.utils import get_strike_and_entry_price
-from app.tasks.utils import get_strike_and_exit_price_dict
 from app.utils.constants import FUT
 from app.utils.constants import update_trade_columns
 from app.utils.option_chain import get_option_chain

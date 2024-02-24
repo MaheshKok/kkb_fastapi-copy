@@ -7,6 +7,9 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.api.trade.IndianFNO.tasks import get_futures_profit
+from app.api.trade.IndianFNO.tasks import get_options_profit
+from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_redis
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
@@ -15,9 +18,6 @@ from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum
-from app.tasks.tasks import get_futures_profit
-from app.tasks.tasks import get_options_profit
-from app.tasks.utils import get_monthly_expiry_date_from_redis
 
 
 nse_headers = {

@@ -4,6 +4,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.api.trade.IndianFNO.tasks import get_futures_profit
+from app.api.trade.IndianFNO.tasks import get_options_profit
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
@@ -12,8 +14,6 @@ from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
-from app.tasks.tasks import get_futures_profit
-from app.tasks.tasks import get_options_profit
 from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_open_trades

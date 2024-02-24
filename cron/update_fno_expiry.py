@@ -2,10 +2,10 @@ import asyncio
 import json
 import logging
 
+from app.api.trade.IndianFNO.utils import get_expiry_dict_from_alice_blue
 from app.core.config import Config
 from app.core.config import get_config
 from app.database.base import get_redis_client
-from app.tasks.utils import get_expiry_dict_from_alice_blue
 
 
 async def sync_expiry_dates_from_alice_blue_to_redis(config: Config = None):

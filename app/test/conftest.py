@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.pool import QueuePool
 
+from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.core.config import get_config
 from app.create_app import get_app
 from app.database import Base
@@ -19,7 +20,6 @@ from app.database.base import get_db_url
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
-from app.tasks.utils import get_current_and_next_expiry_from_redis
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_pre_db_data
 from app.utils.constants import TRADES_AND_OPTION_CHAIN_REDIS
