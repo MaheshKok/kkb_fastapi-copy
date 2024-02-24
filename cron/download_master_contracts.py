@@ -41,8 +41,8 @@ async def download_master_contract():
     ]
 
     # Use a pipeline to set each chunk of key-value pairs in Redis
-    for chunk in dict_chunks:
-        async with redis_client.pipeline() as pipe:
+    async with redis_client.pipeline() as pipe:
+        for chunk in dict_chunks:
             for key, value in chunk.items():
                 pipe.set(key, value)
 

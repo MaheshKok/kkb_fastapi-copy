@@ -9,6 +9,6 @@ password = "V7Bqqlbzx6zX9VAmcC0355dzZVNHdiYa"
 
 
 [trades_and_option_chain_redis]
-url = "redis://:9jm85p9z1m28zf8v34jr8x7dgpw5hgar6pacs4trfbfe3rk78t2t@professional-owl-c222061bfc.redisgreen.net:11042"
+url = "redis://:m0xfzfd1v4r31f8qqzhkjv6gxbpp6saweqfb3m8avrr3frh28bjq@marvelous-orangutan-5ece872ffd.redisgreen.net:11042"
 
 strategy_id_uuid_namespace = "570ad7fe-754f-498b-b8e1-40c5cfcf4763"
