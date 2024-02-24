@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 import time
@@ -19,7 +20,6 @@ from app.api.trade.Capital.utils import get_lots_to_trade_and_profit_or_loss
 from app.api.trade.IndianFNO.tasks import task_entry_trade
 from app.api.trade.IndianFNO.tasks import task_exit_trade
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
-from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_redis
 from app.api.trade.IndianFNO.utils import get_opposite_trade_option_type
 from app.api.trade.IndianFNO.utils import set_option_type
 from app.api.trade.IndianFNO.utils import set_quantity
@@ -56,6 +56,27 @@ async def get_open_trades():
         return trade_models
 
 
+def get_expiry_date_to_trade(
+    *,
+    current_expiry_date: datetime.date,
+    next_expiry_date: datetime.date,
+    strategy_schema: StrategySchema,
+    is_today_expiry: bool,
+):
+    if not is_today_expiry:
+        return current_expiry_date
+
+    current_time = datetime.datetime.utcnow()
+    if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
+        if current_time.time() > datetime.time(hour=9, minute=45):
+            current_expiry_date = next_expiry_date
+    else:
+        if current_time.time() > datetime.time(hour=8, minute=30):
+            current_expiry_date = next_expiry_date
+
+    return current_expiry_date
+
+
 @fno_router.post("/nfo", status_code=200)
 async def post_nfo_indian_options(
     signal_payload_schema: SignalPayloadSchema,
@@ -76,23 +97,37 @@ async def post_nfo_indian_options(
     }
 
     # hardcoded instrument_type because i want to explicitly get expiry for futures
-    # i cant fetch it from strategy_schema.instrument_type because it can be OPTIDX.
+    # I cant fetch it from strategy_schema.instrument_type because it can be OPTIDX.
+    # (
+    #     current_futures_expiry_date,
+    #     next_futures_expiry_date,
+    #     is_today_futures_expiry,
+    # ) = await get_monthly_expiry_date_from_redis(
+    #     async_redis_client=async_redis_client,
+    #     instrument_type=InstrumentTypeEnum.FUTIDX,
+    #     symbol=strategy_schema.symbol,
+    # )
+
     (
         current_futures_expiry_date,
         next_futures_expiry_date,
         is_today_futures_expiry,
-    ) = await get_monthly_expiry_date_from_redis(
-        async_redis_client=async_redis_client,
-        instrument_type=InstrumentTypeEnum.FUTIDX,
-        symbol=strategy_schema.symbol,
+    ) = await get_current_and_next_expiry_from_redis(async_redis_client, strategy_schema)
+
+    futures_expiry_date = get_expiry_date_to_trade(
+        current_expiry_date=current_futures_expiry_date,
+        next_expiry_date=next_futures_expiry_date,
+        strategy_schema=strategy_schema,
+        is_today_expiry=is_today_futures_expiry,
     )
+
     # fetch opposite position based trades
-    redis_hash = f"{current_futures_expiry_date} {PositionEnum.SHORT if signal_payload_schema.action == SignalTypeEnum.BUY else PositionEnum.LONG} {FUT}"
-    signal_payload_schema.expiry = current_futures_expiry_date
+    redis_hash = f"{futures_expiry_date} {PositionEnum.SHORT if signal_payload_schema.action == SignalTypeEnum.BUY else PositionEnum.LONG} {FUT}"
+    signal_payload_schema.expiry = futures_expiry_date
     kwargs.update(
         {
             "only_futures": True,
-            "futures_expiry_date": current_futures_expiry_date,
+            "futures_expiry_date": futures_expiry_date,
         }
     )
 
@@ -103,16 +138,22 @@ async def post_nfo_indian_options(
             next_options_expiry_date,
             is_today_options_expiry,
         ) = await get_current_and_next_expiry_from_redis(async_redis_client, strategy_schema)
+        options_expiry_date = get_expiry_date_to_trade(
+            current_expiry_date=current_options_expiry_date,
+            next_expiry_date=next_options_expiry_date,
+            strategy_schema=strategy_schema,
+            is_today_expiry=is_today_options_expiry,
+        )
         # fetch opposite position based trades
         opposite_trade_option_type = get_opposite_trade_option_type(
             strategy_schema.position, signal_payload_schema.action
         )
-        redis_hash = f"{current_options_expiry_date} {opposite_trade_option_type}"
-        signal_payload_schema.expiry = current_options_expiry_date
+        redis_hash = f"{options_expiry_date} {opposite_trade_option_type}"
+        signal_payload_schema.expiry = options_expiry_date
         kwargs.update(
             {
                 "only_futures": False,
-                "options_expiry_date": current_options_expiry_date,
+                "options_expiry_date": options_expiry_date,
             }
         )
 

@@ -325,6 +325,7 @@ async def get_current_and_next_expiry_from_redis(
             break
         elif todays_date < expiry_date:
             current_expiry_date = expiry_date
+            next_expiry_date = expiry_list[index + 1]
             break
 
     return current_expiry_date, next_expiry_date, is_today_expiry

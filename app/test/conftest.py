@@ -41,9 +41,11 @@ logging.basicConfig(
 #     import pandas as pd
 #     from app.utils.constants import REDIS_DATE_FORMAT
 #     from app.schemas.enums import InstrumentTypeEnum
-#     from app.tasks.utils import get_monthly_expiry_date_from_redis
-#     from app.api.utils import get_expiry_dict_from_alice_blue
 #     from app.utils.constants import AB_NFO_CONTRACTS_URL, INSTRUMENT_COLUMN
+#     from app.api.trade.IndianFNO.utils import (
+#         get_monthly_expiry_date_from_redis,
+#         get_expiry_dict_from_alice_blue,
+#     )
 #
 #     test_config = get_config(ConfigFile.TEST)
 #     _test_async_redis_client = aioredis.Redis(
@@ -191,7 +193,7 @@ def test_config():
     return config
 
 
-@pytest_asyncio.fixture(scope="function")
+@pytest.fixture(scope="session", autouse=True)
 async def test_async_redis_client():
     test_config = get_config(ConfigFile.TEST)
     _test_async_redis_client = aioredis.Redis(
@@ -202,6 +204,13 @@ async def test_async_redis_client():
         decode_responses=True,
     )
     logging.info("test redis client created")
+    # Check Redis connection
+    ping = await _test_async_redis_client.ping()
+    if ping:
+        logging.info("test redis client successfully connected")
+    else:
+        logging.error("test redis client connection failed")
+
     yield _test_async_redis_client
     await _test_async_redis_client.close()
     logging.info("test redis client closed")
