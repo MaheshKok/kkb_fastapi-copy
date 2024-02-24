@@ -42,10 +42,11 @@ async def download_master_contract():
 
     # Use a pipeline to set each chunk of key-value pairs in Redis
     for chunk in dict_chunks:
-        with redis_client.pipeline() as pipe:
+        async with redis_client.pipeline() as pipe:
             for key, value in chunk.items():
                 pipe.set(key, value)
-            pipe.execute()
+
+            await pipe.execute()
 
     print(f"Time taken to set {len(full_name_row_dict)} keys: {datetime.now() - start_time}")
 
