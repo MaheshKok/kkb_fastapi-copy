@@ -5,6 +5,8 @@ from datetime import datetime
 import aiocron
 import httpx
 from cron.download_master_contracts import download_master_contract
+from cron.rollover_to_next_expiry import rollover_to_next_expiry
+from cron.update_daily_profit import update_daily_profit
 from cron.update_fno_expiry import sync_expiry_dates_from_alice_blue_to_redis
 from cron.update_session_token import cron_update_session_token
 
@@ -115,7 +117,7 @@ async def task_update_till_yesterdays_profits():
         if app == "flaskstockpi":
             tasks.append(get_api(f"{base_urls[app]}/update_till_yesterdays_profits"))
         elif app == "kokobrothers-be":
-            tasks.append(get_api(f"{base_urls[app]}/cron/update/daily_profit"))
+            await update_daily_profit()
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
 
@@ -128,7 +130,7 @@ async def task_rollover_to_next_expiry():
         if app == "flaskstockpi":
             tasks.append(get_api(f"{base_urls[app]}/rollover_to_next_expiry"))
         elif app == "kokobrothers-be":
-            tasks.append(get_api(f"{base_urls[app]}/cron/rollover_to_next_expiry"))
+            await rollover_to_next_expiry()
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
 

@@ -15,12 +15,10 @@ from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_strategy_schema
 from app.api.endpoints.trade import trading_router
-from app.api.utils import get_current_and_next_expiry_from_redis
 from app.api.utils import get_lots_to_trade_and_profit_or_loss
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
@@ -29,7 +27,11 @@ from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from app.tasks.tasks import task_entry_trade
 from app.tasks.tasks import task_exit_trade
+from app.tasks.utils import get_current_and_next_expiry_from_redis
 from app.tasks.utils import get_monthly_expiry_date_from_redis
+from app.tasks.utils import get_opposite_trade_option_type
+from app.tasks.utils import set_option_type
+from app.tasks.utils import set_quantity
 from app.utils.constants import FUT
 
 
@@ -52,57 +54,6 @@ async def get_open_trades():
         )
         trade_models = fetch_open_trades_query_.scalars().all()
         return trade_models
-
-
-def set_option_type(strategy_schema: StrategySchema, payload: SignalPayloadSchema) -> None:
-    # set OptionTypeEnum base strategy's position column and signal's action.
-    strategy_position_trade = {
-        PositionEnum.LONG: {
-            SignalTypeEnum.BUY: OptionTypeEnum.CE,
-            SignalTypeEnum.SELL: OptionTypeEnum.PE,
-        },
-        PositionEnum.SHORT: {
-            SignalTypeEnum.BUY: OptionTypeEnum.PE,
-            SignalTypeEnum.SELL: OptionTypeEnum.CE,
-        },
-    }
-
-    opposite_trade = {OptionTypeEnum.CE: OptionTypeEnum.PE, OptionTypeEnum.PE: OptionTypeEnum.CE}
-
-    position_based_trade = strategy_position_trade.get(strategy_schema.position)
-    payload.option_type = position_based_trade.get(payload.action) or opposite_trade.get(
-        payload.option_type
-    )
-
-
-def get_opposite_trade_option_type(strategy_position, signal_action) -> OptionTypeEnum:
-    if strategy_position == PositionEnum.LONG:
-        if signal_action == SignalTypeEnum.BUY:
-            opposite_trade_option_type = OptionTypeEnum.PE
-        else:
-            opposite_trade_option_type = OptionTypeEnum.CE
-    else:
-        if signal_action == SignalTypeEnum.BUY:
-            opposite_trade_option_type = OptionTypeEnum.CE
-        else:
-            opposite_trade_option_type = OptionTypeEnum.PE
-
-    return opposite_trade_option_type
-
-
-def set_quantity(
-    strategy_schema: StrategySchema, signal_payload_schema: SignalPayloadSchema, lots_to_open: int
-) -> None:
-    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if strategy_schema.position == PositionEnum.LONG:
-            signal_payload_schema.quantity = lots_to_open
-        else:
-            signal_payload_schema.quantity = -lots_to_open
-    else:
-        if signal_payload_schema.action == SignalTypeEnum.BUY:
-            signal_payload_schema.quantity = lots_to_open
-        else:
-            signal_payload_schema.quantity = -lots_to_open
 
 
 @fno_router.post("/nfo", status_code=200)

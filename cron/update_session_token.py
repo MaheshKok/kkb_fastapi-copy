@@ -4,8 +4,8 @@ import logging
 import httpx
 from sqlalchemy import select
 
-from app.api.utils import update_session_token
 from app.broker.utils import get_pya3_obj
+from app.broker.utils import update_session_token
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client

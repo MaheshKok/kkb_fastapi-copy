@@ -1,9 +1,9 @@
 from datetime import timedelta
 
-from app.api.utils import get_current_and_next_expiry_from_alice_blue
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum
+from app.tasks.utils import get_current_and_next_expiry_from_alice_blue
 from app.tasks.utils import get_monthly_expiry_date_from_alice_blue
 from app.test.factory.strategy import StrategyFactory
 from app.test.factory.take_away_profit import TakeAwayProfitFactory

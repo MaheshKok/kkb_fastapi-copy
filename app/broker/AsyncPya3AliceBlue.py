@@ -601,7 +601,6 @@ class AsyncPya3Aliceblue(Aliceblue):
         placeorderresp = await self._post("placeOrder", data)
         return placeorderresp
 
-    @staticmethod
     async def get_margin(
         self,
         *,
@@ -610,6 +609,7 @@ class AsyncPya3Aliceblue(Aliceblue):
         qty: float,
         product: str,
         priceType: str,
+        price: str,
         token: str,
         transType: str,
     ):
@@ -629,7 +629,7 @@ class AsyncPya3Aliceblue(Aliceblue):
         payload = {
             "exchange": exchange,
             "tradingSymbol": tradingSymbol,
-            "price": priceType,
+            "price": price,
             "qty": qty,
             "product": product,
             "priceType": priceType,

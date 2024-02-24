@@ -20,7 +20,6 @@ from pya3 import ProductType
 from pya3 import TransactionType
 from sqlalchemy import select
 
-from app.api.utils import update_session_token
 from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
@@ -407,3 +406,21 @@ async def close_alice_blue_trades(
 
 
 # TODO: improve logging and delegate exception handling
+async def update_session_token(pya3_obj: AsyncPya3Aliceblue, async_redis_client: Redis):
+    session_id = await pya3_obj.login_and_get_session_id()
+
+    async with Database() as async_session:
+        # get broker model from db filtered by username
+        fetch_broker_query = await async_session.execute(
+            select(BrokerModel).where(BrokerModel.username == pya3_obj.user_id)
+        )
+        broker_model = fetch_broker_query.scalars().one_or_none()
+        broker_model.access_token = session_id
+        await async_session.flush()
+
+        # update redis cache with new session_id
+        await async_redis_client.set(
+            str(broker_model.id), BrokerSchema.model_validate(broker_model).json()
+        )
+        logging.info(f"session updated for user: {pya3_obj.user_id} in db and redis")
+        return session_id

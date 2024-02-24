@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 import traceback
@@ -6,14 +7,16 @@ from datetime import datetime
 from typing import List
 from typing import Optional
 
+import httpx
+import pandas as pd
 from aioredis import Redis
 from fastapi import HTTPException
 from httpx import AsyncClient
 
-from app.api.utils import get_expiry_dict_from_alice_blue
 from app.broker.utils import buy_alice_blue_trades
 from app.broker.utils import close_alice_blue_trades
 from app.schemas.enums import InstrumentTypeEnum
+from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
@@ -278,20 +281,127 @@ async def get_strike_and_entry_price(
     return strike, premium
 
 
+async def get_expiry_dict_from_alice_blue():
+    api = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
+
+    response = await httpx.AsyncClient().get(api)
+    data_stream = io.StringIO(response.text)
+    df = pd.read_csv(data_stream)
+    result = {}
+    for (instrument_type, symbol), group in df.groupby(["Instrument Type", "Symbol"]):
+        if instrument_type not in result:
+            result[instrument_type] = {}
+        expiry_dates = sorted(set(group["Expiry Date"].tolist()))
+        result[instrument_type][symbol] = expiry_dates
+
+    return result
+
+
+async def get_expiry_list_from_redis(async_redis_client, instrument_type, symbol):
+    instrument_expiry = await async_redis_client.get(instrument_type)
+    expiry_list = eval(instrument_expiry)[symbol]
+    return [datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list]
+
+
+async def get_current_and_next_expiry_from_redis(
+    async_redis_client, strategy_schema: StrategySchema
+):
+    todays_date = datetime.now().date()
+
+    is_today_expiry = False
+    current_expiry_date = None
+    next_expiry_date = None
+    expiry_list = await get_expiry_list_from_redis(
+        async_redis_client, strategy_schema.instrument_type, strategy_schema.symbol
+    )
+
+    for index, expiry_date in enumerate(expiry_list):
+        if todays_date > expiry_date:
+            continue
+        elif expiry_date == todays_date:
+            next_expiry_date = expiry_list[index + 1]
+            current_expiry_date = expiry_date
+            is_today_expiry = True
+            break
+        elif todays_date < expiry_date:
+            current_expiry_date = expiry_date
+            break
+
+    return current_expiry_date, next_expiry_date, is_today_expiry
+
+
+async def get_current_and_next_expiry_from_alice_blue(symbol: str):
+    todays_date = datetime.now().date()
+
+    is_today_expiry = False
+    current_expiry_date = None
+    next_expiry_date = None
+    expiry_dict = await get_expiry_dict_from_alice_blue()
+    expiry_list = expiry_dict[InstrumentTypeEnum.OPTIDX][symbol]
+    expiry_datetime_obj_list = [
+        datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list
+    ]
+    for index, expiry_date in enumerate(expiry_datetime_obj_list):
+        if todays_date > expiry_date:
+            continue
+        elif expiry_date == todays_date:
+            next_expiry_date = expiry_list[index + 1]
+            current_expiry_date = expiry_date
+            is_today_expiry = True
+            break
+        elif todays_date < expiry_date:
+            current_expiry_date = expiry_date
+            break
+
+    return current_expiry_date, next_expiry_date, is_today_expiry
+
+
+def set_option_type(strategy_schema: StrategySchema, payload: SignalPayloadSchema) -> None:
+    # set OptionTypeEnum base strategy's position column and signal's action.
+    strategy_position_trade = {
+        PositionEnum.LONG: {
+            SignalTypeEnum.BUY: OptionTypeEnum.CE,
+            SignalTypeEnum.SELL: OptionTypeEnum.PE,
+        },
+        PositionEnum.SHORT: {
+            SignalTypeEnum.BUY: OptionTypeEnum.PE,
+            SignalTypeEnum.SELL: OptionTypeEnum.CE,
+        },
+    }
+
+    opposite_trade = {OptionTypeEnum.CE: OptionTypeEnum.PE, OptionTypeEnum.PE: OptionTypeEnum.CE}
+
+    position_based_trade = strategy_position_trade.get(strategy_schema.position)
+    payload.option_type = position_based_trade.get(payload.action) or opposite_trade.get(
+        payload.option_type
+    )
+
+
+def get_opposite_trade_option_type(strategy_position, signal_action) -> OptionTypeEnum:
+    if strategy_position == PositionEnum.LONG:
+        if signal_action == SignalTypeEnum.BUY:
+            opposite_trade_option_type = OptionTypeEnum.PE
+        else:
+            opposite_trade_option_type = OptionTypeEnum.CE
+    else:
+        if signal_action == SignalTypeEnum.BUY:
+            opposite_trade_option_type = OptionTypeEnum.CE
+        else:
+            opposite_trade_option_type = OptionTypeEnum.PE
+
+    return opposite_trade_option_type
+
+
 def set_quantity(
-    *,
-    signal_payload_schema: SignalPayloadSchema,
-    quantity: float,
-    strategy_schema: StrategySchema,
+    strategy_schema: StrategySchema, signal_payload_schema: SignalPayloadSchema, lots_to_open: int
 ) -> None:
     if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
         if strategy_schema.position == PositionEnum.LONG:
-            signal_payload_schema.quantity = quantity
+            signal_payload_schema.quantity = lots_to_open
         else:
-            signal_payload_schema.quantity = -quantity
+            signal_payload_schema.quantity = -lots_to_open
     else:
-        # this is for futures
         if signal_payload_schema.action == SignalTypeEnum.BUY:
-            signal_payload_schema.quantity = quantity
+            signal_payload_schema.quantity = lots_to_open
         else:
-            signal_payload_schema.quantity = -quantity
+            signal_payload_schema.quantity = -lots_to_open

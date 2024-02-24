@@ -1,124 +1,19 @@
 import asyncio
-import io
 import logging
-from datetime import datetime
 
 import httpx
-import pandas as pd
 from _decimal import ROUND_DOWN
 from _decimal import Decimal
 from _decimal import getcontext
-from aioredis import Redis
 from fastapi import HTTPException
-from sqlalchemy import select
 from sqlalchemy import update
 
 from app.broker.AsyncCapital import AsyncCapitalClient
-from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
-from app.database.models import BrokerModel
 from app.database.models import CFDStrategyModel
 from app.database.session_manager.db_session import Database
-from app.schemas.broker import BrokerSchema
-from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import CFDPayloadSchema
-from app.utils.constants import REDIS_DATE_FORMAT
-
-
-async def get_expiry_dict_from_alice_blue():
-    api = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
-
-    response = await httpx.AsyncClient().get(api)
-    data_stream = io.StringIO(response.text)
-    df = pd.read_csv(data_stream)
-    result = {}
-    for (instrument_type, symbol), group in df.groupby(["Instrument Type", "Symbol"]):
-        if instrument_type not in result:
-            result[instrument_type] = {}
-        expiry_dates = sorted(set(group["Expiry Date"].tolist()))
-        result[instrument_type][symbol] = expiry_dates
-
-    return result
-
-
-async def get_expiry_list_from_redis(async_redis_client, instrument_type, symbol):
-    instrument_expiry = await async_redis_client.get(instrument_type)
-    expiry_list = eval(instrument_expiry)[symbol]
-    return [datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list]
-
-
-async def get_current_and_next_expiry_from_redis(
-    async_redis_client, strategy_schema: StrategySchema
-):
-    todays_date = datetime.now().date()
-
-    is_today_expiry = False
-    current_expiry_date = None
-    next_expiry_date = None
-    expiry_list = await get_expiry_list_from_redis(
-        async_redis_client, strategy_schema.instrument_type, strategy_schema.symbol
-    )
-
-    for index, expiry_date in enumerate(expiry_list):
-        if todays_date > expiry_date:
-            continue
-        elif expiry_date == todays_date:
-            next_expiry_date = expiry_list[index + 1]
-            current_expiry_date = expiry_date
-            is_today_expiry = True
-            break
-        elif todays_date < expiry_date:
-            current_expiry_date = expiry_date
-            break
-
-    return current_expiry_date, next_expiry_date, is_today_expiry
-
-
-async def get_current_and_next_expiry_from_alice_blue(symbol: str):
-    todays_date = datetime.now().date()
-
-    is_today_expiry = False
-    current_expiry_date = None
-    next_expiry_date = None
-    expiry_dict = await get_expiry_dict_from_alice_blue()
-    expiry_list = expiry_dict[InstrumentTypeEnum.OPTIDX][symbol]
-    expiry_datetime_obj_list = [
-        datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list
-    ]
-    for index, expiry_date in enumerate(expiry_datetime_obj_list):
-        if todays_date > expiry_date:
-            continue
-        elif expiry_date == todays_date:
-            next_expiry_date = expiry_list[index + 1]
-            current_expiry_date = expiry_date
-            is_today_expiry = True
-            break
-        elif todays_date < expiry_date:
-            current_expiry_date = expiry_date
-            break
-
-    return current_expiry_date, next_expiry_date, is_today_expiry
-
-
-async def update_session_token(pya3_obj: AsyncPya3Aliceblue, async_redis_client: Redis):
-    session_id = await pya3_obj.login_and_get_session_id()
-
-    async with Database() as async_session:
-        # get broker model from db filtered by username
-        fetch_broker_query = await async_session.execute(
-            select(BrokerModel).where(BrokerModel.username == pya3_obj.user_id)
-        )
-        broker_model = fetch_broker_query.scalars().one_or_none()
-        broker_model.access_token = session_id
-        await async_session.flush()
-
-        # update redis cache with new session_id
-        await async_redis_client.set(
-            str(broker_model.id), BrokerSchema.model_validate(broker_model).json()
-        )
-        logging.info(f"session updated for user: {pya3_obj.user_id} in db and redis")
-        return session_id
 
 
 def get_lots_to_trade_and_profit_or_loss(

@@ -6,7 +6,6 @@ import sentry_sdk
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from app.api.endpoints.cron_api import cron_api
 from app.api.endpoints.healthcheck import healthcheck_router
 from app.api.endpoints.strategy import strategy_router
 from app.api.endpoints.takeaway_profit import takeaway_profit
@@ -37,7 +36,6 @@ def register_routers(app: FastAPI):
     app.include_router(takeaway_profit)
     app.include_router(forex_router)
     app.include_router(binance_router)
-    app.include_router(cron_api)
     app.include_router(oanda_forex_router)
 
 
