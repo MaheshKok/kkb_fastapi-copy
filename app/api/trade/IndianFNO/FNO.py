@@ -100,18 +100,6 @@ async def post_nfo_indian_options(
         "crucial_details": crucial_details,
     }
 
-    # hardcoded instrument_type because i want to explicitly get expiry for futures
-    # I cant fetch it from strategy_schema.instrument_type because it can be OPTIDX.
-    # (
-    #     current_futures_expiry_date,
-    #     next_futures_expiry_date,
-    #     is_today_futures_expiry,
-    # ) = await get_monthly_expiry_date_from_redis(
-    #     async_redis_client=async_redis_client,
-    #     instrument_type=InstrumentTypeEnum.FUTIDX,
-    #     symbol=strategy_schema.symbol,
-    # )
-
     (
         current_futures_expiry_date,
         next_futures_expiry_date,
