@@ -10,6 +10,9 @@ from cron.update_daily_profit import update_daily_profit
 from cron.update_fno_expiry import sync_expiry_dates_from_alice_blue_to_redis
 from cron.update_session_token import cron_update_session_token
 
+from app.schemas.enums import InstrumentTypeEnum
+from app.schemas.enums import PositionEnum
+
 
 logging.basicConfig(level=logging.INFO)
 
@@ -122,7 +125,7 @@ async def task_update_till_yesterdays_profits():
     await asyncio.gather(*tasks)
 
 
-async def task_rollover_to_next_expiry():
+async def task_rollover_long_options_to_next_expiry():
     logging.info(f"Job task_rollover_to_next_expiry executed at: {datetime.now()}")
 
     tasks = []
@@ -130,9 +133,20 @@ async def task_rollover_to_next_expiry():
         if app == "flaskstockpi":
             tasks.append(get_api(f"{base_urls[app]}/rollover_to_next_expiry"))
         elif app == "kokobrothers-be":
-            await rollover_to_next_expiry()
+            await rollover_to_next_expiry(
+                instrument_type=InstrumentTypeEnum.OPTIDX, position=PositionEnum.LONG
+            )
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
+
+
+async def task_rollover_short_options_and_futures_to_next_expiry():
+    await asyncio.gather(
+        rollover_to_next_expiry(
+            instrument_type=InstrumentTypeEnum.OPTIDX, position=PositionEnum.SHORT
+        ),
+        rollover_to_next_expiry(instrument_type=InstrumentTypeEnum.FUTIDX),
+    )
 
 
 async def task_backup_db():
@@ -156,7 +170,10 @@ aiocron.crontab("0 3 * * *", func=task_update_expiry_list)  # Every day at 03:00
 aiocron.crontab("10 3 * * *", func=task_update_session_token)  # Every day at 03:10
 aiocron.crontab("30 3 * * *", func=task_update_session_token)  # Every day at 03:30
 # aiocron.crontab("30 3 * * *", func=task_scale_up_dynos)  # Every day at 03:30
-aiocron.crontab("30 8 * * *", func=task_rollover_to_next_expiry)  # Every day at 9:00
+aiocron.crontab("30 8 * * *", func=task_rollover_long_options_to_next_expiry)  # Every day at 8:30
+aiocron.crontab(
+    "45 9 * * *", func=task_rollover_short_options_and_futures_to_next_expiry
+)  # Every day at 9:45
 # aiocron.crontab("0 10 * * *", func=task_scale_down_dynos)  # Every day at 10:00
 aiocron.crontab("5 10 * * *", func=task_update_till_yesterdays_profits)  # Every day at 10:05
 

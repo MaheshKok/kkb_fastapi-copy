@@ -67,11 +67,15 @@ def get_expiry_date_to_trade(
         return current_expiry_date
 
     current_time = datetime.datetime.utcnow()
-    if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
-        if current_time.time() > datetime.time(hour=9, minute=45):
-            current_expiry_date = next_expiry_date
+    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
+        if strategy_schema.position == PositionEnum.SHORT:
+            if current_time.time() > datetime.time(hour=9, minute=45):
+                current_expiry_date = next_expiry_date
+        else:
+            if current_time.time() > datetime.time(hour=8, minute=30):
+                current_expiry_date = next_expiry_date
     else:
-        if current_time.time() > datetime.time(hour=8, minute=30):
+        if current_time.time() > datetime.time(hour=9, minute=45):
             current_expiry_date = next_expiry_date
 
     return current_expiry_date

@@ -50,7 +50,9 @@ def get_action(strategy_schema: StrategySchema, trade_model: RedisTradeSchema):
 
 
 # TODO: Test this function
-async def rollover_to_next_expiry():
+async def rollover_to_next_expiry(
+    instrument_type: InstrumentTypeEnum, position: PositionEnum = None
+):
     config = get_config()
     Database.init(get_db_url(config))
 
@@ -61,7 +63,19 @@ async def rollover_to_next_expiry():
     future_price_cache = {}
     async with Database() as async_session:
         # get all strategy from database
-        strategy_models_query = await async_session.execute(select(StrategyModel))
+        if position:
+            strategy_models_query = await async_session.execute(
+                select(StrategyModel).filter_by(
+                    instrument_type=instrument_type,
+                    position=position,
+                )
+            )
+        else:
+            strategy_models_query = await async_session.execute(
+                select(StrategyModel).filter_by(
+                    instrument_type=instrument_type,
+                )
+            )
         strategy_models = strategy_models_query.scalars().all()
 
         tasks = []
