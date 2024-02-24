@@ -4,7 +4,7 @@ import logging
 from binance import AsyncClient as BinanceAsyncClient
 from fastapi import APIRouter
 
-from app.api.endpoints.trade import trading_router
+from app.api.trade import trading_router
 from app.schemas.enums import SignalTypeEnum
 from app.schemas.trade import BinanceFuturesPayloadSchema
 

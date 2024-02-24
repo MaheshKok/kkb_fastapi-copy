@@ -14,7 +14,7 @@ from pydantic import TypeAdapter
 from sqlalchemy import text
 from sqlalchemy import update
 
-from app.api.utils import get_lots_to_trade_and_profit_or_loss
+from app.api.trade.Capital.utils import get_lots_to_trade_and_profit_or_loss
 from app.broker.utils import buy_alice_blue_trades
 from app.database.models import StrategyModel
 from app.database.models import TradeModel

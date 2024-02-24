@@ -14,8 +14,8 @@ from sqlalchemy import select
 from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_strategy_schema
-from app.api.endpoints.trade import trading_router
-from app.api.utils import get_lots_to_trade_and_profit_or_loss
+from app.api.trade import trading_router
+from app.api.trade.Capital.utils import get_lots_to_trade_and_profit_or_loss
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum

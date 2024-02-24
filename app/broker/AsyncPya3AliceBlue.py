@@ -18,7 +18,7 @@ from pya3 import OrderType
 from pya3 import ProductType
 from pya3 import encrypt_string
 
-from app.api.endpoints.trade.utils import generate_trading_symbol
+from app.api.trade.IndianFNO.utils import generate_trading_symbol
 from app.utils.constants import OptionType
 
 

@@ -16,8 +16,8 @@ from oandapyV20.endpoints.trades import TradesList
 from sqlalchemy import select
 
 from app.api.dependency import get_cfd_strategy_schema
-from app.api.endpoints.trade import trading_router
-from app.api.utils import update_cfd_strategy_funds
+from app.api.trade import trading_router
+from app.api.trade.Capital.utils import update_cfd_strategy_funds
 from app.broker.AsyncPyOanda import AsyncAPI
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database

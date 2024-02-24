@@ -9,7 +9,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import model_validator
 
-from app.api.endpoints.trade.utils import generate_trading_symbol
+from app.api.trade.IndianFNO.utils import generate_trading_symbol
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum

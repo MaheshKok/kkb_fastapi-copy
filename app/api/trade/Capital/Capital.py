@@ -5,10 +5,10 @@ from fastapi import APIRouter
 from fastapi import Depends
 
 from app.api.dependency import get_cfd_strategy_schema
-from app.api.endpoints.trade import trading_router
-from app.api.utils import close_capital_lots
-from app.api.utils import get_capital_cfd_existing_profit_or_loss
-from app.api.utils import open_capital_lots
+from app.api.trade import trading_router
+from app.api.trade.Capital.utils import close_capital_lots
+from app.api.trade.Capital.utils import get_capital_cfd_existing_profit_or_loss
+from app.api.trade.Capital.utils import open_capital_lots
 from app.broker.AsyncCapital import AsyncCapitalClient
 from app.schemas.strategy import CFDStrategySchema
 from app.schemas.trade import CFDPayloadSchema
