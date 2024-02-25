@@ -50,3 +50,6 @@ async def test_upate_daily_profit_or_loss_in_db_for_second_time(
         daily_profit_query = await async_session.execute(select(DailyProfitModel))
         daily_profit_model = daily_profit_query.scalars().all()
         assert len(daily_profit_model) == 2
+
+
+# TODO: test for only_on_expiry dailyprofit

@@ -42,3 +42,4 @@ class StrategyFactory(AsyncSQLAlchemyFactory):
     # if compounding is True then contracts will be 0.0 and if compounding is False then contracts needs to be set
     contracts = 0.0
     funds_usage_percent = 1.0
+    only_on_expiry = False

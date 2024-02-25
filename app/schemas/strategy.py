@@ -33,6 +33,7 @@ class StrategyCreateSchema(BaseModel):
     contracts: float = Field(description="Contracts", example=15)
     funds_usage_percent: float = Field(description="Funds Usage Percent", example=0.25)
 
+    only_on_expiry: bool = Field(description="Only on Expiry", example=False)
     broker_id: Optional[uuid.UUID] = Field(
         description="Broker on which strategy will be executed",
         example="6b38655e-0e28-471d-aefb-dd7ce2f6a825",

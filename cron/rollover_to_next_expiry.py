@@ -174,6 +174,10 @@ async def rollover_to_next_expiry(
             )
             tasks.append(sell_task)
 
+            if strategy_schema.only_on_expiry:
+                # do not carry forward if only on expiry
+                continue
+
             # set option_type
             set_option_type(strategy_schema, signal_payload_schema)
 

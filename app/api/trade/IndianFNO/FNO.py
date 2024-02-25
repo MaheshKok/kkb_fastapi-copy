@@ -89,6 +89,7 @@ async def post_nfo_indian_options(
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
 ):
     crucial_details = f"{ strategy_schema.symbol} {strategy_schema.id} {strategy_schema.instrument_type} {signal_payload_schema.action}"
+    todays_date = datetime.datetime.utcnow().date()
     start_time = time.perf_counter()
     logging.info(f"[ {crucial_details} ] signal received")
 
@@ -109,6 +110,13 @@ async def post_nfo_indian_options(
         instrument_type=InstrumentTypeEnum.FUTIDX,
         symbol=strategy_schema.symbol,
     )
+
+    if (
+        strategy_schema.only_on_expiry
+        and strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX
+        and current_futures_expiry_date != todays_date
+    ):
+        return {"message": "Only on expiry"}
 
     futures_expiry_date = get_expiry_date_to_trade(
         current_expiry_date=current_futures_expiry_date,
@@ -138,6 +146,14 @@ async def post_nfo_indian_options(
             instrument_type=InstrumentTypeEnum.OPTIDX,
             symbol=strategy_schema.symbol,
         )
+
+        if (
+            strategy_schema.only_on_expiry
+            and strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX
+            and current_options_expiry_date != todays_date
+        ):
+            return {"message": "Only on expiry"}
+
         options_expiry_date = get_expiry_date_to_trade(
             current_expiry_date=current_options_expiry_date,
             next_expiry_date=next_options_expiry_date,
