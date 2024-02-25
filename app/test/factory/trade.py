@@ -15,7 +15,7 @@ from app.test.factory.strategy import StrategyFactory
 def generate_expiry_date():
     today = datetime.today()
     current_weekday = today.weekday()
-    days_ahead = (2 - current_weekday) % 7  # 3 represents Thursday (Monday is 0, Sunday is 6)
+    days_ahead = (3 - current_weekday) % 7  # 3 represents Thursday (Monday is 0, Sunday is 6)
     next_thursday = today + timedelta(days=days_ahead)
     return next_thursday
 
@@ -63,11 +63,11 @@ class CompletedTradeFactory(AsyncSQLAlchemyFactory):
 
     entry_price = 400.0
     exit_price = 500.0
-    profit = 2500.0
+    profit = 1500.0
 
-    future_entry_price_received = 44300.0
-    future_exit_price_received = 44625.0
-    future_profit = 7500.0
+    future_entry_price_received = 44000.0
+    future_exit_price_received = 44100.0
+    future_profit = 1500.0
 
     entry_received_at = factory.Sequence(
         lambda n: datetime.utcnow() - timedelta(days=n, minutes=1)

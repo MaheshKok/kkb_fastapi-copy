@@ -21,7 +21,7 @@ from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
 from app.schemas.strategy import StrategySchema
 from app.test.unit_tests.test_data import get_test_post_trade_payload
-from app.test.utils import create_pre_db_data
+from app.test.utils import create_close_trades
 from app.utils.constants import TRADES_AND_OPTION_CHAIN_REDIS
 from app.utils.constants import ConfigFile
 
@@ -193,7 +193,7 @@ def test_config():
     return config
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(scope="function", autouse=True)
 async def test_async_redis_client():
     test_config = get_config(ConfigFile.TEST)
     _test_async_redis_client = aioredis.Redis(
@@ -308,7 +308,7 @@ async def test_async_client(test_app):
 async def buy_task_payload_dict(test_async_redis_client: aioredis.Redis):
     post_trade_payload = get_test_post_trade_payload()
 
-    await create_pre_db_data(users=1, strategies=1, trades=10)
+    await create_close_trades(users=1, strategies=1, trades=10)
     # query database for stragey
 
     async with Database() as async_session:

@@ -16,8 +16,8 @@ from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
+from app.test.utils import create_close_trades
 from app.test.utils import create_open_trades
-from app.test.utils import create_pre_db_data
 from app.test.utils import future_entry_price
 from app.test.utils import option_entry_price
 from app.utils.constants import FUT
@@ -62,7 +62,9 @@ options_exit_columns_captured = {*options_entry_columns_captured, *exit_columns_
 async def test_trading_nfo_options_first_ever_trade(
     action, test_async_client, test_async_redis_client
 ):
-    await create_pre_db_data(users=1, strategies=1)
+    await create_close_trades(
+        users=1, strategies=1, test_async_redis_client=test_async_redis_client
+    )
 
     async with Database() as async_session:
         strategy_model = await async_session.scalar(select(StrategyModel))
@@ -277,7 +279,12 @@ async def test_trading_nfo_options_opposite_direction(
 async def test_trading_nfo_options_first_ever_trade_for_short_strategy(
     action, test_async_client, test_async_redis_client
 ):
-    await create_pre_db_data(users=1, strategies=1, strategy_position=PositionEnum.SHORT)
+    await create_close_trades(
+        users=1,
+        strategies=1,
+        strategy_position=PositionEnum.SHORT,
+        test_async_redis_client=test_async_redis_client,
+    )
 
     async with Database() as async_session:
         strategy_model = await async_session.scalar(select(StrategyModel))
@@ -448,11 +455,12 @@ async def test_trading_nfo_options_opposite_direction_for_short_strategy(
 async def test_trading_nfo_futures_first_ever_trade(
     action, test_async_client, test_async_redis_client
 ):
-    await create_pre_db_data(
+    await create_close_trades(
         users=1,
         strategies=1,
         strategy_position=PositionEnum.LONG,
         instrument_type=InstrumentTypeEnum.FUTIDX,
+        test_async_redis_client=test_async_redis_client,
     )
 
     async with Database() as async_session:

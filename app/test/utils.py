@@ -1,10 +1,15 @@
 from datetime import timedelta
 
+import httpx
+from cron.update_daily_profit import get_holidays_list
+from cron.update_daily_profit import get_last_working_date
+
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_alice_blue
 from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_alice_blue
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum
+from app.test.factory.daily_profit import DailyProfitFactory
 from app.test.factory.strategy import StrategyFactory
 from app.test.factory.take_away_profit import TakeAwayProfitFactory
 from app.test.factory.trade import CompletedTradeFactory
@@ -83,15 +88,15 @@ async def create_open_trades(
                 )
 
 
-async def create_pre_db_data(
+async def create_close_trades(
     users=1,
     strategies=1,
     trades=0,
-    take_away_profit=False,
-    daily_profit=0,
+    daily_profit=True,
     strategy_position=PositionEnum.LONG,
     instrument_type=InstrumentTypeEnum.OPTIDX,
     action=SignalTypeEnum.BUY,
+    test_async_redis_client=None,
 ):
     expiry_date = None
     for _ in range(users):
@@ -126,10 +131,9 @@ async def create_pre_db_data(
                 total_profit += trade.profit
                 total_future_profit += trade.future_profit
 
-            if take_away_profit:
-                await TakeAwayProfitFactory(
-                    strategy=strategy,
-                    total_trades=trades,
-                    profit=total_profit,
-                    future_profit=total_future_profit,
+            if daily_profit:
+                holidays_list = await get_holidays_list(
+                    test_async_redis_client, "FO", httpx.AsyncClient()
                 )
+                last_working_date = get_last_working_date(holidays_list)
+                await DailyProfitFactory(strategy=strategy, date=last_working_date)

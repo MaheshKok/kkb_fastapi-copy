@@ -17,8 +17,10 @@ class DailyProfitFactory(AsyncSQLAlchemyFactory):
         sqlalchemy_session = async_session
 
     id = factory.LazyFunction(uuid.uuid4)
-    profit = 12000.0
-    future_profit = 36000.0
-    date = factory.LazyFunction(datetime.utcnow() - timedelta(days=1))
+    todays_profit = 10000.0
+    total_profit = 12000.0
+    todays_future_profit = 10000.0
+    total_future_profit = 36000.0
+    date = factory.LazyFunction(lambda: datetime.utcnow() - timedelta(days=1))
 
     strategy = factory.SubFactory(StrategyFactory)

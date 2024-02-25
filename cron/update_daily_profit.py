@@ -101,8 +101,7 @@ def get_last_working_date(holidays_list_dt_obj):
     return wanted_day
 
 
-async def update_daily_profit():
-    config = get_config()
+async def update_daily_profit(config):
     Database.init(get_db_url(config))
 
     async_redis_client = await get_redis_client(config)
@@ -111,7 +110,7 @@ async def update_daily_profit():
 
     holidays_list = await get_holidays_list(async_redis_client, "FO", httpx.AsyncClient())
     async with Database() as async_session:
-        if todays_date.weekday() < 5 and todays_date not in holidays_list:
+        if todays_date.weekday() < 7 and todays_date not in holidays_list:
             # fetch live trades from db
             strategy_id_ongoing_profit_dict = {}
             fetch_live_trades_query = await async_session.execute(
@@ -243,7 +242,9 @@ async def update_daily_profit():
                     )
 
                     total_profit = round(
-                        strategy_id_funds_dict.get(strategy_id)["funds"] + todays_profit, 2
+                        strategy_id_funds_dict.get(strategy_id)["funds"]
+                        + ongoing_profit["profit"],
+                        2,
                     )
                     total_future_profit = round(
                         strategy_id_funds_dict.get(strategy_id)["future_funds"]
@@ -272,4 +273,5 @@ async def update_daily_profit():
 
 
 if __name__ == "__main__":
-    asyncio.run(update_daily_profit())
+    config = get_config()
+    asyncio.run(update_daily_profit(config))

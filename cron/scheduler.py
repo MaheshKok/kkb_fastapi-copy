@@ -10,6 +10,7 @@ from cron.update_daily_profit import update_daily_profit
 from cron.update_fno_expiry import sync_expiry_dates_from_alice_blue_to_redis
 from cron.update_session_token import cron_update_session_token
 
+from app.core.config import get_config
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import PositionEnum
 
@@ -120,7 +121,8 @@ async def task_update_till_yesterdays_profits():
         if app == "flaskstockpi":
             tasks.append(get_api(f"{base_urls[app]}/update_till_yesterdays_profits"))
         elif app == "kokobrothers-be":
-            await update_daily_profit()
+            config = get_config()
+            await update_daily_profit(config)
     # wait for all tasks to complete
     await asyncio.gather(*tasks)
 

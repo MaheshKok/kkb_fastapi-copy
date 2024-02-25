@@ -42,6 +42,14 @@ def get_db_url(config: Config) -> URL:
 
 def get_redis_client(config: Config) -> aioredis.StrictRedis:
     # Note: we dont need to use create_pool explicitly as celery does it for us
+    if config.data["ENVIRONMENT"] == "test":
+        return aioredis.Redis(
+            host=config.data[TRADES_AND_OPTION_CHAIN_REDIS]["host"],
+            port=config.data[TRADES_AND_OPTION_CHAIN_REDIS]["port"],
+            password=config.data[TRADES_AND_OPTION_CHAIN_REDIS]["password"],
+            encoding="utf-8",
+            decode_responses=True,
+        )
     return aioredis.StrictRedis.from_url(
         config.data[TRADES_AND_OPTION_CHAIN_REDIS]["url"], encoding="utf-8", decode_responses=True
     )
