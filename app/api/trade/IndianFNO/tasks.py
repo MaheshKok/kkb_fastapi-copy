@@ -31,6 +31,7 @@ from app.schemas.trade import ExitTradeSchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from app.utils.constants import FUT
+from app.utils.constants import STRATEGY
 from app.utils.constants import update_trade_columns
 from app.utils.option_chain import get_option_chain
 
@@ -277,11 +278,21 @@ async def close_trades_in_db_and_remove_from_redis(
         )
         await async_session.execute(stmt)
         await async_session.commit()
-
         logging.info(
             f"[ {crucial_details} ] - Total Trade : [ {total_redis_trades} ] closed successfully."
         )
+        logging.info(
+            f"[ {crucial_details} ] - Strategy updated funds: [ {updated_funds} ] and futures funds: [ {updated_futures_funds} ] in db successfully"
+        )
+        strategy_schema.funds = updated_funds
+        strategy_schema.future_funds = updated_futures_funds
         redis_strategy_key = redis_strategy_key_hash.split()[0]
+        await async_redis_client.hset(
+            redis_strategy_key, STRATEGY, StrategySchema.model_dump_json(strategy_schema)
+        )
+        logging.info(
+            f"[ {crucial_details} ] - Strategy updated funds: [ {updated_funds} ] and futures funds: [ {updated_futures_funds} ] in redis successfully"
+        )
         redis_strategy_hash = " ".join(redis_strategy_key_hash.split()[1:])
         result = await async_redis_client.hdel(redis_strategy_key, redis_strategy_hash)
         if result == 1:
