@@ -13,7 +13,6 @@ from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.test.factory.daily_profit import DailyProfitFactory
 from app.test.factory.strategy import StrategyFactory
-from app.test.factory.take_away_profit import TakeAwayProfitFactory
 from app.test.factory.trade import CompletedTradeFactory
 from app.test.factory.trade import LiveTradeFactory
 from app.test.factory.user import UserFactory
@@ -107,15 +106,6 @@ async def create_open_trades(
                         future_entry_price_received=future_entry_price_received,
                         action=action,
                     )
-
-            if take_away_profit:
-                # Just assume there were trades in db which are closed and their profit was taken away
-                await TakeAwayProfitFactory(
-                    strategy=strategy,
-                    total_trades=trades,
-                    profit=50000.0,
-                    future_profit=75000.0,
-                )
 
 
 async def create_close_trades(

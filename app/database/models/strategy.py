@@ -50,6 +50,7 @@ class StrategyModel(Base):
     contracts = Column(Float, nullable=True)
     funds_usage_percent = Column(Float, nullable=False, default=1.0)
 
+    only_on_expiry = Column(Boolean, nullable=False, server_default="False")
     broker_id = Column(
         UUID(as_uuid=True), ForeignKey("broker.id", ondelete="CASCADE"), nullable=True, index=True
     )
@@ -60,8 +61,4 @@ class StrategyModel(Base):
     daily_profit_models = relationship(
         "DailyProfitModel", backref="strategy", cascade="all, delete"
     )
-    take_away_profit_models = relationship(
-        "TakeAwayProfitModel", backref="strategy", cascade="all, delete"
-    )
-
     trades = relationship("TradeModel", back_populates="strategy", cascade="all, delete")

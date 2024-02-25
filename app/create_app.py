@@ -8,7 +8,6 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.api.healthcheck import healthcheck_router
 from app.api.strategy import strategy_router
-from app.api.takeaway_profit import takeaway_profit
 from app.api.trade import trading_router
 from app.api.trade.Binance.crypto import binance_router
 from app.api.trade.Capital.Capital import forex_router
@@ -33,7 +32,6 @@ def register_routers(app: FastAPI):
     app.include_router(trading_router)
     app.include_router(fno_router)
     app.include_router(strategy_router)
-    app.include_router(takeaway_profit)
     app.include_router(forex_router)
     app.include_router(binance_router)
     app.include_router(oanda_forex_router)
