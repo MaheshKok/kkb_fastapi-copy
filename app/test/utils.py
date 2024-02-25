@@ -5,6 +5,7 @@ from cron.update_daily_profit import get_holidays_list
 from cron.update_daily_profit import get_last_working_date
 
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_alice_blue
+from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_alice_blue
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import PositionEnum
@@ -50,12 +51,16 @@ async def create_open_trades(
 
             if not expiry_date:
                 if instrument_type == InstrumentTypeEnum.OPTIDX:
-                    current_expiry, _, _ = await get_current_and_next_expiry_from_alice_blue(
-                        symbol=strategy.symbol
+                    current_expiry, _, _ = await get_current_and_next_expiry_from_redis(
+                        async_redis_client=test_async_redis_client,
+                        instrument_type=strategy.instrument_type,
+                        symbol=strategy.symbol,
                     )
                 else:
-                    current_expiry, _, _ = await get_monthly_expiry_date_from_alice_blue(
-                        instrument_type=strategy.instrument_type, symbol=strategy.symbol
+                    current_expiry, _, _ = await get_current_and_next_expiry_from_redis(
+                        async_redis_client=test_async_redis_client,
+                        instrument_type=InstrumentTypeEnum.FUTIDX,
+                        symbol=strategy.symbol,
                     )
 
                 expiry_date = current_expiry
@@ -74,7 +79,12 @@ async def create_open_trades(
                 option_type=OptionType.CE if ce_trade else OptionType.PE,
                 is_future=False,
             )
-            entry_price = float(option_chain.get(strike)) - 200
+            entry_price = float(option_chain.get(strike)) + (
+                -200 if position == PositionEnum.LONG else +200
+            )
+            future_entry_price_received = strike + (
+                -200 if position == PositionEnum.LONG else +200
+            )
             if instrument_type == InstrumentTypeEnum.OPTIDX:
                 for _ in range(trades):
                     await LiveTradeFactory(
@@ -83,7 +93,8 @@ async def create_open_trades(
                         expiry=expiry_date,
                         entry_price=entry_price,
                         action=action,
-                        future_entry_price_received=future_entry_price,
+                        # let's assume future_entry_price is the same as strike
+                        future_entry_price_received=future_entry_price_received,
                         strike=strike,
                     )
             else:
@@ -93,7 +104,7 @@ async def create_open_trades(
                         expiry=expiry_date,
                         strike=None,
                         option_type=None,
-                        future_entry_price_received=strike,
+                        future_entry_price_received=future_entry_price_received,
                         action=action,
                     )
 

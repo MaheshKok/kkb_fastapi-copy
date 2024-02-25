@@ -5,6 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.api.trade.IndianFNO.tasks import get_futures_profit
+from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
+from app.api.trade.IndianFNO.utils import get_future_price_from_redis
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
@@ -17,8 +19,8 @@ from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_close_trades
 from app.test.utils import create_open_trades
-from app.test.utils import future_entry_price
 from app.utils.constants import FUT
+from app.utils.constants import STRATEGY
 from app.utils.constants import update_trade_columns
 from app.utils.option_chain import get_option_chain
 
@@ -136,8 +138,22 @@ async def test_trading_nfo_futures_opposite_direction(
         strategy_model = await async_session.scalar(
             select(StrategyModel).options(selectinload(StrategyModel.trades))
         )
+        current_monthly_expiry, _, _ = await get_current_and_next_expiry_from_redis(
+            async_redis_client=test_async_redis_client,
+            instrument_type=InstrumentTypeEnum.FUTIDX,
+            symbol=strategy_model.symbol,
+        )
+        future_exit_price = await get_future_price_from_redis(
+            async_redis_client=test_async_redis_client,
+            strategy_schema=StrategySchema.model_validate(strategy_model),
+            expiry_date=current_monthly_expiry,
+        )
         payload = get_test_post_trade_payload(action.value)
+        payload["future_entry_price_received"] = str(future_exit_price)
         payload["strategy_id"] = str(strategy_model.id)
+
+        old_funds = strategy_model.funds
+        old_future_funds = strategy_model.future_funds
 
         # set strategy in redis
         await test_async_redis_client.hset(
@@ -203,23 +219,51 @@ async def test_trading_nfo_futures_opposite_direction(
             f"{exited_trade_models[0].expiry} {PositionEnum.LONG if action==SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}",
         )
         assert len(json.loads(redis_trade_list_json)) == 1
-        # calculate profits
+
+        # assert strategy funds are updated
+        strategy_query = await async_session.execute(
+            select(StrategyModel).filter_by(id=strategy_model.id)
+        )
+        strategy_model = strategy_query.scalars().one_or_none()
+        strategy_json = await test_async_redis_client.hget(str(strategy_model.id), STRATEGY)
+        redis_strategy_schema = StrategySchema.model_validate_json(strategy_json)
+
+        actual_total_profit = sum(trade_model.profit for trade_model in exited_trade_models)
+        actual_future_profit = sum(
+            trade_model.future_profit for trade_model in exited_trade_models
+        )
+        trade_model = exited_trade_models[0]
         option_chain = await get_option_chain(
             async_redis_client=test_async_redis_client,
-            expiry=exited_trade_models[0].expiry,
-            option_type=exited_trade_models[0].option_type,
-            strategy_schema=StrategySchema.model_validate(strategy_model),
+            expiry=trade_model.expiry,
+            strategy_schema=redis_strategy_schema,
             is_future=True,
         )
-        future_exit_price = float(option_chain.get(FUT))
-        # entry price is fixed : 44315
-        futures_profit = get_futures_profit(
-            entry_price=future_entry_price,
-            exit_price=future_exit_price,
-            quantity=trade_model.quantity,
-            signal=trade_model.action,
-        )
+        exit_price = float(option_chain.get("FUT"))
+        expected_total_profit = 0
+        expected_future_profit = 0
+        for trade_model in exited_trade_models:
+            expected_total_profit += get_futures_profit(
+                entry_price=trade_model.entry_price,
+                exit_price=exit_price,
+                quantity=trade_model.quantity,
+                signal=(
+                    SignalTypeEnum.SELL if action == SignalTypeEnum.BUY else SignalTypeEnum.BUY
+                ),
+            )
+            expected_future_profit += get_futures_profit(
+                entry_price=trade_model.future_entry_price_received,
+                exit_price=future_exit_price,
+                quantity=trade_model.quantity,
+                # reason being existing trade has the action opposite to the current signal
+                signal=(
+                    SignalTypeEnum.SELL if action == SignalTypeEnum.BUY else SignalTypeEnum.BUY
+                ),
+            )
 
-        # when we short a trade then we make profit when exit price is lesser than 44315.0
-        if future_exit_price < future_entry_price:
-            assert futures_profit > 0
+        assert expected_total_profit == actual_total_profit
+        assert expected_future_profit == actual_future_profit
+        assert redis_strategy_schema.funds == old_funds + actual_total_profit
+        assert redis_strategy_schema.future_funds == old_future_funds + actual_future_profit
+        assert strategy_model.funds == old_funds + actual_total_profit
+        assert strategy_model.future_funds == old_future_funds + actual_future_profit

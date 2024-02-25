@@ -146,11 +146,10 @@ async def calculate_profits(
     total_future_profit = 0
     exit_at = datetime.utcnow()
     exit_received_at = signal_payload_schema.received_at
-
+    position = strategy_schema.position
     for redis_trade_schema in redis_trade_schema_list:
         entry_price = redis_trade_schema.entry_price
         quantity = redis_trade_schema.quantity
-        position = strategy_schema.position
         exit_price = strike_exit_price_dict.get(redis_trade_schema.strike) or 0.0
         if not exit_price:
             # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker
@@ -164,6 +163,7 @@ async def calculate_profits(
             entry_price=future_entry_price_received,
             exit_price=future_exit_price,
             quantity=quantity,
+            # existing signal when trade was entered into db is captured in action attribute
             signal=redis_trade_schema.action,
         )
 
