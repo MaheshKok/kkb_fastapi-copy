@@ -269,10 +269,11 @@ async def close_trades_in_db_and_remove_from_redis(
 
         # rather update strategy_schema funds in redis
         updated_funds = strategy_schema.funds + total_profit
+        updated_futures_funds = strategy_schema.future_funds + total_future_profit
         stmt = (
             update(StrategyModel)
             .where(StrategyModel.id == strategy_schema.id)
-            .values(funds=updated_funds, future_funds=total_future_profit)
+            .values(funds=updated_funds, future_funds=updated_futures_funds)
         )
         await async_session.execute(stmt)
         await async_session.commit()
