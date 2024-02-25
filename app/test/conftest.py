@@ -377,7 +377,7 @@ async def buy_task_payload_dict(test_async_redis_client: aioredis.Redis):
 #
 # @pytest_asyncio.fixture(scope="function")
 # async def patch_redis_add_trade_to_ongoing_trades(test_async_session, monkeypatch):
-#     await create_open_trades(async_session=test_async_session, trades=10, ce_trade=True)
+#     await create_open_trades(test_async_redis_client=test_async_redis_client,async_session=test_async_session, trades=10, ce_trade=True)
 #     fetch_trades_query_ = await test_async_session.execute(select(TradeModel))
 #     trade_models = fetch_trades_query_.scalars().all()
 #     mock_redis = MagicMock()

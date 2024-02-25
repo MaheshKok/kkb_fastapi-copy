@@ -12,8 +12,10 @@ from app.test.utils import create_open_trades
 
 
 @pytest.mark.asyncio
-async def test_upate_daily_profit_or_loss_in_db_for_first_time(test_config):
-    await create_open_trades(trades=1)
+async def test_upate_daily_profit_or_loss_in_db_for_first_time(
+    test_config, test_async_redis_client
+):
+    await create_open_trades(test_async_redis_client=test_async_redis_client, trades=1)
     await update_daily_profit(test_config)
     async with Database() as async_session:
         daily_profit_query = await async_session.execute(select(DailyProfitModel))

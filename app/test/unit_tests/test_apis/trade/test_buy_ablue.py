@@ -38,7 +38,12 @@ from app.utils.constants import Status
 async def test_buy_alice_blue_trade(
     instrument_type, action, test_async_client, test_async_redis_client, monkeypatch
 ):
-    await create_open_trades(users=1, strategies=1, instrument_type=instrument_type)
+    await create_open_trades(
+        test_async_redis_client=test_async_redis_client,
+        users=1,
+        strategies=1,
+        instrument_type=instrument_type,
+    )
 
     async with Database() as async_session:
         user_model = await async_session.scalar(select(User))
@@ -124,7 +129,9 @@ async def test_buy_alice_blue_trade(
 async def test_buy_alice_blue_trade_raise_401(
     option_type, test_async_client, test_async_redis_client, monkeypatch
 ):
-    await create_open_trades(users=1, strategies=1)
+    await create_open_trades(
+        test_async_redis_client=test_async_redis_client, users=1, strategies=1
+    )
 
     async with Database() as async_session:
         user_model = await async_session.scalar(select(User))

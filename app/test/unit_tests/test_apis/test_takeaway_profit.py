@@ -16,9 +16,16 @@ async def test_get_empty_takeaway_profit(test_async_client):
 
 
 @pytest.mark.asyncio
-async def test_get_takeaway_profits(test_async_client):
+async def test_get_takeaway_profits(test_async_client, test_async_redis_client):
     # create takeaway_profit for every strategy
-    await create_open_trades(users=1, strategies=10, trades=10, take_away_profit=True)
+    await create_open_trades(
+        test_async_redis_client=test_async_redis_client,
+        users=1,
+        strategies=10,
+        trades=10,
+        take_away_profit=True,
+        test_async_redis_client=test_async_redis_client,
+    )
 
     async with Database() as async_session:
         takeaway_profit_query = await async_session.scalars(

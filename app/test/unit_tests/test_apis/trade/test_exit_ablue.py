@@ -46,6 +46,7 @@ async def test_exit_alice_blue_trade_for_long_strategy(
     # if signal is buy then we must have sell trades in db
     # strategy is long i,e for buy signal trades in db should be of PE as we are closing them
     await create_open_trades(
+        test_async_redis_client=test_async_redis_client,
         users=1,
         strategies=1,
         trades=10,
@@ -184,6 +185,7 @@ async def test_exit_alice_blue_trade_for_short_strategy(
 ):
     # If Buy Signal is generated and the unit test is exit then existing trade should be PE option and vice-versa.
     await create_open_trades(
+        test_async_redis_client=test_async_redis_client,
         users=1,
         strategies=1,
         trades=10,
@@ -309,7 +311,7 @@ async def test_exit_alice_blue_trade_for_short_strategy(
 # async def test_exit_alice_blue_trade_raise_401(
 #     option_type, test_async_client, test_async_redis_client, monkeypatch
 # ):
-#     await create_open_trades(
+#     await create_open_trades(test_async_redis_client=test_async_redis_client,
 #         users=1, strategies=1, trades=10, ce_trade=option_type != OptionType.CE
 #     )
 #
