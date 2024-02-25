@@ -3,9 +3,11 @@ import logging
 
 from sqlalchemy import select
 
+from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import PositionEnum
+from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.utils.constants import FUT
 
@@ -34,6 +36,18 @@ async def cache_ongoing_trades(async_redis_client):
         # key should be combination of three columns strategy_id, expiry and option_type
         # then we can avoid the for loop and the redis_key_trade_models_dict
 
+        strategy_query = await async_session.execute(select(StrategyModel))
+        strategy_models = strategy_query.scalars().all()
+        async with async_redis_client.pipeline() as pipe:
+            for strategy_model in strategy_models:
+                pipe.hset(
+                    str(strategy_model.id),
+                    "strategy",
+                    StrategySchema.model_validate(strategy_model).model_dump_json(),
+                )
+            await pipe.execute()
+
+        logging.info(f"Cached strategy: {len(strategy_models)}")
         live_trades_query = await async_session.execute(
             select(TradeModel).filter_by(exit_at=None)
         )
@@ -106,5 +120,5 @@ async def cache_ongoing_trades(async_redis_client):
                                 f"Ongoing trades not cached in redis for strategy: [ {strategy_id} ], hash: [ {redis_strategy_hash} ]"
                             )
 
-        await pipe.execute()
+            await pipe.execute()
         logging.info("Ongoing trades cached in redis")
