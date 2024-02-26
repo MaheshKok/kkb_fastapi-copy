@@ -284,15 +284,19 @@ async def get_lots_to_open(
     else:
         logging.info(f"[ {crucial_details} ] - Compounding is disabled")
         fixed_lots_to_trade = strategy_schema.contracts
-        funds_required_to_trade = current_instrument_price / margin_required * fixed_lots_to_trade
+        actual_funds_required_to_trade = round(current_instrument_price * fixed_lots_to_trade, 2)
+        funds_required_to_trade = round(actual_funds_required_to_trade * margin_required, 2)
 
         if available_funds > funds_required_to_trade:
             logging.info(
-                f"[ {crucial_details} ] - available funds : [ {available_funds} ] are greater than funds_required_to_trade : [ {funds_required_to_trade}], contracts : [ {fixed_lots_to_trade} ]"
+                f"[ {crucial_details} ] - available funds : [ {available_funds} $] are greater than funds_required_to_trade : [ {funds_required_to_trade} $], contracts : [ {fixed_lots_to_trade} ]"
             )
             lots_to_trade = round(fixed_lots_to_trade, tradeUnitsPrecision)
             logging.info(f"[ {crucial_details} ] - Hence we can trade Lots : [ {lots_to_trade} ]")
         else:
+            logging.info(
+                f"[ {crucial_details} ] - insufficient available funds : [ {available_funds} $] than funds_required_to_trade : [ {funds_required_to_trade} $], contracts : [ {fixed_lots_to_trade} ]"
+            )
             # contracts worth that can be traded
             total_worth_of_contracts_to_trade = available_funds / margin_required
             lots_to_trade = round(
