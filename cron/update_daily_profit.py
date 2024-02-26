@@ -200,10 +200,10 @@ async def get_updated_values_for_only_expiry_strategy(
         )
     )
     todays_trade_models = todays_trade_query.scalars().all()
-    todays_profit = sum(trade.profit for trade in todays_trade_models)
-    todays_future_profit = sum(trade.future_profit for trade in todays_trade_models)
-    total_profit = strategy_model.funds
-    total_future_profit = strategy_model.future_funds
+    todays_profit = round(sum(trade.profit for trade in todays_trade_models), 2)
+    todays_future_profit = round(sum(trade.future_profit for trade in todays_trade_models), 2)
+    total_profit = round(strategy_model.funds, 2)
+    total_future_profit = round(strategy_model.future_funds, 2)
     return todays_profit, total_profit, todays_future_profit, total_future_profit
 
 
