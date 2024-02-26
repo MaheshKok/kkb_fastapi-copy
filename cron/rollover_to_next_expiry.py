@@ -111,10 +111,21 @@ async def rollover_to_next_expiry(
 
             # fetch redis trades
             redis_strategy_data = await async_redis_client.hgetall(str(strategy_schema.id))
-            redis_trades_hash_list = [
-                key for key in redis_strategy_data.keys() if "strategy" not in key
-            ]
+            if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
+                redis_trades_hash_list = [
+                    key
+                    for key in redis_strategy_data.keys()
+                    if str(options_current_expiry) in key
+                ]
+            else:
+                redis_trades_hash_list = [
+                    key
+                    for key in redis_strategy_data.keys()
+                    if str(futures_current_expiry) in key
+                ]
+
             if redis_trades_hash_list:
+                # lets hope at any point of time we dont have both CE and PE open
                 redis_hash = redis_trades_hash_list[0]
             else:
                 logging.warning(
@@ -203,4 +214,4 @@ async def rollover_to_next_expiry(
 
 
 if __name__ == "__main__":
-    asyncio.run(rollover_to_next_expiry(InstrumentTypeEnum.FUTIDX))
+    asyncio.run(rollover_to_next_expiry(InstrumentTypeEnum.OPTIDX))

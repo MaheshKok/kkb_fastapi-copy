@@ -24,7 +24,6 @@ from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
 from app.utils.constants import REDIS_DATE_FORMAT
-from app.utils.constants import OptionType
 from app.utils.option_chain import get_option_chain
 
 
@@ -37,9 +36,9 @@ async def get_exit_price_from_option_chain(
     async_redis_client,
     redis_trade_schema_list,
     expiry_date,
-    option_type,
     strategy_schema: StrategySchema,
 ):
+    option_type = redis_trade_schema_list[0].option_type
     # reason for using set comprehension, we want the exit_price for all distinct strikes
     strikes = {trade.strike for trade in redis_trade_schema_list}
     option_chain = await get_option_chain(
@@ -185,17 +184,11 @@ async def get_future_price(
 async def get_strike_and_exit_price_dict(
     *,
     async_redis_client: Redis,
-    signal_payload_schema: SignalPayloadSchema,
     redis_trade_schema_list: list[RedisTradeSchema],
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
     expiry_date: date,
 ) -> dict:
-    # Reason being trade_payload is an entry trade and we want to close all ongoing trades of opposite option_type
-    ongoing_trades_option_type = (
-        OptionType.PE if signal_payload_schema.option_type == OptionType.CE else OptionType.CE
-    )
-
     if strategy_schema.broker_id:
         strike_exit_price_dict = await close_alice_blue_trades(
             redis_trade_schema_list, strategy_schema, async_redis_client, async_httpx_client
@@ -206,7 +199,6 @@ async def get_strike_and_exit_price_dict(
             async_redis_client=async_redis_client,
             redis_trade_schema_list=redis_trade_schema_list,
             expiry_date=expiry_date,
-            option_type=ongoing_trades_option_type,
             strategy_schema=strategy_schema,
         )
 

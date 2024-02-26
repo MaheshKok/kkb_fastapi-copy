@@ -452,7 +452,6 @@ async def compute_trade_data_needed_for_closing_trade(
         strike_exit_price_dict, future_exit_price = await asyncio.gather(
             get_strike_and_exit_price_dict(
                 async_redis_client=async_redis_client,
-                signal_payload_schema=signal_payload_schema,
                 redis_trade_schema_list=redis_trade_schema_list,
                 strategy_schema=strategy_schema,
                 async_httpx_client=async_httpx_client,
