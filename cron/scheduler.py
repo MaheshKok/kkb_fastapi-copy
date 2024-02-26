@@ -11,11 +11,15 @@ from cron.update_fno_expiry import sync_expiry_dates_from_alice_blue_to_redis
 from cron.update_session_token import cron_update_session_token
 
 from app.core.config import get_config
+from app.create_app import register_sentry
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import PositionEnum
 
 
 logging.basicConfig(level=logging.INFO)
+
+# this is to capture exceptions raised during cron jobs
+register_sentry()
 
 base_urls = {
     # "flaskstockpi": "https://flaskstockapi.herokuapp.com/api",
@@ -114,17 +118,10 @@ async def task_scale_down_dynos():
     await asyncio.gather(*tasks)
 
 
-async def task_update_till_yesterdays_profits():
+async def task_update_daily_profit():
+    config = get_config()
+    await update_daily_profit(config)
     logging.info(f"Job update_till_yesterdays_profits executed at: {datetime.now()}")
-    tasks = []
-    for app in base_urls:
-        if app == "flaskstockpi":
-            tasks.append(get_api(f"{base_urls[app]}/update_till_yesterdays_profits"))
-        elif app == "kokobrothers-be":
-            config = get_config()
-            await update_daily_profit(config)
-    # wait for all tasks to complete
-    await asyncio.gather(*tasks)
 
 
 async def task_rollover_long_options_to_next_expiry():
@@ -177,7 +174,7 @@ aiocron.crontab(
     "45 9 * * *", func=task_rollover_short_options_and_futures_to_next_expiry
 )  # Every day at 9:45
 # aiocron.crontab("0 10 * * *", func=task_scale_down_dynos)  # Every day at 10:00
-aiocron.crontab("5 10 * * *", func=task_update_till_yesterdays_profits)  # Every day at 10:05
+aiocron.crontab("5 10 * * *", func=task_update_daily_profit)  # Every day at 10:05
 
 # Run the main loop
 loop = asyncio.get_event_loop()

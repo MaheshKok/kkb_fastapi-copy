@@ -357,6 +357,10 @@ async def get_current_and_next_expiry_from_alice_blue(symbol: str):
 
 
 def set_option_type(strategy_schema: StrategySchema, payload: SignalPayloadSchema) -> None:
+    # this is to prevent setting option type on future strategy, it acts as double protection
+    if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
+        return
+
     # set OptionTypeEnum base strategy's position column and signal's action.
     strategy_position_trade = {
         PositionEnum.LONG: {

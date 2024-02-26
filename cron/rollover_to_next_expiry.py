@@ -178,8 +178,9 @@ async def rollover_to_next_expiry(
                 # do not carry forward if only on expiry
                 continue
 
-            # set option_type
-            set_option_type(strategy_schema, signal_payload_schema)
+            if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
+                # set option_type
+                set_option_type(strategy_schema, signal_payload_schema)
 
             if not strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
                 kwargs["options_expiry_date"] = options_next_expiry
@@ -202,4 +203,4 @@ async def rollover_to_next_expiry(
 
 
 if __name__ == "__main__":
-    asyncio.run(rollover_to_next_expiry())
+    asyncio.run(rollover_to_next_expiry(InstrumentTypeEnum.FUTIDX))
