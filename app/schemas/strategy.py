@@ -20,7 +20,7 @@ class StrategyCreateSchema(BaseModel):
     )
     symbol: str = Field(description="Symbol", example="BANKNIFTY")
     name: str = Field(description="Name", example="BANKNIFTY1! TF:2 Brick_Size:35 Pyramiding:100")
-    position: PositionEnum = Field(description="Position", example="LONG")
+    position: Optional[PositionEnum] = Field(description="Position", example="LONG", default=None)
 
     premium: Optional[float] = Field(description="Premium", example=350.0, default=None)
 
@@ -30,7 +30,7 @@ class StrategyCreateSchema(BaseModel):
     margin_for_min_quantity: float = Field(description="Margin for Min Quantity", example=2.65)
     incremental_step_size: float = Field(description="Incremental Step Size", example=0.1)
     compounding: bool = Field(description="Compounding")
-    contracts: float = Field(description="Contracts", example=15)
+    contracts: Optional[float] = Field(description="Contracts", example=15, default=None)
     funds_usage_percent: float = Field(description="Funds Usage Percent", example=0.25)
 
     only_on_expiry: bool = Field(description="Only on Expiry", example=False)
