@@ -154,6 +154,13 @@ async def post_nfo_indian_options(
         ):
             return {"message": "Only on expiry"}
 
+        if (
+            strategy_schema.only_on_expiry
+            and strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX
+            and datetime.datetime.utcnow().time() >= datetime.time(hour=9, minute=45)
+        ):
+            return {"message": "Cannot Trade after 9:45AM GMT+5:30 on Expiry"}
+
         options_expiry_date = get_expiry_date_to_trade(
             current_expiry_date=current_options_expiry_date,
             next_expiry_date=next_options_expiry_date,
