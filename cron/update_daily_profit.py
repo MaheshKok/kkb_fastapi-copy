@@ -86,18 +86,12 @@ def get_last_working_date(holidays_list_dt_obj):
 
     if current_day_of_week == 0:  # Monday
         wanted_day = current_day - datetime.timedelta(days=3)
-    elif current_day_of_week == 1:  # Tuesday
+    elif current_day_of_week in [1, 2, 3, 4, 5]:  # Tuesday, Wednesday, Thursday, Friday, Saturday
         wanted_day = current_day - datetime.timedelta(days=1)
-    elif current_day_of_week == 2:  # Wednesday
+    elif current_day_of_week == 6:  # Sunday
         wanted_day = current_day - datetime.timedelta(days=2)
-    elif current_day_of_week == 3:  # Thursday
-        wanted_day = current_day - datetime.timedelta(days=3)
-    elif current_day_of_week == 4:  # Friday
-        wanted_day = current_day - datetime.timedelta(days=4)
-    elif current_day_of_week in [5, 6]:  # Saturday & Sunday
-        wanted_day = current_day - datetime.timedelta(days=(current_day_of_week - 4))
 
-    # Keep checking previous day until it's not a weekend or a holiday
+    # Keep checking the previous day until it's not a weekend or a holiday
     while wanted_day.weekday() >= 5 or wanted_day in holidays_list_dt_obj:
         wanted_day = wanted_day - datetime.timedelta(days=1)
 
