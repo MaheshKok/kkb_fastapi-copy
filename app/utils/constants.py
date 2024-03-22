@@ -38,7 +38,7 @@ TRADES_AND_OPTION_CHAIN_REDIS = "trades_and_option_chain_redis"
 AB_NFO_CONTRACTS_URL = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
 # Choose the column to be used as the key
 INSTRUMENT_COLUMN = "Trading Symbol"
-
+ANGELONE_BROKER_ID = "angelone_broker_id"
 update_trade_columns = {
     "exit_price",
     "profit",

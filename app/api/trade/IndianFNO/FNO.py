@@ -10,10 +10,12 @@ from fastapi import APIRouter
 from fastapi import Depends
 from httpx import AsyncClient
 from pydantic import TypeAdapter
+from SmartApi import SmartConnect
 from sqlalchemy import select
 
 from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
+from app.api.dependency import get_smart_connect_client
 from app.api.dependency import get_strategy_schema
 from app.api.trade import trading_router
 from app.api.trade.Capital.utils import get_lots_to_trade_and_profit_or_loss
@@ -87,6 +89,7 @@ async def post_nfo_indian_options(
     strategy_schema: StrategySchema = Depends(get_strategy_schema),
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
+    smart_connect_client: SmartConnect = Depends(get_smart_connect_client),
 ):
     crucial_details = f"{ strategy_schema.symbol} {strategy_schema.id} {strategy_schema.instrument_type} {signal_payload_schema.action}"
     todays_date = datetime.datetime.utcnow().date()
@@ -125,7 +128,7 @@ async def post_nfo_indian_options(
         is_today_expiry=is_today_futures_expiry,
     )
 
-    # fetch opposite position based trades
+    # fetch opposite position-based trades
     redis_hash = f"{futures_expiry_date} {PositionEnum.SHORT if signal_payload_schema.action == SignalTypeEnum.BUY else PositionEnum.LONG} {FUT}"
     signal_payload_schema.expiry = futures_expiry_date
     kwargs.update(
@@ -167,7 +170,7 @@ async def post_nfo_indian_options(
             strategy_schema=strategy_schema,
             is_today_expiry=is_today_options_expiry,
         )
-        # fetch opposite position based trades
+        # fetch opposite position-based trades
         opposite_trade_option_type = get_opposite_trade_option_type(
             strategy_schema.position, signal_payload_schema.action
         )
