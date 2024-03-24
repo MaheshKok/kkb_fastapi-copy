@@ -36,8 +36,12 @@ ALICE_BLUE_DATE_FORMAT = "%d%b%y"
 FUT = "FUT"
 TRADES_AND_OPTION_CHAIN_REDIS = "trades_and_option_chain_redis"
 AB_NFO_CONTRACTS_URL = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
+ANGELONE_ONE_CONTRACTS_URL = (
+    "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json"
+)
 # Choose the column to be used as the key
 INSTRUMENT_COLUMN = "Trading Symbol"
+SYMBOL_STR = "symbol"
 ANGELONE_BROKER_ID = "angelone_broker_id"
 update_trade_columns = {
     "exit_price",
