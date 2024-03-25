@@ -1,5 +1,13 @@
 ENVIRONMENT = "production"
 
+[angelone_broker]
+id = "a02d2158-cf03-4527-b8a4-d4f4dee66e6d"
+username = "M57484244"
+password = "4286"
+api_key = "rUhNkLeD"
+totp = "KOZTYAU6NMG7RMZAEZOYIPYJZE"
+
+
 [db]
 host = "l8yc5u.stackhero-network.com"
 port = "5432"

@@ -2,6 +2,7 @@ import asyncio
 import io
 import json
 from datetime import datetime
+from itertools import islice
 
 import httpx
 import pandas as pd
@@ -9,20 +10,20 @@ import pandas as pd
 from app.core.config import get_config
 from app.database.base import get_redis_client
 from app.utils.constants import AB_NFO_CONTRACTS_URL
+from app.utils.constants import ANGELONE_ONE_CONTRACTS_URL
 from app.utils.constants import INSTRUMENT_COLUMN
+from app.utils.constants import NAME_STR
+from app.utils.constants import SYMBOL_STR
 
 
-async def download_master_contract():
-    config = get_config()
-    redis_client = get_redis_client(config)
-
+async def push_alice_blue_instruments(redis_client):
     response = await httpx.AsyncClient().get(AB_NFO_CONTRACTS_URL)
     # Read the CSV file
     data_stream = io.StringIO(response.text)
     df = pd.read_csv(data_stream)
 
     # Construct the dictionary
-    # Note: there are many duplicate keys in the CSV file and they are exact duplicates so dont worry about it
+    # Note: there are many duplicate keys in the CSV file and they are exact duplicates so don't worry about it
     full_name_row_dict = {}
     for _, row in df.iterrows():
         row_dict = row.to_dict()
@@ -43,12 +44,63 @@ async def download_master_contract():
     # Use a pipeline to set each chunk of key-value pairs in Redis
     async with redis_client.pipeline() as pipe:
         for chunk in dict_chunks:
-            for key, value in chunk.items():
-                pipe.set(key, value)
-
+            pipe.mset(chunk)
             await pipe.execute()
 
-    print(f"Time taken to set {len(full_name_row_dict)} keys: {datetime.now() - start_time}")
+    print(
+        f"Time taken to set Alice Blue {len(full_name_row_dict)} keys: {datetime.now() - start_time}"
+    )
+
+
+async def push_angel_one_instruments(redis_client, symbols=None):
+    response = await httpx.AsyncClient().get(ANGELONE_ONE_CONTRACTS_URL)
+    data_stream = json.loads(response.text)
+    df = pd.DataFrame(data_stream)
+
+    # Construct the dictionary
+    full_name_row_dict = {}
+    if not symbols:
+        for _, row in df.iterrows():
+            row_dict = row.to_dict()
+            trading_symbol = row_dict[SYMBOL_STR]
+            value = json.dumps(row_dict)
+            full_name_row_dict[trading_symbol] = value
+    else:
+        for _, row in df.iterrows():
+            row_dict = row.to_dict()
+            symbol = row_dict[NAME_STR]
+            trading_symbol = row_dict[SYMBOL_STR]
+            if symbol in symbols:
+                value = json.dumps(row_dict)
+                full_name_row_dict[trading_symbol] = value
+
+    print("Setting keys in Redis")
+    start_time = datetime.now()
+
+    # # Split the dictionary into smaller chunks
+    def chunked_dict(d, chunk_size):
+        it = iter(d)
+        for _ in range(0, len(d), chunk_size):
+            yield {k: d[k] for k in islice(it, chunk_size)}
+
+    # # Use a pipeline to set each chunk of key-value pairs in Redis
+    async with redis_client.pipeline() as pipe:
+        for chunk in chunked_dict(full_name_row_dict, chunk_size=1000):
+            pipe.mset(chunk)
+            # execute the pipeline after each chunk, otherwise it will throw broken pipe error due to large data
+            await pipe.execute()
+
+    print(
+        f"Time taken to set Angel One {len(full_name_row_dict)} keys: {datetime.now() - start_time}"
+    )
+
+
+async def download_master_contract():
+    config = get_config()
+    redis_client = get_redis_client(config)
+    await asyncio.gather(
+        push_angel_one_instruments(redis_client), push_alice_blue_instruments(redis_client)
+    )
 
 
 if __name__ == "__main__":

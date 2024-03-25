@@ -192,7 +192,7 @@ async def test_buy_alice_blue_trade_raise_401(
 
     # Use monkeypatch to patch the method
     monkeypatch.setattr(
-        "app.broker.utils.update_session_token",
+        "app.broker.utils.update_ablue_session_token",
         AsyncMock(side_effect=mock_update_session_token),
     )
 

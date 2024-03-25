@@ -10,6 +10,7 @@ from httpx import AsyncClient
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
+from app.api.dependency import get_smart_connect_client
 from app.api.trade.IndianFNO.tasks import task_entry_trade
 from app.api.trade.IndianFNO.tasks import task_exit_trade
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
@@ -58,10 +59,12 @@ async def rollover_to_next_expiry(
     # use different strategy to make it faster and efficient
     async_redis_client = get_redis_client(config)
     async_httpx_client = AsyncClient()
-
+    angel_one_client = await get_smart_connect_client(
+        config=config, async_redis_client=async_redis_client
+    )
     future_price_cache = {}
     async with Database() as async_session:
-        # get all strategy from database
+        # get all strategies from database
         if position:
             strategy_models_query = await async_session.execute(
                 select(StrategyModel).filter_by(
@@ -125,7 +128,7 @@ async def rollover_to_next_expiry(
                 ]
 
             if redis_trades_hash_list:
-                # lets hope at any point of time we dont have both CE and PE open
+                # lets hope at any point of time we don't have both CE and PE open
                 redis_hash = redis_trades_hash_list[0]
             else:
                 logging.warning(
@@ -176,14 +179,11 @@ async def rollover_to_next_expiry(
                     }
                 )
 
-            sell_task = asyncio.create_task(
-                task_exit_trade(
-                    **kwargs,
-                    redis_hash=redis_hash,
-                    redis_trade_schema_list=redis_trade_schema_list,
-                )
+            ongoing_profit = await task_exit_trade(
+                **kwargs,
+                redis_hash=redis_hash,
+                redis_trade_schema_list=redis_trade_schema_list,
             )
-            tasks.append(sell_task)
 
             if strategy_schema.only_on_expiry:
                 # do not carry forward if only on expiry
@@ -201,12 +201,11 @@ async def rollover_to_next_expiry(
                 kwargs["futures_expiry_date"] = futures_next_expiry
                 signal_payload_schema.expiry = futures_next_expiry
 
-            signal_payload_schema.quantity = int(
-                len(exiting_trades_json_list) * trade_schema.quantity
-            )
+            kwargs["ongoing_profit"] = ongoing_profit
             buy_task = asyncio.create_task(
                 task_entry_trade(
                     **kwargs,
+                    client=angel_one_client,
                 )
             )
             tasks.append(buy_task)

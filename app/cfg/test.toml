@@ -1,5 +1,13 @@
 ENVIRONMENT = "test"
 
+[angelone_broker]
+id = "a02d2158-cf03-4527-b8a4-d4f4dee66e6d"
+username = "M57484244"
+password = "4286"
+api_key = "rUhNkLeD"
+totp = "KOZTYAU6NMG7RMZAEZOYIPYJZE"
+
+
 [db]
 host = "localhost"
 port = "5432"
@@ -9,7 +17,7 @@ password = "postgres"
 
 
 [trades_and_option_chain_redis]
-host = "redis-17407.c226.eu-west-1-3.ec2.cloud.redislabs.com"
-port = "17407"
-password = "7zzFkCNokCTtsdexYrmQH8Zu167UiO7E"
-db = "test-redis"
+host = "redis-12100.c233.eu-west-1-1.ec2.cloud.redislabs.com"
+port = "12100"
+password = "UmzKGgUzZkE4NMqjuzisvSUXSrLxGI6K"
+db = "test"
