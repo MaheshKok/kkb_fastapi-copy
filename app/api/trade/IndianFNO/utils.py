@@ -518,6 +518,15 @@ async def get_margin_required(
     # exchange = NSE, BSE, NFO, CDS, MCX, NCDEX and BFO
     # product_type = CARRYFORWARD, INTRADAY, DELIVERY, MARGIN, BO, and CO.
     #  tradeType = BUY or SELL
+    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
+        trade_type = (
+            SignalTypeEnum.BUY
+            if strategy_schema.position == PositionEnum.LONG
+            else SignalTypeEnum.SELL
+        )
+    else:
+        trade_type = signal_type
+
     params = {
         "positions": [
             {
@@ -526,7 +535,7 @@ async def get_margin_required(
                 "price": price,
                 "productType": ProductTypeEnum.CARRYFORWARD,
                 "token": instrument_schema.token,
-                "tradeType": signal_type.upper(),
+                "tradeType": trade_type.upper(),
             }
         ]
     }
