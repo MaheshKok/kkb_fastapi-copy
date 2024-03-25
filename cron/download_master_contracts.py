@@ -12,6 +12,7 @@ from app.database.base import get_redis_client
 from app.utils.constants import AB_NFO_CONTRACTS_URL
 from app.utils.constants import ANGELONE_ONE_CONTRACTS_URL
 from app.utils.constants import INSTRUMENT_COLUMN
+from app.utils.constants import NAME_STR
 from app.utils.constants import SYMBOL_STR
 
 
@@ -51,19 +52,27 @@ async def push_alice_blue_instruments(redis_client):
     )
 
 
-async def push_angel_one_instruments(redis_client):
+async def push_angel_one_instruments(redis_client, symbols=None):
     response = await httpx.AsyncClient().get(ANGELONE_ONE_CONTRACTS_URL)
-    # Read the CSV file
     data_stream = json.loads(response.text)
     df = pd.DataFrame(data_stream)
 
     # Construct the dictionary
     full_name_row_dict = {}
-    for _, row in df.iterrows():
-        row_dict = row.to_dict()
-        key = row_dict[SYMBOL_STR]
-        value = json.dumps(row_dict)
-        full_name_row_dict[key] = value
+    if not symbols:
+        for _, row in df.iterrows():
+            row_dict = row.to_dict()
+            trading_symbol = row_dict[SYMBOL_STR]
+            value = json.dumps(row_dict)
+            full_name_row_dict[trading_symbol] = value
+    else:
+        for _, row in df.iterrows():
+            row_dict = row.to_dict()
+            symbol = row_dict[NAME_STR]
+            trading_symbol = row_dict[SYMBOL_STR]
+            if symbol in symbols:
+                value = json.dumps(row_dict)
+                full_name_row_dict[trading_symbol] = value
 
     print("Setting keys in Redis")
     start_time = datetime.now()

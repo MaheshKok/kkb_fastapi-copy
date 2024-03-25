@@ -90,8 +90,8 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
     else:
         async with Database() as async_session:
             # We have a cron that update session token every 1 hour,
-            # but frequency can be brought down to 1 day, but we dont know when it expires
-            # but due to some reason it doesnt work then get session token updated using get_alice_blue_obj
+            # but frequency can be brought down to 1 day, but we don't know when it expires
+            # but due to some reason it  doesn't work then get session token updated using get_alice_blue_obj
             # and then create pya3_obj again and we would need to do it in place_order
 
             # TODO: fetch it from redis
@@ -263,7 +263,7 @@ async def place_ablue_order(
         and "401 - Unauthorized" == place_order_response["emsg"]
     ):
         # update the session token and try again
-        session_id = await update_session_token(
+        session_id = await update_ablue_session_token(
             pya3_obj=pya3_obj, async_redis_client=async_redis_client
         )
         pya3_obj.session_id = session_id
@@ -279,12 +279,12 @@ async def place_ablue_order(
         if "NOrdNo" in place_order_response:
             return strike, place_order_response["NOrdNo"]
 
-    # TODO: i think below code is stale as i dont know which scenario below code handles,
-    # below code was developed when i assumed some scenario might occur which i dont remember now
-    # now i dont think below code is required, but still keeping it for now
+    # TODO: i think below code is stale as i don't know which scenario below code handles,
+    # below code was developed when i assumed some scenario might occur which i don't remember now
+    # now i don't think below code is required, but still keeping it for now
     logging.error(f"place_order_response: {place_order_response}")
 
-    # get order book and check if order is placed
+    # get an order book and check if order is placed
     orders = await pya3_obj.order_data()
     # filter orders by instrument token
     token_orders = [order for order in orders if order["token"] == str(instr_token)]
@@ -299,7 +299,7 @@ async def place_ablue_order(
             raise Exception(f"order not placed, place_order_response: {place_order_response}")
         else:
             # if sell order_id is not fetched, then assume it has been executed and
-            # try to fetch avg price from option chain which is done later in code
+            # try to fetch avg price from an option chain which is done later in code
             return strike, None
 
     # sort orders by orderentrytime, but first convert orderentrytime to datetime using parser
@@ -406,7 +406,7 @@ async def close_alice_blue_trades(
 
 
 # TODO: improve logging and delegate exception handling
-async def update_session_token(pya3_obj: AsyncPya3Aliceblue, async_redis_client: Redis):
+async def update_ablue_session_token(pya3_obj: AsyncPya3Aliceblue, async_redis_client: Redis):
     session_id = await pya3_obj.login_and_get_session_id()
 
     async with Database() as async_session:
@@ -416,11 +416,11 @@ async def update_session_token(pya3_obj: AsyncPya3Aliceblue, async_redis_client:
         )
         broker_model = fetch_broker_query.scalars().one_or_none()
         broker_model.access_token = session_id
-        await async_session.flush()
+        await async_session.commit()
 
         # update redis cache with new session_id
         await async_redis_client.set(
             str(broker_model.id), BrokerSchema.model_validate(broker_model).json()
         )
-        logging.info(f"session updated for user: {pya3_obj.user_id} in db and redis")
+        logging.info(f"access_token updated for user: {pya3_obj.user_id} in db and redis")
         return session_id

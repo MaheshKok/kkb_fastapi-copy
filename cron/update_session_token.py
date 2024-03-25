@@ -2,15 +2,21 @@ import asyncio
 import logging
 
 import httpx
+import pyotp
+from aioredis import Redis
+from SmartApi import SmartConnect
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.broker.utils import get_pya3_obj
-from app.broker.utils import update_session_token
+from app.broker.utils import update_ablue_session_token
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
+from app.schemas.broker import BrokerSchema
+from app.schemas.enums import BrokerNameEnum
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -19,7 +25,7 @@ logging.basicConfig(level=logging.DEBUG)
 # refactored update and logging into a separate coroutine
 async def update_session_token_with_logging(pya3_obj, async_redis_client, broker_model):
     try:
-        await update_session_token(pya3_obj=pya3_obj, async_redis_client=async_redis_client)
+        await update_ablue_session_token(pya3_obj=pya3_obj, async_redis_client=async_redis_client)
         logging.info(
             f"successfully updated session token for: [ {broker_model.name} ] user: [ {broker_model.username} ]"
         )
@@ -27,6 +33,27 @@ async def update_session_token_with_logging(pya3_obj, async_redis_client, broker
         logging.error(
             f"Error while updating session token for: [ {broker_model.name} ] user: [ {broker_model.username} ], {e}"
         )
+
+
+async def update_angelone_session_token(
+    broker_model: BrokerModel, async_redis_client: Redis, async_session: AsyncSession
+):
+    broker_schema = BrokerSchema.model_validate(broker_model)
+    client = SmartConnect(broker_schema.api_key)
+    client.generateSession(
+        clientCode=broker_schema.username,
+        password=broker_schema.password,
+        totp=pyotp.TOTP(broker_schema.totp).now(),
+    )
+    broker_model.access_token = client.access_token
+    await async_session.commit()
+    # update redis cache with new session_id
+    await async_redis_client.set(
+        str(broker_model.id), BrokerSchema.model_validate(broker_model).json()
+    )
+    logging.info(f"access_token updated for user: {broker_schema.username} in db and redis")
+
+    return client
 
 
 async def cron_update_session_token():
@@ -38,7 +65,7 @@ async def cron_update_session_token():
     async with Database() as async_session:
         # get broker model from db filtered by username
         fetch_broker_query = await async_session.execute(
-            select(BrokerModel).filter_by(name="ALICEBLUE")
+            select(BrokerModel).filter_by(name=BrokerNameEnum.ALICEBLUE.value)
         )
         broker_models = fetch_broker_query.scalars().all()
 

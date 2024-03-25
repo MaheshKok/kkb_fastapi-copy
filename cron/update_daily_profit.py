@@ -84,20 +84,15 @@ def get_last_working_date(holidays_list_dt_obj):
     # Find out what day of the week it is
     current_day_of_week = current_day.weekday()
 
-    if current_day_of_week == 0:  # Monday
-        wanted_day = current_day - datetime.timedelta(days=3)
-    elif current_day_of_week == 1:  # Tuesday
+    if current_day_of_week in [1, 2, 3, 4, 5]:  # Tuesday, Wednesday, Thursday, Friday, Saturday
         wanted_day = current_day - datetime.timedelta(days=1)
-    elif current_day_of_week == 2:  # Wednesday
+    elif current_day_of_week == 6:  # Sunday
         wanted_day = current_day - datetime.timedelta(days=2)
-    elif current_day_of_week == 3:  # Thursday
+    else:
+        # Monday
         wanted_day = current_day - datetime.timedelta(days=3)
-    elif current_day_of_week == 4:  # Friday
-        wanted_day = current_day - datetime.timedelta(days=4)
-    elif current_day_of_week in [5, 6]:  # Saturday & Sunday
-        wanted_day = current_day - datetime.timedelta(days=(current_day_of_week - 4))
 
-    # Keep checking previous day until it's not a weekend or a holiday
+    # Keep checking the previous day until it's not a weekend or a holiday
     while wanted_day.weekday() >= 5 or wanted_day in holidays_list_dt_obj:
         wanted_day = wanted_day - datetime.timedelta(days=1)
 
@@ -262,8 +257,8 @@ async def update_daily_profit(config):
     todays_date = datetime.datetime.now().date()
     holidays_list = await get_holidays_list(async_redis_client, "FO", httpx.AsyncClient())
 
-    async with Database() as async_session:
-        if todays_date.weekday() < 7 and todays_date not in holidays_list:
+    if todays_date.weekday() < 5 and todays_date not in holidays_list:
+        async with Database() as async_session:
             strategy_id_ongoing_profit_dict = await get_strategy_id_ongoing_profit_dict(
                 async_session=async_session,
                 async_redis_client=async_redis_client,
@@ -281,8 +276,8 @@ async def update_daily_profit(config):
             # for strategy_id, ongoing_profit in strategy_id_ongoing_profit_dict.items():
             for strategy_model in strategy_models:
                 if strategy_model.only_on_expiry:
-                    # we don't have ongoing profit for only on expiry as it is exited on 9:45 am UTC
-                    # so today's profit is sum of all profit of trade executed on expiry date
+                    # we don't have ongoing profit for only on expiry as it is exited on 9:45 am UTC,
+                    # so today's profit is the sum of all profit of trade executed on expiry date
                     current_expiry, _, _ = await get_current_and_next_expiry_from_redis(
                         async_redis_client=async_redis_client,
                         instrument_type=strategy_model.instrument_type,
@@ -300,7 +295,7 @@ async def update_daily_profit(config):
                             todays_date=todays_date,
                         )
                     else:
-                        # if today is not expiry then we dont update daily profit for this strategy as we dont have any trade executed
+                        # if today is not expiry then we don't update daily profit for this strategy as we don't have any trade executed
                         continue
                 else:
                     ongoing_profit = strategy_id_ongoing_profit_dict.get(strategy_model.id)
@@ -356,8 +351,8 @@ async def update_daily_profit(config):
             async_session.add_all(daily_profit_models)
             await async_session.commit()
             logging.info("Daily profit captured")
-        else:
-            logging.info("Cant capture daily profit on weekends")
+    else:
+        logging.info("Cant capture daily profit on weekends")
 
 
 if __name__ == "__main__":

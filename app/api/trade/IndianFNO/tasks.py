@@ -11,14 +11,19 @@ from aioredis import Redis
 from httpx import AsyncClient
 from line_profiler import profile  # noqa
 from pydantic import TypeAdapter
+from SmartApi import SmartConnect
 from sqlalchemy import text
 from sqlalchemy import update
 
-from app.api.trade.Capital.utils import get_lots_to_trade_and_profit_or_loss
+from app.api.trade.IndianFNO.utils import get_angel_one_futures_trading_symbol
+from app.api.trade.IndianFNO.utils import get_angel_one_options_trading_symbol
 from app.api.trade.IndianFNO.utils import get_future_price
 from app.api.trade.IndianFNO.utils import get_future_price_from_redis
+from app.api.trade.IndianFNO.utils import get_lots_to_open
+from app.api.trade.IndianFNO.utils import get_margin_required
 from app.api.trade.IndianFNO.utils import get_strike_and_entry_price
 from app.api.trade.IndianFNO.utils import get_strike_and_exit_price_dict
+from app.api.trade.IndianFNO.utils import set_quantity
 from app.broker.utils import buy_alice_blue_trades
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
@@ -142,7 +147,7 @@ async def calculate_profits(
     strategy_schema: StrategySchema,
 ):
     updated_data = {}
-    total_profit = 0
+    total_ongoing_profit = 0
     total_future_profit = 0
     exit_at = datetime.utcnow()
     exit_received_at = signal_payload_schema.received_at
@@ -180,14 +185,14 @@ async def calculate_profits(
         }
 
         updated_data[redis_trade_schema.id] = mapping
-        total_profit += profit
+        total_ongoing_profit += profit
         total_future_profit += future_profit
 
     # validate all mappings via ExitTradeSchema
     ExitTradeListValidator = TypeAdapter(List[ExitTradeSchema])
     ExitTradeListValidator.validate_python(list(updated_data.values()))
 
-    return updated_data, round(total_profit, 2), round(total_future_profit, 2)
+    return updated_data, round(total_ongoing_profit, 2), round(total_future_profit, 2)
 
 
 async def push_trade_to_redis(
@@ -313,9 +318,11 @@ async def task_entry_trade(
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
     crucial_details: str,
+    client: SmartConnect,
     futures_expiry_date: date,
     options_expiry_date: date = None,
     only_futures: bool = False,
+    ongoing_profit: int = 0,
 ):
     if not only_futures:
         option_chain = await get_option_chain(
@@ -352,7 +359,12 @@ async def task_entry_trade(
             return None
 
         signal_payload_schema.strike = strike
-
+        angel_one_trading_symbol = get_angel_one_options_trading_symbol(
+            symbol=strategy_schema.symbol,
+            expiry_date=signal_payload_schema.expiry,
+            strike=int(strike),
+            option_type=signal_payload_schema.option_type,
+        )
     else:
         if strategy_schema.broker_id:
             entry_price = await buy_alice_blue_trades(
@@ -375,9 +387,33 @@ async def task_entry_trade(
                 f"[ {crucial_details} ] - entry price: [ {entry_price} ] from redis option chain"
             )
 
+        angel_one_trading_symbol = get_angel_one_futures_trading_symbol(
+            symbol=strategy_schema.symbol,
+            expiry_date=signal_payload_schema.expiry,
+        )
         logging.info(
             f"[ {crucial_details} ] - Slippage: [ {entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
         )
+
+    margin_for_min_quantity = await get_margin_required(
+        client=client,
+        price=entry_price,
+        signal_type=signal_payload_schema.action,
+        strategy_schema=strategy_schema,
+        async_redis_client=async_redis_client,
+        angel_one_trading_symbol=angel_one_trading_symbol,
+    )
+    lots_to_open = get_lots_to_open(
+        strategy_schema=strategy_schema,
+        crucial_details=crucial_details,
+        ongoing_profit_or_loss=ongoing_profit,
+        margin_for_min_quantity=margin_for_min_quantity,
+    )
+    set_quantity(
+        strategy_schema=strategy_schema,
+        signal_payload_schema=signal_payload_schema,
+        lots_to_open=lots_to_open,
+    )
 
     await dump_trade_in_db_and_redis(
         strategy_schema=strategy_schema,
@@ -468,7 +504,7 @@ async def compute_trade_data_needed_for_closing_trade(
         logging.info(
             f"[ {crucial_details} ] - Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
         )
-        updated_data, total_profit, total_actual_profit = await calculate_profits(
+        updated_data, total_ongoing_profit, total_actual_profit = await calculate_profits(
             strike_exit_price_dict=strike_exit_price_dict,
             future_exit_price=future_exit_price,
             signal_payload_schema=signal_payload_schema,
@@ -476,9 +512,9 @@ async def compute_trade_data_needed_for_closing_trade(
             strategy_schema=strategy_schema,
         )
         logging.info(
-            f" [ {crucial_details} ] - adding profit: [ {total_profit} ] and future profit: [ {total_actual_profit} ]"
+            f" [ {crucial_details} ] - adding profit: [ {total_ongoing_profit} ] and future profit: [ {total_actual_profit} ]"
         )
-        return updated_data, total_profit, total_actual_profit
+        return updated_data, total_ongoing_profit, total_actual_profit
 
 
 async def task_exit_trade(
@@ -505,7 +541,7 @@ async def task_exit_trade(
     try:
         (
             updated_data,
-            total_profit,
+            total_ongoing_profit,
             total_future_profit,
         ) = await compute_trade_data_needed_for_closing_trade(
             signal_payload_schema=signal_payload_schema,
@@ -519,25 +555,18 @@ async def task_exit_trade(
             crucial_details=crucial_details,
         )
 
-        lots_to_open, ongoing_profit_or_loss = get_lots_to_trade_and_profit_or_loss(
-            funds_to_use=strategy_schema.funds,
-            strategy_schema=strategy_schema,
-            ongoing_profit_or_loss=total_profit,
-            crucial_details=crucial_details,
-        )
-
         # update database with the updated data
         await close_trades_in_db_and_remove_from_redis(
             updated_data=updated_data,
             strategy_schema=strategy_schema,
-            total_profit=ongoing_profit_or_loss,
+            total_profit=total_ongoing_profit,
             total_future_profit=total_future_profit,
             total_redis_trades=len(redis_trade_schema_list),
             async_redis_client=async_redis_client,
             redis_strategy_key_hash=f"{trades_key} {redis_hash}",
             crucial_details=crucial_details,
         )
-        return lots_to_open
+        return total_ongoing_profit
 
     except Exception as e:
         logging.error(f"[ {crucial_details} ] - Exception while exiting trade: {e}")

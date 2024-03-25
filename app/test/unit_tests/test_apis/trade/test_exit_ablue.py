@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy import select
 
+from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
@@ -22,6 +23,7 @@ from app.utils.constants import FUT
 from app.utils.constants import STRATEGY
 from app.utils.constants import Status
 from app.utils.constants import update_trade_columns
+from app.utils.option_chain import get_option_chain
 
 
 @pytest.mark.asyncio
@@ -65,12 +67,12 @@ async def test_exit_alice_blue_trade_for_long_strategy(
 
         payload = get_test_post_trade_payload(action.value)
         payload["strategy_id"] = str(strategy_model.id)
-
+        strategy_schema = StrategySchema.model_validate(strategy_model)
         # set strategy in redis
         await test_async_redis_client.hset(
             str(strategy_model.id),
             STRATEGY,
-            StrategySchema.model_validate(strategy_model).model_dump_json(),
+            strategy_schema.model_dump_json(),
         )
 
         # set trades in redis
@@ -98,12 +100,28 @@ async def test_exit_alice_blue_trade_for_long_strategy(
 
         await async_session.commit()
 
+    current_expiry_date, _, _ = await get_current_and_next_expiry_from_redis(
+        async_redis_client=test_async_redis_client,
+        instrument_type=InstrumentTypeEnum.FUTIDX,
+        symbol=strategy_schema.symbol,
+    )
+    future_option_chain = await get_option_chain(
+        async_redis_client=test_async_redis_client,
+        expiry=current_expiry_date,
+        strategy_schema=strategy_schema,
+        is_future=True,
+    )
+    future_entry_price = float(future_option_chain.get("FUT"))
+
     # Mock the place_order method
     async def mock_place_order(*args, **kwargs):
         return {"stat": "ok", "NOrdNo": "1234567890"}
 
     async def mock_get_order_history(*args, **kwargs):
-        return {"Avgprc": 410.5, "Status": Status.COMPLETE}
+        if instrument_type == InstrumentTypeEnum.OPTIDX:
+            return {"Avgprc": 410.5, "Status": Status.COMPLETE}
+        else:
+            return {"Avgprc": future_entry_price + 200, "Status": Status.COMPLETE}
 
     # Use monkeypatch to patch the method
     monkeypatch.setattr(
@@ -205,11 +223,12 @@ async def test_exit_alice_blue_trade_for_short_strategy(
         payload = get_test_post_trade_payload(action.value)
         payload["strategy_id"] = str(strategy_model.id)
 
+        strategy_schema = StrategySchema.model_validate(strategy_model)
         # set strategy in redis
         await test_async_redis_client.hset(
             str(strategy_model.id),
             STRATEGY,
-            StrategySchema.model_validate(strategy_model).model_dump_json(),
+            strategy_schema.model_dump_json(),
         )
 
         # set trades in redis
@@ -237,12 +256,28 @@ async def test_exit_alice_blue_trade_for_short_strategy(
 
         await async_session.commit()
 
+    current_expiry_date, _, _ = await get_current_and_next_expiry_from_redis(
+        async_redis_client=test_async_redis_client,
+        instrument_type=InstrumentTypeEnum.FUTIDX,
+        symbol=strategy_schema.symbol,
+    )
+    future_option_chain = await get_option_chain(
+        async_redis_client=test_async_redis_client,
+        expiry=current_expiry_date,
+        strategy_schema=strategy_schema,
+        is_future=True,
+    )
+    future_entry_price = float(future_option_chain.get("FUT"))
+
     # Mock the place_order method
     async def mock_place_order(*args, **kwargs):
         return {"stat": "ok", "NOrdNo": "1234567890"}
 
     async def mock_get_order_history(*args, **kwargs):
-        return {"Avgprc": 410.5, "Status": Status.COMPLETE}
+        if instrument_type == InstrumentTypeEnum.OPTIDX:
+            return {"Avgprc": 410.5, "Status": Status.COMPLETE}
+        else:
+            return {"Avgprc": future_entry_price + 200, "Status": Status.COMPLETE}
 
     # Use monkeypatch to patch the method
     monkeypatch.setattr(
@@ -302,7 +337,7 @@ async def test_exit_alice_blue_trade_for_short_strategy(
         assert len(json.loads(redis_trade_json)) == 1
 
 
-# TODO: we dont need below unit test because
+# TODO: we don't need below unit test because
 #  401 is being raised by place_order and it is being handled in the test_ablue_buy unit test
 # @pytest.mark.asyncio
 # @pytest.mark.parametrize(

@@ -19,9 +19,12 @@ from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
+from app.schemas.broker import BrokerSchema
+from app.schemas.enums import BrokerNameEnum
 from app.schemas.strategy import StrategySchema
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_close_trades
+from app.utils.constants import ANGELONE_BROKER
 from app.utils.constants import TRADES_AND_OPTION_CHAIN_REDIS
 from app.utils.constants import ConfigFile
 
@@ -46,6 +49,8 @@ logging.basicConfig(
 #         get_monthly_expiry_date_from_redis,
 #         get_expiry_dict_from_alice_blue,
 #     )
+#     from cron.download_master_contracts import push_angel_one_instruments
+
 #
 #     test_config = get_config(ConfigFile.TEST)
 #     _test_async_redis_client = aioredis.Redis(
@@ -55,6 +60,8 @@ logging.basicConfig(
 #         encoding="utf-8",
 #         decode_responses=True,
 #     )
+#     await _test_async_redis_client.dbsize()
+#     await _test_async_redis_client.flushdb()
 #
 #     # update redis with necessary data i.e expiry list, option chain etc
 #     expiry_dict = await get_expiry_dict_from_alice_blue()
@@ -147,8 +154,10 @@ logging.basicConfig(
 #         f"Time taken to update redis with option chain: [ {datetime.now() - start_time} ]"
 #     )
 #
-#     # set up master contract in redis
-#     response = await httpx.AsyncClient().get(AB_NFO_CONTRACTS_URL)
+#     # set up contract in redis
+#     async with httpx.AsyncClient(verify=False) as client:
+#         response = await client.get(AB_NFO_CONTRACTS_URL)
+#
 #     data_stream = io.StringIO(response.text)
 #     try:
 #         df = pd.read_csv(data_stream)
@@ -172,10 +181,10 @@ logging.basicConfig(
 #     # Use a pipeline to set each chunk of key-value pairs in Redis
 #     async with _test_async_redis_client.pipeline() as pipe:
 #         for chunk in dict_chunks:
-#             for key, value in chunk.items():
-#                 pipe.set(key, value)
+#             pipe.mset(chunk)
 #         await pipe.execute()
 #
+#     await push_angel_one_instruments(_test_async_redis_client, symbols=symbols)
 #     logging.info(f"Time taken to set master contract in redis: [ {datetime.now() - start_time} ]")
 
 
@@ -211,6 +220,15 @@ async def test_async_redis_client():
     else:
         logging.error("test redis client connection failed")
 
+    broker_schema = BrokerSchema(
+        id=test_config.data[ANGELONE_BROKER]["id"],
+        name=BrokerNameEnum.ANGELONE,
+        username=test_config.data[ANGELONE_BROKER]["username"],
+        password=test_config.data[ANGELONE_BROKER]["password"],
+        totp=test_config.data[ANGELONE_BROKER]["totp"],
+        api_key=test_config.data[ANGELONE_BROKER]["api_key"],
+    )
+    await _test_async_redis_client.set(str(broker_schema.id), broker_schema.model_dump_json())
     yield _test_async_redis_client
     await _test_async_redis_client.close()
     logging.info("test redis client closed")

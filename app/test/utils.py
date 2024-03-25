@@ -70,21 +70,25 @@ async def create_open_trades(
                 strategy_schema=StrategySchema.model_validate(strategy),
                 is_future=True,
             )
-            strike = float(str(int(float(future_option_chain.get("FUT"))) // 100 * 100) + ".0")
-            option_chain = await get_option_chain(
-                async_redis_client=test_async_redis_client,
-                expiry=expiry_date,
-                strategy_schema=StrategySchema.model_validate(strategy),
-                option_type=OptionType.CE if ce_trade else OptionType.PE,
-                is_future=False,
-            )
-            entry_price = float(option_chain.get(strike)) + (
+            future_entry_price = float(future_option_chain.get("FUT"))
+            future_entry_price_received = future_entry_price + (
                 -200 if position == PositionEnum.LONG else +200
             )
-            future_entry_price_received = strike + (
-                -200 if position == PositionEnum.LONG else +200
-            )
+
             if instrument_type == InstrumentTypeEnum.OPTIDX:
+                strike = float(
+                    str(int(float(future_option_chain.get("FUT"))) // 100 * 100) + ".0"
+                )
+                option_chain = await get_option_chain(
+                    async_redis_client=test_async_redis_client,
+                    expiry=expiry_date,
+                    strategy_schema=StrategySchema.model_validate(strategy),
+                    option_type=OptionType.CE if ce_trade else OptionType.PE,
+                    is_future=False,
+                )
+                entry_price = float(option_chain.get(strike)) + (
+                    -200 if position == PositionEnum.LONG else +200
+                )
                 for _ in range(trades):
                     await LiveTradeFactory(
                         strategy=strategy,
@@ -100,6 +104,7 @@ async def create_open_trades(
                 for _ in range(trades):
                     await LiveTradeFactory(
                         strategy=strategy,
+                        entry_price=future_entry_price,
                         expiry=expiry_date,
                         strike=None,
                         option_type=None,

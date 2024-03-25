@@ -290,9 +290,11 @@ async def test_trading_nfo_options_opposite_direction(
         strategy_json = await test_async_redis_client.hget(str(strategy_model.id), STRATEGY)
         redis_strategy_schema = StrategySchema.model_validate_json(strategy_json)
 
-        actual_total_profit = sum(trade_model.profit for trade_model in exited_trade_models)
-        actual_future_profit = sum(
-            trade_model.future_profit for trade_model in exited_trade_models
+        actual_total_profit = round(
+            sum(trade_model.profit for trade_model in exited_trade_models), 2
+        )
+        actual_future_profit = round(
+            sum(trade_model.future_profit for trade_model in exited_trade_models), 2
         )
         trade_model = exited_trade_models[0]
         option_chain = await get_option_chain(
@@ -321,6 +323,7 @@ async def test_trading_nfo_options_opposite_direction(
                 ),
             )
 
+        expected_total_profit = round(expected_total_profit, 2)
         assert expected_total_profit == actual_total_profit
         assert expected_future_profit == actual_future_profit
         assert redis_strategy_schema.funds == old_funds + actual_total_profit

@@ -18,13 +18,11 @@ from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_smart_connect_client
 from app.api.dependency import get_strategy_schema
 from app.api.trade import trading_router
-from app.api.trade.Capital.utils import get_lots_to_trade_and_profit_or_loss
 from app.api.trade.IndianFNO.tasks import task_entry_trade
 from app.api.trade.IndianFNO.tasks import task_exit_trade
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.IndianFNO.utils import get_opposite_trade_option_type
 from app.api.trade.IndianFNO.utils import set_option_type
-from app.api.trade.IndianFNO.utils import set_quantity
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum
@@ -153,16 +151,12 @@ async def post_nfo_indian_options(
         if (
             strategy_schema.only_on_expiry
             and strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX
-            and current_options_expiry_date != todays_date
         ):
-            return {"message": "Only on expiry"}
+            if current_options_expiry_date != todays_date:
+                return {"message": "Only on expiry"}
 
-        if (
-            strategy_schema.only_on_expiry
-            and strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX
-            and datetime.datetime.utcnow().time() >= datetime.time(hour=9, minute=45)
-        ):
-            return {"message": "Cannot Trade after 9:45AM GMT+5:30 on Expiry"}
+            if datetime.datetime.utcnow().time() >= datetime.time(hour=9, minute=45):
+                return {"message": "Cannot Trade after 9:45AM GMT on Expiry"}
 
         options_expiry_date = get_expiry_date_to_trade(
             current_expiry_date=current_options_expiry_date,
@@ -184,7 +178,6 @@ async def post_nfo_indian_options(
         )
 
     trades_key = f"{signal_payload_schema.strategy_id}"
-    lots_to_open = None
     msg = "successfully"
     if exiting_trades_json := await async_redis_client.hget(trades_key, redis_hash):
         # initiate exit_trade
@@ -195,30 +188,18 @@ async def post_nfo_indian_options(
         redis_trade_schema_list = TypeAdapter(List[RedisTradeSchema]).validate_python(
             [json.loads(trade) for trade in exiting_trades_json_list]
         )
-        lots_to_open = await task_exit_trade(
+        ongoing_profit = await task_exit_trade(
             **kwargs,
             redis_hash=redis_hash,
             redis_trade_schema_list=redis_trade_schema_list,
         )
-
+        kwargs["ongoing_profit"] = ongoing_profit
         msg += " closed existing trades and"
 
-    if not lots_to_open:
-        lots_to_open, ongoing_profit_or_loss = get_lots_to_trade_and_profit_or_loss(
-            funds_to_use=strategy_schema.funds,
-            strategy_schema=strategy_schema,
-            ongoing_profit_or_loss=0.0,
-            crucial_details=crucial_details,
-        )
-
-    set_quantity(
-        strategy_schema=strategy_schema,
-        signal_payload_schema=signal_payload_schema,
-        lots_to_open=lots_to_open,
-    )
     # initiate buy_trade
     await task_entry_trade(
         **kwargs,
+        client=smart_connect_client,
     )
     msg += " bought a new trade"
 

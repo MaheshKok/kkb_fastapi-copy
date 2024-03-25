@@ -12,7 +12,7 @@ from pydantic import model_validator
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
 from app.schemas.enums import SignalTypeEnum
-from app.utils.constants import ALICE_BLUE_DATE_FORMAT
+from app.utils.constants import ALICE_BLUE_EXPIRY_DATE_FORMAT
 from app.utils.constants import OptionType
 
 
@@ -54,7 +54,7 @@ class RedisTradeSchema(SignalPayloadSchema):
         description="Received At", example="2023-05-22 05:11:01.117358"
     )
     # the reason i am making it as optional even though its being inherited from
-    # EntryTradeSchema, because when i use from_orm then TradeModel doesnt have symbol and validation fails
+    # EntryTradeSchema, because when i use from_orm then TradeModel  doesn't have symbol and validation fails
     symbol: Optional[str] = Field(description="Symbol", example="BANKNIFTY", default="")
     received_at: Optional[datetime] = Field(
         description="Received At", example="2023-05-22 05:11:01.117358", default=None
@@ -195,10 +195,10 @@ def generate_trading_symbol(
     if is_fut and option_type:
         raise ValueError("Either Future or Option Type is Expected and not Both")
 
-    expiry_formatted = expiry.strftime(ALICE_BLUE_DATE_FORMAT).upper()
+    expiry_formatted = expiry.strftime(ALICE_BLUE_EXPIRY_DATE_FORMAT).upper()
     if is_fut:
         return f"{symbol}{expiry_formatted}F"
     else:
         is_ce = option_type == OptionType.CE
-        option_char = OptionType.CE[0] if is_ce else OptionType.PE[0]
-        return f"{symbol}{expiry_formatted}{option_char}{int(strike)}"
+        option_type_initial = OptionType.CE[0] if is_ce else OptionType.PE[0]
+        return f"{symbol}{expiry_formatted}{option_type_initial}{int(strike)}"

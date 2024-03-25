@@ -10,19 +10,28 @@ from typing import Optional
 import aioredis
 import httpx
 import pandas as pd
+from _decimal import ROUND_DOWN
+from _decimal import Decimal
+from _decimal import getcontext
 from aioredis import Redis
 from fastapi import HTTPException
 from httpx import AsyncClient
+from SmartApi import SmartConnect
+from starlette import status
 
 from app.broker.utils import buy_alice_blue_trades
 from app.broker.utils import close_alice_blue_trades
+from app.schemas.broker import AngelOneInstrumentSchema
 from app.schemas.enums import InstrumentTypeEnum
 from app.schemas.enums import OptionTypeEnum
 from app.schemas.enums import PositionEnum
+from app.schemas.enums import ProductTypeEnum
 from app.schemas.enums import SignalTypeEnum
 from app.schemas.strategy import StrategySchema
 from app.schemas.trade import RedisTradeSchema
 from app.schemas.trade import SignalPayloadSchema
+from app.utils.constants import ANGELONE_EXPIRY_DATE_FORMAT
+from app.utils.constants import FUT
 from app.utils.constants import REDIS_DATE_FORMAT
 from app.utils.option_chain import get_option_chain
 
@@ -277,17 +286,18 @@ async def get_strike_and_entry_price(
 async def get_expiry_dict_from_alice_blue():
     api = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
 
-    response = await httpx.AsyncClient().get(api)
-    data_stream = io.StringIO(response.text)
-    df = pd.read_csv(data_stream)
-    result = {}
-    for (instrument_type, symbol), group in df.groupby(["Instrument Type", "Symbol"]):
-        if instrument_type not in result:
-            result[instrument_type] = {}
-        expiry_dates = sorted(set(group["Expiry Date"].tolist()))
-        result[instrument_type][symbol] = expiry_dates
+    async with httpx.AsyncClient(verify=False) as client:
+        response = await client.get(api)
+        data_stream = io.StringIO(response.text)
+        df = pd.read_csv(data_stream)
+        result = {}
+        for (instrument_type, symbol), group in df.groupby(["Instrument Type", "Symbol"]):
+            if instrument_type not in result:
+                result[instrument_type] = {}
+            expiry_dates = sorted(set(group["Expiry Date"].tolist()))
+            result[instrument_type][symbol] = expiry_dates
 
-    return result
+        return result
 
 
 async def get_expiry_list_from_redis(async_redis_client, instrument_type, symbol):
@@ -401,3 +411,136 @@ def set_quantity(
             signal_payload_schema.quantity = lots_to_open
         else:
             signal_payload_schema.quantity = -lots_to_open
+
+
+def get_lots_to_open(
+    strategy_schema: StrategySchema,
+    ongoing_profit_or_loss,
+    margin_for_min_quantity: float,
+    crucial_details: str = None,
+):
+    def _get_lots_to_trade(strategy_funds_to_trade, strategy_schema):
+        # below is the core of this function, do not mendle with it
+        # Calculate the quantity that can be traded in the current period
+        approx_lots_to_trade = strategy_funds_to_trade * (
+            Decimal(strategy_schema.min_quantity) / Decimal(margin_for_min_quantity)
+        )
+
+        to_increment = Decimal(strategy_schema.incremental_step_size)
+        closest_lots_to_trade = (approx_lots_to_trade // to_increment) * to_increment
+
+        while closest_lots_to_trade + to_increment <= approx_lots_to_trade:
+            closest_lots_to_trade += to_increment
+
+        if closest_lots_to_trade + to_increment == approx_lots_to_trade:
+            lots_to_trade = closest_lots_to_trade + to_increment
+        else:
+            lots_to_trade = closest_lots_to_trade
+
+        # Add rounding here
+        lots_to_trade = lots_to_trade.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+
+        # Convert the result back to a float for consistency with your existing code
+        lots_to_trade = float(lots_to_trade)
+        return lots_to_trade
+
+    # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
+    getcontext().prec = 28  # Set a high precision
+    try:
+        total_available_funds = strategy_schema.funds + ongoing_profit_or_loss
+        if total_available_funds < margin_for_min_quantity:
+            msg = f"[ {crucial_details} ] - total available funds: [ {total_available_funds} ] to trade are less than margin for min quantity: {margin_for_min_quantity}"
+            logging.error(msg)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+
+        available_funds = Decimal(total_available_funds * strategy_schema.funds_usage_percent)
+        available_funds = round(available_funds, 2)
+        logging.info(f"[ {crucial_details} ] - available funds: {available_funds}")
+
+        if available_funds < Decimal(margin_for_min_quantity):
+            # if funds available are less than margin_for_min_quantity, then we will use margin_for_min_quantity
+            """
+            Example:
+            total available funds = 5Lakh and
+            available funds = 50K because funds_usage_percent is 10%
+            margin_for_min_quantity = 1Lakh
+            then we will trade with 1Lakh and not 5Lakh
+            """
+            available_funds = Decimal(margin_for_min_quantity)
+
+        if not strategy_schema.compounding:
+            logging.info(
+                f"[ {crucial_details} ] - Compounding is not enabled, so we will trade fixed contracts: [ {strategy_schema.contracts} ]"
+            )
+            funds_required_for_fixed_contracts = Decimal(
+                (margin_for_min_quantity / strategy_schema.min_quantity)
+                * strategy_schema.contracts
+            )
+
+            if available_funds >= funds_required_for_fixed_contracts:
+                lots_to_trade = strategy_schema.contracts
+                logging.info(
+                    f"[ {crucial_details} ] - Available Funds: [ {available_funds} ] are more than funds required for contracts: [ {funds_required_for_fixed_contracts} ]"
+                )
+            else:
+                lots_to_trade = _get_lots_to_trade(available_funds, strategy_schema)
+                logging.info(
+                    f"[ {crucial_details} ] - Available Funds: [ {available_funds} ] are less than funds required for contracts: [ {funds_required_for_fixed_contracts} ]. So we will trade [ {lots_to_trade} ] contracts"
+                )
+        else:
+            lots_to_trade = _get_lots_to_trade(available_funds, strategy_schema)
+            logging.info(
+                f"[ {crucial_details} ] - Compounding is enabled so we can trade [ {lots_to_trade} ] contracts in [ {total_available_funds} ] funds"
+            )
+
+        logging.info(f"[ {crucial_details} ] - lots to open [ {lots_to_trade} ]")
+        return lots_to_trade
+
+    except ZeroDivisionError:
+        raise HTTPException(
+            status_code=400, detail="Division by zero error in trade quantity calculation"
+        )
+
+
+async def get_margin_required(
+    *,
+    client: SmartConnect,
+    price: float,
+    async_redis_client: Redis,
+    angel_one_trading_symbol: str,
+    signal_type: SignalTypeEnum,
+    strategy_schema: StrategySchema,
+):
+    instrument_json = await async_redis_client.get(angel_one_trading_symbol)
+    instrument = json.loads(instrument_json)
+    instrument_schema = AngelOneInstrumentSchema(**instrument)
+
+    # exchange = NSE, BSE, NFO, CDS, MCX, NCDEX and BFO
+    # product_type = CARRYFORWARD, INTRADAY, DELIVERY, MARGIN, BO, and CO.
+    #  tradeType = BUY or SELL
+    params = {
+        "positions": [
+            {
+                "exchange": instrument_schema.exch_seg,
+                "qty": instrument_schema.lotsize,
+                "price": price,
+                "productType": ProductTypeEnum.CARRYFORWARD,
+                "token": instrument_schema.token,
+                "tradeType": signal_type.upper(),
+            }
+        ]
+    }
+    margin_api_response = client.getMarginApi(params=params)
+    if margin_api_response["message"] == "SUCCESS":
+        return margin_api_response["data"]["totalMarginRequired"]
+    return strategy_schema.margin_for_min_quantity
+
+
+def get_angel_one_options_trading_symbol(
+    symbol: str, expiry_date: date, strike: int, option_type: OptionTypeEnum
+) -> str:
+    return f"{symbol}{(expiry_date.strftime(ANGELONE_EXPIRY_DATE_FORMAT)).upper()}{strike}{option_type}"
+
+
+def get_angel_one_futures_trading_symbol(symbol: str, expiry_date: date) -> str:
+    return f"{symbol}{(expiry_date.strftime(ANGELONE_EXPIRY_DATE_FORMAT)).upper()}{FUT}"
