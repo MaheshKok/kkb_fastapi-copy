@@ -1,4 +1,3 @@
-import pyotp
 from aioredis import Redis
 from fastapi import Depends
 from fastapi import FastAPI
@@ -141,29 +140,34 @@ async def get_smart_connect_client(
     async_redis_client: Redis = Depends(get_async_redis_client),
 ) -> SmartConnect:
     broker_schema = await get_broker_schema(config, async_redis_client)
-    client = SmartConnect(broker_schema.api_key)
-    client.generateSession(
-        clientCode=broker_schema.username,
-        password=broker_schema.password,
-        totp=pyotp.TOTP(broker_schema.totp).now(),
+    client = SmartConnect(
+        broker_schema.api_key,
+        access_token=broker_schema.access_token,
+        refresh_token=broker_schema.refresh_token,
+        feed_token=broker_schema.feed_token,
     )
-
-    update_broker_in_redis = False
-    tokens = [
-        ("refresh_token", client.refresh_token),
-        ("feed_token", client.feed_token),
-        ("access_token", client.access_token),
-    ]
-
-    for token_name, client_token in tokens:
-        broker_token = getattr(broker_schema, token_name)
-        if not broker_token or broker_token != client_token:
-            setattr(broker_schema, token_name, client_token)
-            update_broker_in_redis = True
-
-    if update_broker_in_redis:
-        await async_redis_client.set(
-            str(broker_schema.id), BrokerSchema.model_validate(broker_schema).model_dump_json()
-        )
+    # client.generateSession(
+    #     clientCode=broker_schema.username,
+    #     password=broker_schema.password,
+    #     totp=pyotp.TOTP(broker_schema.totp).now(),
+    # )
+    #
+    # update_broker_in_redis = False
+    # tokens = [
+    #     ("refresh_token", client.refresh_token),
+    #     ("feed_token", client.feed_token),
+    #     ("access_token", client.access_token),
+    # ]
+    #
+    # for token_name, client_token in tokens:
+    #     broker_token = getattr(broker_schema, token_name)
+    #     if not broker_token or broker_token != client_token:
+    #         setattr(broker_schema, token_name, client_token)
+    #         update_broker_in_redis = True
+    #
+    # if update_broker_in_redis:
+    #     await async_redis_client.set(
+    #         str(broker_schema.id), BrokerSchema.model_validate(broker_schema).model_dump_json()
+    #     )
 
     return client
