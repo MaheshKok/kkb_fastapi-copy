@@ -63,12 +63,13 @@ async def get_holidays_list(async_redis_client, market, http_client):
         holiday["tradingDate"]
         for holiday in json.loads(trading_holidays_list_raw).get(market, [])
     ]
-    holidays_list_dt_str.extend(
-        [
-            holiday["tradingDate"]
-            for holiday in json.loads(clearing_holidays_list_raw).get(market, [])
-        ]
-    )
+    # TODO: rethink if we have to include clearing holidays
+    # holidays_list_dt_str.extend(
+    #     [
+    #         holiday["tradingDate"]
+    #         for holiday in json.loads(clearing_holidays_list_raw).get(market, [])
+    #     ]
+    # )
     # remove duplicates
     holidays_list_dt_str = set(holidays_list_dt_str)
     holidays_list_dt_obj = [
@@ -299,6 +300,8 @@ async def update_daily_profit(config):
                         continue
                 else:
                     ongoing_profit = strategy_id_ongoing_profit_dict.get(strategy_model.id)
+                    if not ongoing_profit:
+                        continue
                     till_yesterdays_profit_model = strategy_id_yesterdays_profit_model_dict.get(
                         strategy_model.id
                     )
