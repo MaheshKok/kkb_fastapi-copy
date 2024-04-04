@@ -8,7 +8,7 @@ from httpx import Limits
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.broker.AngelOne import AsyncSmartConnect
+from app.broker.AngelOne import AsyncAngelOneClient
 from app.core.config import Config
 from app.database.models import BrokerModel
 from app.database.models import CFDStrategyModel
@@ -135,18 +135,18 @@ async def get_broker_schema(
     return broker_schema
 
 
-async def get_smart_connect_client(
+async def get_angelone_client(
     config: Config = Depends(get_config),
     async_redis_client: Redis = Depends(get_async_redis_client),
-) -> AsyncSmartConnect:
+) -> AsyncAngelOneClient:
     broker_schema = await get_broker_schema(config, async_redis_client)
-    client = AsyncSmartConnect(
+    async_angelone_client = AsyncAngelOneClient(
         broker_schema.api_key,
         access_token=broker_schema.access_token,
         refresh_token=broker_schema.refresh_token,
         feed_token=broker_schema.feed_token,
     )
-    # client.generateSession(
+    # async_angelone_client.generateSession(
     #     clientCode=broker_schema.username,
     #     password=broker_schema.password,
     #     totp=pyotp.TOTP(broker_schema.totp).now(),
@@ -154,9 +154,9 @@ async def get_smart_connect_client(
     #
     # update_broker_in_redis = False
     # tokens = [
-    #     ("refresh_token", client.refresh_token),
-    #     ("feed_token", client.feed_token),
-    #     ("access_token", client.access_token),
+    #     ("refresh_token", async_angelone_client.refresh_token),
+    #     ("feed_token", async_angelone_client.feed_token),
+    #     ("access_token", async_angelone_client.access_token),
     # ]
     #
     # for token_name, client_token in tokens:
@@ -170,4 +170,4 @@ async def get_smart_connect_client(
     #         str(broker_schema.id), BrokerSchema.model_validate(broker_schema).model_dump_json()
     #     )
 
-    return client
+    return async_angelone_client

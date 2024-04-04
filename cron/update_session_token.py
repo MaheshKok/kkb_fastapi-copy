@@ -7,7 +7,7 @@ from aioredis import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.broker.AngelOne import AsyncSmartConnect
+from app.broker.AngelOne import AsyncAngelOneClient
 from app.broker.utils import get_pya3_obj
 from app.broker.utils import update_ablue_session_token
 from app.core.config import get_config
@@ -71,7 +71,7 @@ async def task_update_angelone_session_token(
     broker_models = fetch_broker_query.scalars().all()
     for broker_model in broker_models:
         broker_schema = BrokerSchema.model_validate(broker_model)
-        client = AsyncSmartConnect(broker_schema.api_key)
+        client = AsyncAngelOneClient(broker_schema.api_key)
         await client.generate_session(
             client_code=broker_schema.username,
             password=broker_schema.password,

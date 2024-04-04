@@ -11,7 +11,7 @@ from SmartApi.version import __title__
 from SmartApi.version import __version__
 
 
-class AsyncSmartConnect:
+class AsyncAngelOneClient:
     # _rootUrl = "https://openapisuat.angelbroking.com"
     _rootUrl = "https://apiconnect.angelbroking.com"  # prod endpoint
     # _login_url ="https://smartapi.angelbroking.com/login"

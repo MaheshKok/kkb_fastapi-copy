@@ -12,9 +12,9 @@ from httpx import AsyncClient
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
+from app.api.dependency import get_angelone_client
 from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
-from app.api.dependency import get_smart_connect_client
 from app.api.dependency import get_strategy_schema
 from app.api.trade import trading_router
 from app.api.trade.IndianFNO.tasks import task_entry_trade
@@ -22,7 +22,7 @@ from app.api.trade.IndianFNO.tasks import task_exit_trade
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.IndianFNO.utils import get_opposite_trade_option_type
 from app.api.trade.IndianFNO.utils import set_option_type
-from app.broker.AngelOne import AsyncSmartConnect
+from app.broker.AngelOne import AsyncAngelOneClient
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum
@@ -87,7 +87,7 @@ async def post_nfo_indian_options(
     strategy_schema: StrategySchema = Depends(get_strategy_schema),
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
-    smart_connect_client: AsyncSmartConnect = Depends(get_smart_connect_client),
+    async_angelone_client: AsyncAngelOneClient = Depends(get_angelone_client),
 ):
     crucial_details = f"{ strategy_schema.symbol} {strategy_schema.id} {strategy_schema.instrument_type} {signal_payload_schema.action}"
     todays_date = datetime.datetime.utcnow().date()
@@ -199,7 +199,7 @@ async def post_nfo_indian_options(
     # initiate buy_trade
     await task_entry_trade(
         **kwargs,
-        client=smart_connect_client,
+        async_angelone_client=async_angelone_client,
     )
     msg += " bought a new trade"
 

@@ -10,7 +10,7 @@ from httpx import AsyncClient
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
-from app.api.dependency import get_smart_connect_client
+from app.api.dependency import get_angelone_client
 from app.api.trade.IndianFNO.tasks import task_entry_trade
 from app.api.trade.IndianFNO.tasks import task_exit_trade
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
@@ -59,7 +59,7 @@ async def rollover_to_next_expiry(
     # use different strategy to make it faster and efficient
     async_redis_client = get_redis_client(config)
     async_httpx_client = AsyncClient()
-    angel_one_client = await get_smart_connect_client(
+    async_angelone_client = await get_angelone_client(
         config=config, async_redis_client=async_redis_client
     )
     future_price_cache = {}
@@ -205,7 +205,7 @@ async def rollover_to_next_expiry(
             buy_task = asyncio.create_task(
                 task_entry_trade(
                     **kwargs,
-                    client=angel_one_client,
+                    async_angelone_client=async_angelone_client,
                 )
             )
             tasks.append(buy_task)

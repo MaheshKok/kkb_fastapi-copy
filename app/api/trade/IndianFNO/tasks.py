@@ -23,7 +23,7 @@ from app.api.trade.IndianFNO.utils import get_margin_required
 from app.api.trade.IndianFNO.utils import get_strike_and_entry_price
 from app.api.trade.IndianFNO.utils import get_strike_and_exit_price_dict
 from app.api.trade.IndianFNO.utils import set_quantity
-from app.broker.AngelOne import AsyncSmartConnect
+from app.broker.AngelOne import AsyncAngelOneClient
 from app.broker.utils import buy_alice_blue_trades
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
@@ -318,7 +318,7 @@ async def task_entry_trade(
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
     crucial_details: str,
-    client: AsyncSmartConnect,
+    async_angelone_client: AsyncAngelOneClient,
     futures_expiry_date: date,
     options_expiry_date: date = None,
     only_futures: bool = False,
@@ -396,7 +396,7 @@ async def task_entry_trade(
         )
 
     margin_for_min_quantity = await get_margin_required(
-        client=client,
+        client=async_angelone_client,
         price=entry_price,
         signal_type=signal_payload_schema.action,
         strategy_schema=strategy_schema,

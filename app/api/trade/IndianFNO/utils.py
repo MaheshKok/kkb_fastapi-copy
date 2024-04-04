@@ -18,7 +18,7 @@ from fastapi import HTTPException
 from httpx import AsyncClient
 from starlette import status
 
-from app.broker.AngelOne import AsyncSmartConnect
+from app.broker.AngelOne import AsyncAngelOneClient
 from app.broker.utils import buy_alice_blue_trades
 from app.broker.utils import close_alice_blue_trades
 from app.schemas.broker import AngelOneInstrumentSchema
@@ -504,7 +504,7 @@ def get_lots_to_open(
 
 async def get_margin_required(
     *,
-    client: AsyncSmartConnect,
+    client: AsyncAngelOneClient,
     price: float,
     async_redis_client: Redis,
     angel_one_trading_symbol: str,
