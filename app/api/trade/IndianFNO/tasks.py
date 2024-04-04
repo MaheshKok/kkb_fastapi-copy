@@ -11,7 +11,6 @@ from aioredis import Redis
 from httpx import AsyncClient
 from line_profiler import profile  # noqa
 from pydantic import TypeAdapter
-from SmartApi import SmartConnect
 from sqlalchemy import text
 from sqlalchemy import update
 
@@ -24,6 +23,7 @@ from app.api.trade.IndianFNO.utils import get_margin_required
 from app.api.trade.IndianFNO.utils import get_strike_and_entry_price
 from app.api.trade.IndianFNO.utils import get_strike_and_exit_price_dict
 from app.api.trade.IndianFNO.utils import set_quantity
+from app.broker.AngelOne import AsyncSmartConnect
 from app.broker.utils import buy_alice_blue_trades
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
@@ -318,7 +318,7 @@ async def task_entry_trade(
     strategy_schema: StrategySchema,
     async_httpx_client: AsyncClient,
     crucial_details: str,
-    client: SmartConnect,
+    client: AsyncSmartConnect,
     futures_expiry_date: date,
     options_expiry_date: date = None,
     only_futures: bool = False,

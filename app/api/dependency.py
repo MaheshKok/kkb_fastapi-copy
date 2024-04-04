@@ -5,10 +5,10 @@ from fastapi import HTTPException
 from fastapi import Request
 from httpx import AsyncClient
 from httpx import Limits
-from SmartApi import SmartConnect
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.broker.AngelOne import AsyncSmartConnect
 from app.core.config import Config
 from app.database.models import BrokerModel
 from app.database.models import CFDStrategyModel
@@ -138,9 +138,9 @@ async def get_broker_schema(
 async def get_smart_connect_client(
     config: Config = Depends(get_config),
     async_redis_client: Redis = Depends(get_async_redis_client),
-) -> SmartConnect:
+) -> AsyncSmartConnect:
     broker_schema = await get_broker_schema(config, async_redis_client)
-    client = SmartConnect(
+    client = AsyncSmartConnect(
         broker_schema.api_key,
         access_token=broker_schema.access_token,
         refresh_token=broker_schema.refresh_token,

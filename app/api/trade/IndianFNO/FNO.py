@@ -10,7 +10,6 @@ from fastapi import APIRouter
 from fastapi import Depends
 from httpx import AsyncClient
 from pydantic import TypeAdapter
-from SmartApi import SmartConnect
 from sqlalchemy import select
 
 from app.api.dependency import get_async_httpx_client
@@ -23,6 +22,7 @@ from app.api.trade.IndianFNO.tasks import task_exit_trade
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.IndianFNO.utils import get_opposite_trade_option_type
 from app.api.trade.IndianFNO.utils import set_option_type
+from app.broker.AngelOne import AsyncSmartConnect
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum
@@ -87,7 +87,7 @@ async def post_nfo_indian_options(
     strategy_schema: StrategySchema = Depends(get_strategy_schema),
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
-    smart_connect_client: SmartConnect = Depends(get_smart_connect_client),
+    smart_connect_client: AsyncSmartConnect = Depends(get_smart_connect_client),
 ):
     crucial_details = f"{ strategy_schema.symbol} {strategy_schema.id} {strategy_schema.instrument_type} {signal_payload_schema.action}"
     todays_date = datetime.datetime.utcnow().date()
