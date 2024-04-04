@@ -263,7 +263,9 @@ async def test_trading_nfo_options_opposite_direction_for_short_strategy(
 
         assert expected_total_profit == actual_total_profit
         assert expected_future_profit == actual_future_profit
-        assert redis_strategy_schema.funds == old_funds + actual_total_profit
-        assert redis_strategy_schema.future_funds == old_future_funds + actual_future_profit
-        assert strategy_model.funds == old_funds + actual_total_profit
-        assert strategy_model.future_funds == old_future_funds + actual_future_profit
+        assert redis_strategy_schema.funds == round(old_funds + actual_total_profit, 2)
+        assert redis_strategy_schema.future_funds == round(
+            old_future_funds + actual_future_profit, 2
+        )
+        assert strategy_model.funds == round(old_funds + actual_total_profit, 2)
+        assert strategy_model.future_funds == round(old_future_funds + actual_future_profit, 2)

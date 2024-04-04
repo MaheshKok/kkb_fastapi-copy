@@ -264,6 +264,7 @@ async def test_trading_nfo_futures_opposite_direction(
             )
 
         expected_total_profit = round(expected_total_profit, 2)
+        expected_future_profit = round(expected_future_profit, 2)
         assert expected_total_profit == actual_total_profit
         assert expected_future_profit == actual_future_profit
         assert redis_strategy_schema.funds == old_funds + actual_total_profit

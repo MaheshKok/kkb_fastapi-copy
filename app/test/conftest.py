@@ -50,7 +50,6 @@ logging.basicConfig(
 #         get_expiry_dict_from_alice_blue,
 #     )
 #     from cron.download_master_contracts import push_angel_one_instruments
-
 #
 #     test_config = get_config(ConfigFile.TEST)
 #     _test_async_redis_client = aioredis.Redis(
