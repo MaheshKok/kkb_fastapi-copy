@@ -65,15 +65,7 @@ def strip_previous_expiry_dates(expiry_list_date_obj):
     return upcoming_expiry_dates
 
 
-async def get_monthly_expiry_date_from_redis(
-    *, async_redis_client: Redis, instrument_type: InstrumentTypeEnum, symbol: str
-):
-    symbol_expiry_str = await async_redis_client.get(instrument_type)
-    symbol_expiry = json.loads(symbol_expiry_str)
-    expiry_list_date_obj = [
-        datetime.strptime(expiry, "%Y-%m-%d").date() for expiry in symbol_expiry[symbol]
-    ]
-    expiry_list_date_obj = strip_previous_expiry_dates(expiry_list_date_obj)
+def get_current_and_next_expiry_from_expiry_list(expiry_list_date_obj):
     current_month_expiry = expiry_list_date_obj[0]
     next_month_expiry = None
     is_today_months_expiry = False
@@ -96,6 +88,18 @@ async def get_monthly_expiry_date_from_redis(
             next_month_expiry = expiry_list_date_obj[i]
 
     return current_month_expiry, next_month_expiry, is_today_months_expiry
+
+
+async def get_monthly_expiry_date_from_redis(
+    *, async_redis_client: Redis, instrument_type: InstrumentTypeEnum, symbol: str
+):
+    expiry_dict_json = await async_redis_client.get(instrument_type)
+    expiry_list = json.loads(expiry_dict_json)[symbol]
+    expiry_datetime_obj_list = [
+        datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list
+    ]
+    expiry_list_date_obj = strip_previous_expiry_dates(expiry_datetime_obj_list)
+    return get_current_and_next_expiry_from_expiry_list(expiry_list_date_obj)
 
 
 async def get_monthly_expiry_date_from_alice_blue(*, instrument_type, symbol):
@@ -105,28 +109,7 @@ async def get_monthly_expiry_date_from_alice_blue(*, instrument_type, symbol):
         datetime.strptime(expiry, REDIS_DATE_FORMAT).date() for expiry in expiry_list
     ]
     expiry_list_date_obj = strip_previous_expiry_dates(expiry_datetime_obj_list)
-    current_month_expiry = expiry_list_date_obj[0]
-    next_month_expiry = None
-    is_today_months_expiry = False
-
-    for i in range(1, len(expiry_list_date_obj)):
-        if (
-            expiry_list_date_obj[i].month != expiry_list_date_obj[i - 1].month
-        ):  # If a change of month is detected in the list
-            # Save the last date of the previous month
-            if expiry_list_date_obj[i - 1].month == datetime.now().month:  # adjust this as needed
-                current_month_expiry = expiry_list_date_obj[i - 1]
-                if current_month_expiry == datetime.now().date():
-                    is_today_months_expiry = True
-            elif expiry_list_date_obj[i - 1].month == ((datetime.now().month % 12) + 1):
-                next_month_expiry = expiry_list_date_obj[i - 1]
-        # Catch the last date of the next month, in case the loop finishes
-        elif i == len(expiry_list_date_obj) - 1 and expiry_list_date_obj[i].month == (
-            (datetime.now().month % 12) + 1
-        ):
-            next_month_expiry = expiry_list_date_obj[i]
-
-    return current_month_expiry, next_month_expiry, is_today_months_expiry
+    return get_current_and_next_expiry_from_expiry_list(expiry_list_date_obj)
 
 
 async def get_future_price_from_redis(
@@ -433,16 +416,13 @@ def get_lots_to_open(
             closest_lots_to_trade += to_increment
 
         if closest_lots_to_trade + to_increment == approx_lots_to_trade:
-            lots_to_trade = closest_lots_to_trade + to_increment
+            _lots_to_trade = closest_lots_to_trade + to_increment
         else:
-            lots_to_trade = closest_lots_to_trade
+            _lots_to_trade = closest_lots_to_trade
 
-        # Add rounding here
-        lots_to_trade = lots_to_trade.quantize(Decimal("0.01"), rounding=ROUND_DOWN)
-
-        # Convert the result back to a float for consistency with your existing code
-        lots_to_trade = float(lots_to_trade)
-        return lots_to_trade
+        # Add rounding here and Convert the result back to a float for consistency with your existing code
+        _lots_to_trade = float(_lots_to_trade.quantize(Decimal("0.01"), rounding=ROUND_DOWN))
+        return _lots_to_trade
 
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
     getcontext().prec = 28  # Set a high precision
@@ -461,12 +441,17 @@ def get_lots_to_open(
             # if funds available are less than margin_for_min_quantity, then we will use margin_for_min_quantity
             """
             Example:
-            total available funds = 5Lakh and
-            available funds = 50K because funds_usage_percent is 10%
-            margin_for_min_quantity = 1Lakh
+            total available funds = 5Lakh and if funds_usage_percent is 10%
+            then available funds = 50K and suppose margin_for_min_quantity = 1Lakh
             then we will trade with 1Lakh and not 5Lakh
             """
-            available_funds = Decimal(margin_for_min_quantity)
+            logging.info(
+                f"[ {crucial_details} ] - Available Funds: [ {available_funds} ] are less than margin for min quantity: [ {margin_for_min_quantity} ]"
+            )
+            logging.info(
+                f"[ {crucial_details} ] - lots to open [ {strategy_schema.min_quantity} ]"
+            )
+            return strategy_schema.min_quantity
 
         if not strategy_schema.compounding:
             logging.info(
