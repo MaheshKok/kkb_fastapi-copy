@@ -7,7 +7,7 @@ from aioredis import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.broker.AngelOne import AsyncAngelOneClient
+from app.broker.AsyncAngelOne import AsyncAngelOneClient
 from app.broker.utils import get_pya3_obj
 from app.broker.utils import update_ablue_session_token
 from app.core.config import get_config

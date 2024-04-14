@@ -23,7 +23,7 @@ from app.api.trade.IndianFNO.utils import get_margin_required
 from app.api.trade.IndianFNO.utils import get_strike_and_entry_price
 from app.api.trade.IndianFNO.utils import get_strike_and_exit_price_dict
 from app.api.trade.IndianFNO.utils import set_quantity
-from app.broker.AngelOne import AsyncAngelOneClient
+from app.broker.AsyncAngelOne import AsyncAngelOneClient
 from app.broker.utils import buy_alice_blue_trades
 from app.database.models import StrategyModel
 from app.database.models import TradeModel

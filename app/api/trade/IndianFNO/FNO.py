@@ -22,7 +22,7 @@ from app.api.trade.IndianFNO.tasks import task_exit_trade
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.IndianFNO.utils import get_opposite_trade_option_type
 from app.api.trade.IndianFNO.utils import set_option_type
-from app.broker.AngelOne import AsyncAngelOneClient
+from app.broker.AsyncAngelOne import AsyncAngelOneClient
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
 from app.schemas.enums import InstrumentTypeEnum

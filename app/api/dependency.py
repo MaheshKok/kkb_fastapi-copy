@@ -8,7 +8,7 @@ from httpx import Limits
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.broker.AngelOne import AsyncAngelOneClient
+from app.broker.AsyncAngelOne import AsyncAngelOneClient
 from app.core.config import Config
 from app.database.models import BrokerModel
 from app.database.models import CFDStrategyModel

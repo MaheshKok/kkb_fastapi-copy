@@ -18,7 +18,7 @@ from fastapi import HTTPException
 from httpx import AsyncClient
 from starlette import status
 
-from app.broker.AngelOne import AsyncAngelOneClient
+from app.broker.AsyncAngelOne import AsyncAngelOneClient
 from app.broker.utils import buy_alice_blue_trades
 from app.broker.utils import close_alice_blue_trades
 from app.schemas.broker import AngelOneInstrumentSchema
