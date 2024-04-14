@@ -495,6 +495,7 @@ async def get_margin_required(
     angel_one_trading_symbol: str,
     signal_type: SignalTypeEnum,
     strategy_schema: StrategySchema,
+    crucial_details: str,
 ):
     instrument_json = await async_redis_client.get(angel_one_trading_symbol)
     instrument = json.loads(instrument_json)
@@ -527,6 +528,9 @@ async def get_margin_required(
     margin_api_response = await client.get_margin_api(params=params)
     if margin_api_response["message"] == "SUCCESS":
         return margin_api_response["data"]["totalMarginRequired"]
+    logging.info(
+        f"[ {crucial_details} ] - margin required to {trade_type.upper()} lots: [ {instrument_schema.lotsize} ] is {strategy_schema.margin_for_min_quantity}"
+    )
     return strategy_schema.margin_for_min_quantity
 
 

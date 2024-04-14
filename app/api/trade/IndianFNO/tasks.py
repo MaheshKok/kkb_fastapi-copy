@@ -203,8 +203,8 @@ async def push_trade_to_redis(
     crucial_details: str,
 ):
     # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
-    # it works i confirmed this with python_console with dummy data,
-    # interesting part is to get such trades i have to call lrange with 0, -1
+    # it works I confirmed this with python_console with test double data,
+    # interesting part is to get such trades I have to call lrange with 0, -1
     redis_key = str(trade_model.strategy_id)
     if trade_model.option_type:
         redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
@@ -402,6 +402,7 @@ async def task_entry_trade(
         strategy_schema=strategy_schema,
         async_redis_client=async_redis_client,
         angel_one_trading_symbol=angel_one_trading_symbol,
+        crucial_details=crucial_details,
     )
     lots_to_open = get_lots_to_open(
         strategy_schema=strategy_schema,
