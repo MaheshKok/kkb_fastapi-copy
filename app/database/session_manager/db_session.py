@@ -13,8 +13,8 @@ from app.database.session_manager.exceptions import MissingSessionError
 from app.database.session_manager.exceptions import SessionNotInitialisedError
 
 
-_Session: Optional[async_sessionmaker] = None
-_session: ContextVar[Optional[AsyncSession]] = ContextVar("_session", default=None)
+_async_session_maker: Optional[async_sessionmaker] = None
+_AsyncSession: ContextVar[Optional[AsyncSession]] = ContextVar("_session", default=None)
 
 
 class DBSessionMeta(type):
@@ -23,14 +23,14 @@ class DBSessionMeta(type):
     @property
     def session(self) -> AsyncSession:
         """Return an instance of Session local to the current async context."""
-        if _Session is None:
+        if _async_session_maker is None:
             raise SessionNotInitialisedError
 
-        session = _session.get()
-        if session is None:
+        _async_session = _AsyncSession.get()
+        if _async_session is None:
             raise MissingSessionError
 
-        return session
+        return _async_session
 
 
 class Database(metaclass=DBSessionMeta):
@@ -40,22 +40,22 @@ class Database(metaclass=DBSessionMeta):
         self.commit_on_exit = commit_on_exit
 
     async def __aenter__(self):
-        if not isinstance(_Session, async_sessionmaker):
+        if not isinstance(_async_session_maker, async_sessionmaker):
             raise SessionNotInitialisedError
 
-        self.token = _session.set(_Session(**self.session_args))
+        self.token = _AsyncSession.set(_async_session_maker(**self.session_args))
         return self.session  # Note that we now return the session
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        session = _session.get()
+        _async_session = _AsyncSession.get()
         if exc_type is not None:
-            await session.rollback()
+            await _async_session.rollback()
 
         if self.commit_on_exit:
-            await session.commit()
+            await _async_session.commit()
 
-        await session.close()
-        _session.reset(self.token)
+        await _async_session.close()
+        _AsyncSession.reset(self.token)
 
     @classmethod
     def init(
@@ -75,18 +75,18 @@ class Database(metaclass=DBSessionMeta):
         else:
             engine = custom_engine
 
-        global _Session
-        _Session = async_sessionmaker(engine, expire_on_commit=False, **session_args)
+        global _async_session_maker
+        _async_session_maker = async_sessionmaker(engine, expire_on_commit=False, **session_args)
 
     # using metaclass property
     @property
     def session(self) -> AsyncSession:
         """Return an instance of Session local to the current async context."""
-        if _Session is None:
+        if _async_session_maker is None:
             raise SessionNotInitialisedError
 
-        session = _session.get()
-        if session is None:
+        _async_session = _AsyncSession.get()
+        if _async_session is None:
             raise MissingSessionError
 
-        return session
+        return _async_session
