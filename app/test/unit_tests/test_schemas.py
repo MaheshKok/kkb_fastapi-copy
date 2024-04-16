@@ -7,6 +7,7 @@ strategy_payload = {
     "instrument_type": "FUTIDX",
     "symbol": "BANKNIFTY",
     "name": "BANKNIFTY1! TF:5 Brick_Size:83",
+    "only_on_expiry": False,
     "position": "SHORT",
     "premium": 700.0,
     "funds": 200000.0,

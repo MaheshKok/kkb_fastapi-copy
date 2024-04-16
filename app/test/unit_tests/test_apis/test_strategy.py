@@ -50,6 +50,7 @@ async def test_post_strategys(test_async_client):
             symbol="BANKNIFTY",
             name="BANKNIFTY1! TF:2 Brick_Size:35 Pyramiding:100",
             position=PositionEnum.LONG,
+            only_on_expiry=False,
             premium=350.0,
             funds=1000000.0,
             future_funds=1000000.0,
