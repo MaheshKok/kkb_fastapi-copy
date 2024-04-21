@@ -28,13 +28,13 @@ from app.broker.utils import buy_alice_blue_trades
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
-from app.schemas.enums import PositionEnum
-from app.schemas.enums import SignalTypeEnum
-from app.schemas.strategy import StrategySchema
-from app.schemas.trade import EntryTradeSchema
-from app.schemas.trade import ExitTradeSchema
-from app.schemas.trade import RedisTradeSchema
-from app.schemas.trade import SignalPayloadSchema
+from app.pydantic_models.enums import PositionEnum
+from app.pydantic_models.enums import SignalTypeEnum
+from app.pydantic_models.strategy import StrategyPydanticModel
+from app.pydantic_models.trade import EntryTradePydanticModel
+from app.pydantic_models.trade import ExitTradePydanticModel
+from app.pydantic_models.trade import RedisTradePydanticModel
+from app.pydantic_models.trade import SignalPydanticModel
 from app.utils.constants import FUT
 from app.utils.constants import STRATEGY
 from app.utils.constants import update_trade_columns
@@ -142,20 +142,20 @@ async def calculate_profits(
     *,
     strike_exit_price_dict: dict,
     future_exit_price: float,
-    signal_payload_schema: SignalPayloadSchema,
-    redis_trade_schema_list: List[RedisTradeSchema],
-    strategy_schema: StrategySchema,
+    signal_pydantic_model: SignalPydanticModel,
+    redis_trade_pydantic_model_list: List[RedisTradePydanticModel],
+    strategy_pydantic_model: StrategyPydanticModel,
 ):
     updated_data = {}
     total_ongoing_profit = 0
     total_future_profit = 0
     exit_at = datetime.utcnow()
-    exit_received_at = signal_payload_schema.received_at
-    position = strategy_schema.position
-    for redis_trade_schema in redis_trade_schema_list:
-        entry_price = redis_trade_schema.entry_price
-        quantity = redis_trade_schema.quantity
-        exit_price = strike_exit_price_dict.get(redis_trade_schema.strike) or 0.0
+    exit_received_at = signal_pydantic_model.received_at
+    position = strategy_pydantic_model.position
+    for redis_trade_pydantic_model in redis_trade_pydantic_model_list:
+        entry_price = redis_trade_pydantic_model.entry_price
+        quantity = redis_trade_pydantic_model.quantity
+        exit_price = strike_exit_price_dict.get(redis_trade_pydantic_model.strike) or 0.0
         if not exit_price:
             # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker
             continue
@@ -163,19 +163,19 @@ async def calculate_profits(
         profit = get_options_profit(
             entry_price=entry_price, exit_price=exit_price, quantity=quantity, position=position
         )
-        future_entry_price_received = redis_trade_schema.future_entry_price_received
+        future_entry_price_received = redis_trade_pydantic_model.future_entry_price_received
         future_profit = get_futures_profit(
             entry_price=future_entry_price_received,
             exit_price=future_exit_price,
             quantity=quantity,
             # existing signal when trade was entered into db is captured in action attribute
-            signal=redis_trade_schema.action,
+            signal=redis_trade_pydantic_model.action,
         )
 
         mapping = {
-            "id": redis_trade_schema.id,
+            "id": redis_trade_pydantic_model.id,
             "future_exit_price_received": round(
-                signal_payload_schema.future_entry_price_received, 2
+                signal_pydantic_model.future_entry_price_received, 2
             ),
             "exit_price": exit_price,
             "exit_received_at": exit_received_at,
@@ -184,12 +184,12 @@ async def calculate_profits(
             "future_profit": future_profit,
         }
 
-        updated_data[redis_trade_schema.id] = mapping
+        updated_data[redis_trade_pydantic_model.id] = mapping
         total_ongoing_profit += profit
         total_future_profit += future_profit
 
     # validate all mappings via ExitTradeSchema
-    ExitTradeListValidator = TypeAdapter(List[ExitTradeSchema])
+    ExitTradeListValidator = TypeAdapter(List[ExitTradePydanticModel])
     ExitTradeListValidator.validate_python(list(updated_data.values()))
 
     return updated_data, round(total_ongoing_profit, 2), round(total_future_profit, 2)
@@ -211,7 +211,7 @@ async def push_trade_to_redis(
     else:
         redis_hash = f"{trade_model.expiry} {PositionEnum.LONG if signal_type == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
     redis_trades_json = await async_redis_client.hget(redis_key, redis_hash)
-    new_trade_json = RedisTradeSchema.model_validate(trade_model).model_dump_json(
+    new_trade_json = RedisTradePydanticModel.model_validate(trade_model).model_dump_json(
         exclude={"received_at"}, exclude_none=True
     )
     redis_trades_list = []
@@ -224,24 +224,24 @@ async def push_trade_to_redis(
 
 async def dump_trade_in_db_and_redis(
     *,
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
     entry_price: float,
-    signal_payload_schema: SignalPayloadSchema,
+    signal_pydantic_model: SignalPydanticModel,
     async_redis_client: aioredis.StrictRedis,
     crucial_details: str,
 ):
     async with Database() as async_session:
         # Use the AsyncSession to perform database operations
         # Example: Create a new entry in the database
-        trade_schema = EntryTradeSchema(
-            symbol=strategy_schema.symbol,
+        trade_pydatic_model = EntryTradePydanticModel(
+            symbol=strategy_pydantic_model.symbol,
             entry_price=entry_price,
-            entry_received_at=signal_payload_schema.received_at,
-            **signal_payload_schema.model_dump(exclude={"premium"}, exclude_none=True),
+            entry_received_at=signal_pydantic_model.received_at,
+            **signal_pydantic_model.model_dump(exclude={"premium"}, exclude_none=True),
         )
 
         trade_model = TradeModel(
-            **trade_schema.model_dump(
+            **trade_pydatic_model.model_dump(
                 exclude={"premium", "broker_id", "symbol", "received_at"},
                 exclude_none=True,
             )
@@ -252,7 +252,7 @@ async def dump_trade_in_db_and_redis(
         await push_trade_to_redis(
             async_redis_client=async_redis_client,
             trade_model=trade_model,
-            signal_type=signal_payload_schema.action,
+            signal_type=signal_pydantic_model.action,
             crucial_details=crucial_details,
         )
 
@@ -260,7 +260,7 @@ async def dump_trade_in_db_and_redis(
 async def close_trades_in_db_and_remove_from_redis(
     *,
     updated_data: dict,
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
     total_profit: float,
     total_future_profit: float,
     total_redis_trades: int,
@@ -273,12 +273,14 @@ async def close_trades_in_db_and_remove_from_redis(
         await async_session.execute(query_)
         await async_session.flush()
 
-        # rather update strategy_schema funds in redis
-        updated_funds = round(strategy_schema.funds + total_profit, 2)
-        updated_futures_funds = round(strategy_schema.future_funds + total_future_profit, 2)
+        # rather update strategy_pydantic_model funds in redis
+        updated_funds = round(strategy_pydantic_model.funds + total_profit, 2)
+        updated_futures_funds = round(
+            strategy_pydantic_model.future_funds + total_future_profit, 2
+        )
         stmt = (
             update(StrategyModel)
-            .where(StrategyModel.id == strategy_schema.id)
+            .where(StrategyModel.id == strategy_pydantic_model.id)
             .values(funds=updated_funds, future_funds=updated_futures_funds)
         )
         await async_session.execute(stmt)
@@ -289,11 +291,13 @@ async def close_trades_in_db_and_remove_from_redis(
         logging.info(
             f"[ {crucial_details} ] - Strategy updated funds: [ {updated_funds} ] and futures funds: [ {updated_futures_funds} ] in db successfully"
         )
-        strategy_schema.funds = updated_funds
-        strategy_schema.future_funds = updated_futures_funds
+        strategy_pydantic_model.funds = updated_funds
+        strategy_pydantic_model.future_funds = updated_futures_funds
         redis_strategy_key = redis_strategy_key_hash.split()[0]
         await async_redis_client.hset(
-            redis_strategy_key, STRATEGY, StrategySchema.model_dump_json(strategy_schema)
+            redis_strategy_key,
+            STRATEGY,
+            StrategyPydanticModel.model_dump_json(strategy_pydantic_model),
         )
         logging.info(
             f"[ {crucial_details} ] - Strategy updated funds: [ {updated_funds} ] and futures funds: [ {updated_futures_funds} ] in redis successfully"
@@ -306,16 +310,16 @@ async def close_trades_in_db_and_remove_from_redis(
             )
         else:
             logging.error(
-                f"[ {crucial_details} ] - Redis Key: [ {redis_strategy_key_hash} ] not deleted from redis for strategy: [ {strategy_schema.name} ]"
+                f"[ {crucial_details} ] - Redis Key: [ {redis_strategy_key_hash} ] not deleted from redis for strategy: [ {strategy_pydantic_model.name} ]"
             )
 
 
 # @profile
 async def task_entry_trade(
     *,
-    signal_payload_schema: SignalPayloadSchema,
+    signal_pydantic_model: SignalPydanticModel,
     async_redis_client: aioredis.StrictRedis,
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
     async_httpx_client: AsyncClient,
     crucial_details: str,
     async_angelone_client: AsyncAngelOneClient,
@@ -328,20 +332,20 @@ async def task_entry_trade(
         option_chain = await get_option_chain(
             async_redis_client=async_redis_client,
             expiry=options_expiry_date,
-            option_type=signal_payload_schema.option_type,
-            strategy_schema=strategy_schema,
+            option_type=signal_pydantic_model.option_type,
+            strategy_pydantic_model=strategy_pydantic_model,
         )
 
         future_entry_price, strike_and_entry_price = await asyncio.gather(
             get_future_price_from_redis(
                 async_redis_client=async_redis_client,
-                strategy_schema=strategy_schema,
+                strategy_pydantic_model=strategy_pydantic_model,
                 expiry_date=futures_expiry_date,
             ),
             get_strike_and_entry_price(
                 option_chain=option_chain,
-                signal_payload_schema=signal_payload_schema,
-                strategy_schema=strategy_schema,
+                signal_pydantic_model=signal_pydantic_model,
+                strategy_pydantic_model=strategy_pydantic_model,
                 async_redis_client=async_redis_client,
                 async_httpx_client=async_httpx_client,
                 crucial_details=crucial_details,
@@ -358,20 +362,20 @@ async def task_entry_trade(
             )
             return None
 
-        signal_payload_schema.strike = strike
+        signal_pydantic_model.strike = strike
         angel_one_trading_symbol = get_angel_one_options_trading_symbol(
-            symbol=strategy_schema.symbol,
-            expiry_date=signal_payload_schema.expiry,
+            symbol=strategy_pydantic_model.symbol,
+            expiry_date=signal_pydantic_model.expiry,
             strike=int(strike),
-            option_type=signal_payload_schema.option_type,
+            option_type=signal_pydantic_model.option_type,
         )
     else:
-        if strategy_schema.broker_id:
+        if strategy_pydantic_model.broker_id:
             entry_price = await buy_alice_blue_trades(
                 strike=None,
-                signal_payload_schema=signal_payload_schema,
+                signal_pydantic_model=signal_pydantic_model,
                 async_redis_client=async_redis_client,
-                strategy_schema=strategy_schema,
+                strategy_pydantic_model=strategy_pydantic_model,
                 async_httpx_client=async_httpx_client,
             )
             logging.info(
@@ -380,7 +384,7 @@ async def task_entry_trade(
         else:
             entry_price = await get_future_price_from_redis(
                 async_redis_client=async_redis_client,
-                strategy_schema=strategy_schema,
+                strategy_pydantic_model=strategy_pydantic_model,
                 expiry_date=futures_expiry_date,
             )
             logging.info(
@@ -388,38 +392,38 @@ async def task_entry_trade(
             )
 
         angel_one_trading_symbol = get_angel_one_futures_trading_symbol(
-            symbol=strategy_schema.symbol,
-            expiry_date=signal_payload_schema.expiry,
+            symbol=strategy_pydantic_model.symbol,
+            expiry_date=signal_pydantic_model.expiry,
         )
         logging.info(
-            f"[ {crucial_details} ] - Slippage: [ {entry_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_payload_schema.future_entry_price_received} ] "
+            f"[ {crucial_details} ] - Slippage: [ {entry_price - signal_pydantic_model.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_pydantic_model.future_entry_price_received} ] "
         )
 
     margin_for_min_quantity = await get_margin_required(
         client=async_angelone_client,
         price=entry_price,
-        signal_type=signal_payload_schema.action,
-        strategy_schema=strategy_schema,
+        signal_type=signal_pydantic_model.action,
+        strategy_pydantic_model=strategy_pydantic_model,
         async_redis_client=async_redis_client,
         angel_one_trading_symbol=angel_one_trading_symbol,
         crucial_details=crucial_details,
     )
     lots_to_open = get_lots_to_open(
-        strategy_schema=strategy_schema,
+        strategy_pydantic_model=strategy_pydantic_model,
         crucial_details=crucial_details,
         ongoing_profit_or_loss=ongoing_profit,
         margin_for_min_quantity=margin_for_min_quantity,
     )
     set_quantity(
-        strategy_schema=strategy_schema,
-        signal_payload_schema=signal_payload_schema,
+        strategy_pydantic_model=strategy_pydantic_model,
+        signal_pydantic_model=signal_pydantic_model,
         lots_to_open=lots_to_open,
     )
 
     await dump_trade_in_db_and_redis(
-        strategy_schema=strategy_schema,
+        strategy_pydantic_model=strategy_pydantic_model,
         entry_price=entry_price,
-        signal_payload_schema=signal_payload_schema,
+        signal_pydantic_model=signal_pydantic_model,
         async_redis_client=async_redis_client,
         crucial_details=crucial_details,
     )
@@ -429,10 +433,10 @@ async def task_entry_trade(
 
 async def compute_trade_data_needed_for_closing_trade(
     *,
-    signal_payload_schema: SignalPayloadSchema,
-    redis_trade_schema_list: list[RedisTradeSchema],
+    signal_pydantic_model: SignalPydanticModel,
+    redis_trade_pydantic_model_list: list[RedisTradePydanticModel],
     async_redis_client: Redis,
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
     async_httpx_client: AsyncClient,
     crucial_details: str,
     futures_expiry_date: date,
@@ -442,41 +446,41 @@ async def compute_trade_data_needed_for_closing_trade(
     if only_futures:
         actual_exit_price = await get_future_price(
             async_redis_client=async_redis_client,
-            strategy_schema=strategy_schema,
+            strategy_pydantic_model=strategy_pydantic_model,
             expiry_date=futures_expiry_date,
-            signal_payload_schema=signal_payload_schema,
+            signal_pydantic_model=signal_pydantic_model,
             async_httpx_client=async_httpx_client,
-            redis_trade_schema_list=redis_trade_schema_list,
+            redis_trade_pydantic_model_list=redis_trade_pydantic_model_list,
         )
         logging.info(
-            f"[ {crucial_details} ], Slippage: [ {signal_payload_schema.future_entry_price_received - actual_exit_price } points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
+            f"[ {crucial_details} ], Slippage: [ {signal_pydantic_model.future_entry_price_received - actual_exit_price } points ] introduced for future_exit_price: [ {signal_pydantic_model.future_entry_price_received} ] "
         )
 
         updated_data = {}
         total_actual_profit = 0
         total_expected_profit = 0
-        for trade_schema in redis_trade_schema_list:
+        for trade_pydantic_model in redis_trade_pydantic_model_list:
             actual_profit = get_futures_profit(
-                entry_price=trade_schema.entry_price,
+                entry_price=trade_pydantic_model.entry_price,
                 exit_price=actual_exit_price,
-                quantity=trade_schema.quantity,
-                signal=trade_schema.action,
+                quantity=trade_pydantic_model.quantity,
+                signal=trade_pydantic_model.action,
             )
 
             expected_profit = get_futures_profit(
-                entry_price=trade_schema.future_entry_price_received,
-                exit_price=signal_payload_schema.future_entry_price_received,
-                quantity=trade_schema.quantity,
-                signal=trade_schema.action,
+                entry_price=trade_pydantic_model.future_entry_price_received,
+                exit_price=signal_pydantic_model.future_entry_price_received,
+                quantity=trade_pydantic_model.quantity,
+                signal=trade_pydantic_model.action,
             )
 
-            updated_data[trade_schema.id] = {
-                "id": trade_schema.id,
+            updated_data[trade_pydantic_model.id] = {
+                "id": trade_pydantic_model.id,
                 "future_exit_price_received": round(
-                    signal_payload_schema.future_entry_price_received, 2
+                    signal_pydantic_model.future_entry_price_received, 2
                 ),
                 "exit_price": actual_exit_price,
-                "exit_received_at": signal_payload_schema.received_at,
+                "exit_received_at": signal_pydantic_model.received_at,
                 "exit_at": datetime.utcnow(),
                 "profit": actual_profit,
                 "future_profit": expected_profit,
@@ -489,28 +493,28 @@ async def compute_trade_data_needed_for_closing_trade(
         strike_exit_price_dict, future_exit_price = await asyncio.gather(
             get_strike_and_exit_price_dict(
                 async_redis_client=async_redis_client,
-                redis_trade_schema_list=redis_trade_schema_list,
-                strategy_schema=strategy_schema,
+                redis_trade_pydantic_model_list=redis_trade_pydantic_model_list,
+                strategy_pydantic_model=strategy_pydantic_model,
                 async_httpx_client=async_httpx_client,
                 expiry_date=options_expiry_date,
             ),
             get_future_price(
                 async_redis_client=async_redis_client,
-                strategy_schema=strategy_schema,
+                strategy_pydantic_model=strategy_pydantic_model,
                 expiry_date=futures_expiry_date,
-                signal_payload_schema=signal_payload_schema,
+                signal_pydantic_model=signal_pydantic_model,
                 async_httpx_client=async_httpx_client,
             ),
         )
         logging.info(
-            f"[ {crucial_details} ] - Slippage: [ {future_exit_price - signal_payload_schema.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_payload_schema.future_entry_price_received} ] "
+            f"[ {crucial_details} ] - Slippage: [ {future_exit_price - signal_pydantic_model.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_pydantic_model.future_entry_price_received} ] "
         )
         updated_data, total_ongoing_profit, total_actual_profit = await calculate_profits(
             strike_exit_price_dict=strike_exit_price_dict,
             future_exit_price=future_exit_price,
-            signal_payload_schema=signal_payload_schema,
-            redis_trade_schema_list=redis_trade_schema_list,
-            strategy_schema=strategy_schema,
+            signal_pydantic_model=signal_pydantic_model,
+            redis_trade_pydantic_model_list=redis_trade_pydantic_model_list,
+            strategy_pydantic_model=strategy_pydantic_model,
         )
         logging.info(
             f" [ {crucial_details} ] - adding profit: [ {total_ongoing_profit} ] and future profit: [ {total_actual_profit} ]"
@@ -520,18 +524,18 @@ async def compute_trade_data_needed_for_closing_trade(
 
 async def task_exit_trade(
     *,
-    signal_payload_schema: SignalPayloadSchema,
-    strategy_schema: StrategySchema,
+    signal_pydantic_model: SignalPydanticModel,
+    strategy_pydantic_model: StrategyPydanticModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
     only_futures: bool,
     redis_hash: str,
-    redis_trade_schema_list: List[RedisTradeSchema],
+    redis_trade_pydantic_model_list: List[RedisTradePydanticModel],
     crucial_details: str,
     futures_expiry_date: date,
     options_expiry_date: date = None,
 ):
-    trades_key = f"{signal_payload_schema.strategy_id}"
+    trades_key = f"{signal_pydantic_model.strategy_id}"
 
     # TODO: in future decide based on strategy new column, strategy_type:
     # if strategy_position is "every" then close all ongoing trades and buy new trade
@@ -545,10 +549,10 @@ async def task_exit_trade(
             total_ongoing_profit,
             total_future_profit,
         ) = await compute_trade_data_needed_for_closing_trade(
-            signal_payload_schema=signal_payload_schema,
-            redis_trade_schema_list=redis_trade_schema_list,
+            signal_pydantic_model=signal_pydantic_model,
+            redis_trade_pydantic_model_list=redis_trade_pydantic_model_list,
             async_redis_client=async_redis_client,
-            strategy_schema=strategy_schema,
+            strategy_pydantic_model=strategy_pydantic_model,
             async_httpx_client=async_httpx_client,
             only_futures=only_futures,
             futures_expiry_date=futures_expiry_date,
@@ -559,10 +563,10 @@ async def task_exit_trade(
         # update database with the updated data
         await close_trades_in_db_and_remove_from_redis(
             updated_data=updated_data,
-            strategy_schema=strategy_schema,
+            strategy_pydantic_model=strategy_pydantic_model,
             total_profit=total_ongoing_profit,
             total_future_profit=total_future_profit,
-            total_redis_trades=len(redis_trade_schema_list),
+            total_redis_trades=len(redis_trade_pydantic_model_list),
             async_redis_client=async_redis_client,
             redis_strategy_key_hash=f"{trades_key} {redis_hash}",
             crucial_details=crucial_details,

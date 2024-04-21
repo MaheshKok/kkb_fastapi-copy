@@ -10,11 +10,11 @@ from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.models import User
 from app.database.session_manager.db_session import Database
-from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.enums import PositionEnum
-from app.schemas.enums import SignalTypeEnum
-from app.schemas.strategy import StrategySchema
-from app.schemas.trade import RedisTradeSchema
+from app.pydantic_models.enums import InstrumentTypeEnum
+from app.pydantic_models.enums import PositionEnum
+from app.pydantic_models.enums import SignalTypeEnum
+from app.pydantic_models.strategy import StrategyPydanticModel
+from app.pydantic_models.trade import RedisTradePydanticModel
 from app.test.factory.broker import BrokerFactory
 from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
@@ -67,12 +67,12 @@ async def test_exit_alice_blue_trade_for_long_strategy(
 
         payload = get_test_post_trade_payload(action.value)
         payload["strategy_id"] = str(strategy_model.id)
-        strategy_schema = StrategySchema.model_validate(strategy_model)
+        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_model)
         # set strategy in redis
         await test_async_redis_client.hset(
             str(strategy_model.id),
             STRATEGY,
-            strategy_schema.model_dump_json(),
+            strategy_pydantic_model.model_dump_json(),
         )
 
         # set trades in redis
@@ -92,7 +92,7 @@ async def test_exit_alice_blue_trade_for_long_strategy(
             redis_hash,
             json.dumps(
                 [
-                    RedisTradeSchema.model_validate(trade_model).model_dump_json()
+                    RedisTradePydanticModel.model_validate(trade_model).model_dump_json()
                     for trade_model in trade_models
                 ]
             ),
@@ -103,12 +103,12 @@ async def test_exit_alice_blue_trade_for_long_strategy(
     current_expiry_date, _, _ = await get_current_and_next_expiry_from_redis(
         async_redis_client=test_async_redis_client,
         instrument_type=InstrumentTypeEnum.FUTIDX,
-        symbol=strategy_schema.symbol,
+        symbol=strategy_pydantic_model.symbol,
     )
     future_option_chain = await get_option_chain(
         async_redis_client=test_async_redis_client,
         expiry=current_expiry_date,
-        strategy_schema=strategy_schema,
+        strategy_pydantic_model=strategy_pydantic_model,
         is_future=True,
     )
     future_entry_price = float(future_option_chain.get("FUT"))
@@ -223,12 +223,12 @@ async def test_exit_alice_blue_trade_for_short_strategy(
         payload = get_test_post_trade_payload(action.value)
         payload["strategy_id"] = str(strategy_model.id)
 
-        strategy_schema = StrategySchema.model_validate(strategy_model)
+        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_model)
         # set strategy in redis
         await test_async_redis_client.hset(
             str(strategy_model.id),
             STRATEGY,
-            strategy_schema.model_dump_json(),
+            strategy_pydantic_model.model_dump_json(),
         )
 
         # set trades in redis
@@ -248,7 +248,7 @@ async def test_exit_alice_blue_trade_for_short_strategy(
             redis_hash,
             json.dumps(
                 [
-                    RedisTradeSchema.model_validate(trade_model).model_dump_json()
+                    RedisTradePydanticModel.model_validate(trade_model).model_dump_json()
                     for trade_model in trade_models
                 ]
             ),
@@ -259,12 +259,12 @@ async def test_exit_alice_blue_trade_for_short_strategy(
     current_expiry_date, _, _ = await get_current_and_next_expiry_from_redis(
         async_redis_client=test_async_redis_client,
         instrument_type=InstrumentTypeEnum.FUTIDX,
-        symbol=strategy_schema.symbol,
+        symbol=strategy_pydantic_model.symbol,
     )
     future_option_chain = await get_option_chain(
         async_redis_client=test_async_redis_client,
         expiry=current_expiry_date,
-        strategy_schema=strategy_schema,
+        strategy_pydantic_model=strategy_pydantic_model,
         is_future=True,
     )
     future_entry_price = float(future_option_chain.get("FUT"))

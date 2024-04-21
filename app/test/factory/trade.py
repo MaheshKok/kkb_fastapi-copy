@@ -5,8 +5,8 @@ from datetime import timedelta
 import factory
 
 from app.database.models import TradeModel
-from app.schemas.enums import OptionTypeEnum
-from app.schemas.enums import SignalTypeEnum
+from app.pydantic_models.enums import OptionTypeEnum
+from app.pydantic_models.enums import SignalTypeEnum
 from app.test.factory.base_factory import AsyncSQLAlchemyFactory
 from app.test.factory.create_async_session import async_session
 from app.test.factory.strategy import StrategyFactory

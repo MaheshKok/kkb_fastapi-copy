@@ -8,11 +8,11 @@ from pydantic import Field
 from pydantic import model_validator
 from typing_extensions import Self
 
-from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.enums import PositionEnum
+from app.pydantic_models.enums import InstrumentTypeEnum
+from app.pydantic_models.enums import PositionEnum
 
 
-class StrategyCreateSchema(BaseModel):
+class StrategyCreatePydanticModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     instrument_type: InstrumentTypeEnum = Field(
@@ -64,7 +64,7 @@ class StrategyCreateSchema(BaseModel):
         return _input
 
 
-class StrategySchema(StrategyCreateSchema):
+class StrategyPydanticModel(StrategyCreatePydanticModel):
     id: uuid.UUID = Field(
         description="Strategy ID", example="ff80cf6b-3c4a-4d28-82b0-631eafb4cdd1"
     )
@@ -72,7 +72,7 @@ class StrategySchema(StrategyCreateSchema):
     model_config = ConfigDict(from_attributes=True, json_encoders={uuid.UUID: str})
 
 
-class CFDStrategySchema(BaseModel):
+class CFDStrategyPydanticModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID = Field(

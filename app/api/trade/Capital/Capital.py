@@ -4,14 +4,14 @@ import time
 from fastapi import APIRouter
 from fastapi import Depends
 
-from app.api.dependency import get_cfd_strategy_schema
+from app.api.dependency import get_cfd_strategy_pydantic_model
 from app.api.trade import trading_router
 from app.api.trade.Capital.utils import close_capital_lots
 from app.api.trade.Capital.utils import get_capital_cfd_existing_profit_or_loss
 from app.api.trade.Capital.utils import open_capital_lots
 from app.broker.AsyncCapital import AsyncCapitalClient
-from app.schemas.strategy import CFDStrategySchema
-from app.schemas.trade import CFDPayloadSchema
+from app.pydantic_models.strategy import CFDStrategyPydanticModel
+from app.pydantic_models.trade import CFDPayloadPydanticModel
 
 
 forex_router = APIRouter(
@@ -22,15 +22,15 @@ forex_router = APIRouter(
 
 @forex_router.post("/", status_code=200)
 async def post_capital_cfd(
-    cfd_payload_schema: CFDPayloadSchema,
-    cfd_strategy_schema: CFDStrategySchema = Depends(get_cfd_strategy_schema),
+    cfd_payload_pydantic_model: CFDPayloadPydanticModel,
+    cfd_strategy_pydantic_model: CFDStrategyPydanticModel = Depends(
+        get_cfd_strategy_pydantic_model
+    ),
 ):
     start_time = time.perf_counter()
 
-    demo_or_live = "DEMO" if cfd_strategy_schema.is_demo else "LIVE"
-    crucial_details = (
-        f"Capital {demo_or_live} {cfd_strategy_schema.instrument} {cfd_payload_schema.direction}"
-    )
+    demo_or_live = "DEMO" if cfd_strategy_pydantic_model.is_demo else "LIVE"
+    crucial_details = f"Capital {demo_or_live} {cfd_strategy_pydantic_model.instrument} {cfd_payload_pydantic_model.direction}"
 
     logging.info(f"[ {crucial_details} ] : signal received")
 
@@ -38,18 +38,18 @@ async def post_capital_cfd(
         username="maheshkokare100@gmail.com",
         password="SUua9Ydc83G.i!d",
         api_key="qshPG64m0RCWQ3fe",
-        demo=cfd_strategy_schema.is_demo,
+        demo=cfd_strategy_pydantic_model.is_demo,
     )
 
     profit_or_loss, current_open_lots, direction = await get_capital_cfd_existing_profit_or_loss(
-        client, cfd_strategy_schema, crucial_details
+        client, cfd_strategy_pydantic_model, crucial_details
     )
 
     if current_open_lots:
         position_reversed = await close_capital_lots(
             client=client,
-            cfd_strategy_schema=cfd_strategy_schema,
-            cfd_payload_schema=cfd_payload_schema,
+            cfd_strategy_pydantic_model=cfd_strategy_pydantic_model,
+            cfd_payload_pydantic_model=cfd_payload_pydantic_model,
             demo_or_live=demo_or_live,
             lots_to_close=current_open_lots,
             profit_or_loss=profit_or_loss,
@@ -65,13 +65,13 @@ async def post_capital_cfd(
             )
             return msg
 
-    if direction != cfd_payload_schema.direction.upper():
-        # funds_to_use = await get_funds_to_use(client, cfd_strategy_schema)
+    if direction != cfd_payload_pydantic_model.direction.upper():
+        # funds_to_use = await get_funds_to_use(client, cfd_strategy_pydantic_model)
 
         await open_capital_lots(
             client=client,
-            cfd_strategy_schema=cfd_strategy_schema,
-            cfd_payload_schema=cfd_payload_schema,
+            cfd_strategy_pydantic_model=cfd_strategy_pydantic_model,
+            cfd_payload_pydantic_model=cfd_payload_pydantic_model,
             demo_or_live=demo_or_live,
             profit_or_loss=profit_or_loss,
             funds_to_use=0.0,
@@ -80,6 +80,6 @@ async def post_capital_cfd(
         process_time = time.perf_counter() - start_time
         logging.info(f"[ {crucial_details} ] : request processing time: {process_time} seconds")
     else:
-        msg = f"[ {crucial_details} ] - signal [ {cfd_payload_schema.direction} ] is same as current direction, hence skipping opening new positions"
+        msg = f"[ {crucial_details} ] - signal [ {cfd_payload_pydantic_model.direction} ] is same as current direction, hence skipping opening new positions"
         logging.info(msg)
         return msg

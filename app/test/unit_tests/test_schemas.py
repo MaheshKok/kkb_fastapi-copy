@@ -1,6 +1,6 @@
 import pytest
 
-from app.schemas.strategy import StrategyCreateSchema
+from app.pydantic_models.strategy import StrategyCreatePydanticModel
 
 
 strategy_payload = {
@@ -26,14 +26,14 @@ strategy_payload = {
 @pytest.mark.asyncio
 async def test_strategy_compounding_results_in_0_contracts():
     strategy_payload["compounding"] = True
-    strategy_schema = StrategyCreateSchema(**strategy_payload)
-    assert strategy_schema.contracts == 0.0
+    strategy_pydantic_model = StrategyCreatePydanticModel(**strategy_payload)
+    assert strategy_pydantic_model.contracts == 0.0
 
 
 @pytest.mark.asyncio
 async def test_strategy_futidx_results_in_0_premium():
-    strategy_schema = StrategyCreateSchema(**strategy_payload)
-    assert strategy_schema.premium == 0.0
+    strategy_pydantic_model = StrategyCreatePydanticModel(**strategy_payload)
+    assert strategy_pydantic_model.premium == 0.0
 
 
 @pytest.mark.asyncio
@@ -41,7 +41,7 @@ async def test_strategy_optidx_raise_error_for_no_premium():
     strategy_payload["instrument_type"] = "OPTIDX"
     del strategy_payload["premium"]
     with pytest.raises(ValueError):
-        StrategyCreateSchema(**strategy_payload)
+        StrategyCreatePydanticModel(**strategy_payload)
 
 
 @pytest.mark.asyncio
@@ -49,4 +49,4 @@ async def test_strategy_not_compounding_raise_error_for_no_contracts():
     strategy_payload["compounding"] = False
     del strategy_payload["contracts"]
     with pytest.raises(ValueError):
-        StrategyCreateSchema(**strategy_payload)
+        StrategyCreatePydanticModel(**strategy_payload)

@@ -18,7 +18,7 @@ from pya3 import OrderType
 from pya3 import ProductType
 from pya3 import encrypt_string
 
-from app.schemas.trade import generate_trading_symbol
+from app.pydantic_models.trade import generate_trading_symbol
 from app.utils.constants import OptionType
 
 

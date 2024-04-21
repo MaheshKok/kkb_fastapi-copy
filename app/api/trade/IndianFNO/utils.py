@@ -21,15 +21,15 @@ from starlette import status
 from app.broker.AsyncAngelOne import AsyncAngelOneClient
 from app.broker.utils import buy_alice_blue_trades
 from app.broker.utils import close_alice_blue_trades
-from app.schemas.broker import AngelOneInstrumentSchema
-from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.enums import OptionTypeEnum
-from app.schemas.enums import PositionEnum
-from app.schemas.enums import ProductTypeEnum
-from app.schemas.enums import SignalTypeEnum
-from app.schemas.strategy import StrategySchema
-from app.schemas.trade import RedisTradeSchema
-from app.schemas.trade import SignalPayloadSchema
+from app.pydantic_models.broker import AngelOneInstrumentPydanticModel
+from app.pydantic_models.enums import InstrumentTypeEnum
+from app.pydantic_models.enums import OptionTypeEnum
+from app.pydantic_models.enums import PositionEnum
+from app.pydantic_models.enums import ProductTypeEnum
+from app.pydantic_models.enums import SignalTypeEnum
+from app.pydantic_models.strategy import StrategyPydanticModel
+from app.pydantic_models.trade import RedisTradePydanticModel
+from app.pydantic_models.trade import SignalPydanticModel
 from app.utils.constants import ANGELONE_EXPIRY_DATE_FORMAT
 from app.utils.constants import FUT
 from app.utils.constants import REDIS_DATE_FORMAT
@@ -43,17 +43,17 @@ logging.basicConfig(
 
 async def get_exit_price_from_option_chain(
     async_redis_client,
-    redis_trade_schema_list,
+    redis_trade_pydantic_model_list,
     expiry_date,
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
 ):
-    option_type = redis_trade_schema_list[0].option_type
+    option_type = redis_trade_pydantic_model_list[0].option_type
     # reason for using set comprehension, we want the exit_price for all distinct strikes
-    strikes = {trade.strike for trade in redis_trade_schema_list}
+    strikes = {trade.strike for trade in redis_trade_pydantic_model_list}
     option_chain = await get_option_chain(
         async_redis_client=async_redis_client,
         expiry=expiry_date,
-        strategy_schema=strategy_schema,
+        strategy_pydantic_model=strategy_pydantic_model,
         option_type=option_type,
     )
     return {strike: option_chain[strike] for strike in strikes}
@@ -115,13 +115,13 @@ async def get_monthly_expiry_date_from_alice_blue(*, instrument_type, symbol):
 async def get_future_price_from_redis(
     *,
     async_redis_client: Redis,
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
     expiry_date: date,
 ):
     future_option_chain = await get_option_chain(
         async_redis_client=async_redis_client,
         expiry=expiry_date,
-        strategy_schema=strategy_schema,
+        strategy_pydantic_model=strategy_pydantic_model,
         is_future=True,
     )
 
@@ -134,31 +134,31 @@ async def get_future_price_from_redis(
 async def get_future_price(
     *,
     async_redis_client: Redis,
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
     expiry_date: date,
-    signal_payload_schema: SignalPayloadSchema,
+    signal_pydantic_model: SignalPydanticModel,
     async_httpx_client: AsyncClient,
-    redis_trade_schema_list: Optional[List[RedisTradeSchema]] = None,
+    redis_trade_pydantic_model_list: Optional[List[RedisTradePydanticModel]] = None,
 ) -> float:
     # fetch future price from alice blue only when
-    # strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX and
-    # strategy_schema.broker_id is not None
+    # strategy_pydantic_model.instrument_type == InstrumentTypeEnum.FUTIDX and
+    # strategy_pydantic_model.broker_id is not None
     # for all the other scenario fetch it from redis
-    if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
-        if strategy_schema.broker_id:
-            if signal_payload_schema.action == SignalTypeEnum.BUY:
+    if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.FUTIDX:
+        if strategy_pydantic_model.broker_id:
+            if signal_pydantic_model.action == SignalTypeEnum.BUY:
                 future_price = await buy_alice_blue_trades(
                     strike=None,
-                    signal_payload_schema=signal_payload_schema,
+                    signal_pydantic_model=signal_pydantic_model,
                     async_redis_client=async_redis_client,
-                    strategy_schema=strategy_schema,
+                    strategy_pydantic_model=strategy_pydantic_model,
                     async_httpx_client=async_httpx_client,
                 )
                 return future_price
             else:
                 future_price_dict = await close_alice_blue_trades(
-                    redis_trade_schema_list,
-                    strategy_schema,
+                    redis_trade_pydantic_model_list,
+                    strategy_pydantic_model,
                     async_redis_client,
                     async_httpx_client,
                 )
@@ -167,7 +167,7 @@ async def get_future_price(
 
     future_price = await get_future_price_from_redis(
         async_redis_client=async_redis_client,
-        strategy_schema=strategy_schema,
+        strategy_pydantic_model=strategy_pydantic_model,
         expiry_date=expiry_date,
     )
     return future_price
@@ -176,33 +176,36 @@ async def get_future_price(
 async def get_strike_and_exit_price_dict(
     *,
     async_redis_client: Redis,
-    redis_trade_schema_list: list[RedisTradeSchema],
-    strategy_schema: StrategySchema,
+    redis_trade_pydantic_model_list: list[RedisTradePydanticModel],
+    strategy_pydantic_model: StrategyPydanticModel,
     async_httpx_client: AsyncClient,
     expiry_date: date,
 ) -> dict:
-    if strategy_schema.broker_id:
+    if strategy_pydantic_model.broker_id:
         strike_exit_price_dict = await close_alice_blue_trades(
-            redis_trade_schema_list, strategy_schema, async_redis_client, async_httpx_client
+            redis_trade_pydantic_model_list,
+            strategy_pydantic_model,
+            async_redis_client,
+            async_httpx_client,
         )
     else:
         # get exit price from option chain
         strike_exit_price_dict = await get_exit_price_from_option_chain(
             async_redis_client=async_redis_client,
-            redis_trade_schema_list=redis_trade_schema_list,
+            redis_trade_pydantic_model_list=redis_trade_pydantic_model_list,
             expiry_date=expiry_date,
-            strategy_schema=strategy_schema,
+            strategy_pydantic_model=strategy_pydantic_model,
         )
 
     return strike_exit_price_dict
 
 
 async def get_strike_and_entry_price_from_option_chain(
-    *, option_chain, signal_payload_schema: SignalPayloadSchema, premium: float
+    *, option_chain, signal_pydantic_model: SignalPydanticModel, premium: float
 ):
-    strike = signal_payload_schema.strike
+    strike = signal_pydantic_model.strike
     premium = premium
-    future_price = signal_payload_schema.future_entry_price_received
+    future_price = signal_pydantic_model.future_entry_price_received
 
     # use bisect to find the strike and its price from option chain
     if strike:
@@ -230,24 +233,24 @@ async def get_strike_and_entry_price_from_option_chain(
 async def get_strike_and_entry_price(
     *,
     option_chain,
-    strategy_schema: StrategySchema,
-    signal_payload_schema: SignalPayloadSchema,
+    strategy_pydantic_model: StrategyPydanticModel,
+    signal_pydantic_model: SignalPydanticModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
     crucial_details: str,
 ) -> tuple[float, float]:
     strike, premium = await get_strike_and_entry_price_from_option_chain(
         option_chain=option_chain,
-        signal_payload_schema=signal_payload_schema,
-        premium=strategy_schema.premium,
+        signal_pydantic_model=signal_pydantic_model,
+        premium=strategy_pydantic_model.premium,
     )
 
-    if strategy_schema.broker_id:
+    if strategy_pydantic_model.broker_id:
         try:
             entry_price = await buy_alice_blue_trades(
                 strike=strike,
-                signal_payload_schema=signal_payload_schema,
-                strategy_schema=strategy_schema,
+                signal_pydantic_model=signal_pydantic_model,
+                strategy_pydantic_model=strategy_pydantic_model,
                 async_redis_client=async_redis_client,
                 async_httpx_client=async_httpx_client,
             )
@@ -341,9 +344,11 @@ async def get_current_and_next_expiry_from_alice_blue(symbol: str):
     return current_expiry_date, next_expiry_date, is_today_expiry
 
 
-def set_option_type(strategy_schema: StrategySchema, payload: SignalPayloadSchema) -> None:
+def set_option_type(
+    strategy_pydantic_model: StrategyPydanticModel, payload: SignalPydanticModel
+) -> None:
     # this is to prevent setting option type on future strategy, it acts as double protection
-    if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
+    if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.FUTIDX:
         return
 
     # set OptionTypeEnum base strategy's position column and signal's action.
@@ -360,7 +365,7 @@ def set_option_type(strategy_schema: StrategySchema, payload: SignalPayloadSchem
 
     opposite_trade = {OptionTypeEnum.CE: OptionTypeEnum.PE, OptionTypeEnum.PE: OptionTypeEnum.CE}
 
-    position_based_trade = strategy_position_trade.get(strategy_schema.position)
+    position_based_trade = strategy_position_trade.get(strategy_pydantic_model.position)
     payload.option_type = position_based_trade.get(payload.action) or opposite_trade.get(
         payload.option_type
     )
@@ -382,34 +387,36 @@ def get_opposite_trade_option_type(strategy_position, signal_action) -> OptionTy
 
 
 def set_quantity(
-    strategy_schema: StrategySchema, signal_payload_schema: SignalPayloadSchema, lots_to_open: int
+    strategy_pydantic_model: StrategyPydanticModel,
+    signal_pydantic_model: SignalPydanticModel,
+    lots_to_open: int,
 ) -> None:
-    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if strategy_schema.position == PositionEnum.LONG:
-            signal_payload_schema.quantity = lots_to_open
+    if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.OPTIDX:
+        if strategy_pydantic_model.position == PositionEnum.LONG:
+            signal_pydantic_model.quantity = lots_to_open
         else:
-            signal_payload_schema.quantity = -lots_to_open
+            signal_pydantic_model.quantity = -lots_to_open
     else:
-        if signal_payload_schema.action == SignalTypeEnum.BUY:
-            signal_payload_schema.quantity = lots_to_open
+        if signal_pydantic_model.action == SignalTypeEnum.BUY:
+            signal_pydantic_model.quantity = lots_to_open
         else:
-            signal_payload_schema.quantity = -lots_to_open
+            signal_pydantic_model.quantity = -lots_to_open
 
 
 def get_lots_to_open(
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
     ongoing_profit_or_loss,
     margin_for_min_quantity: float,
     crucial_details: str = None,
 ):
-    def _get_lots_to_trade(strategy_funds_to_trade, strategy_schema):
+    def _get_lots_to_trade(strategy_funds_to_trade, strategy_pydantic_model):
         # below is the core of this function, do not mendle with it
         # Calculate the quantity that can be traded in the current period
         approx_lots_to_trade = strategy_funds_to_trade * (
-            Decimal(strategy_schema.min_quantity) / Decimal(margin_for_min_quantity)
+            Decimal(strategy_pydantic_model.min_quantity) / Decimal(margin_for_min_quantity)
         )
 
-        to_increment = Decimal(strategy_schema.incremental_step_size)
+        to_increment = Decimal(strategy_pydantic_model.incremental_step_size)
         closest_lots_to_trade = (approx_lots_to_trade // to_increment) * to_increment
 
         while closest_lots_to_trade + to_increment <= approx_lots_to_trade:
@@ -427,13 +434,15 @@ def get_lots_to_open(
     # TODO: if funds reach below mranage_for_min_quantity, then we will not trade , handle it
     getcontext().prec = 28  # Set a high precision
     try:
-        total_available_funds = strategy_schema.funds + ongoing_profit_or_loss
+        total_available_funds = strategy_pydantic_model.funds + ongoing_profit_or_loss
         if total_available_funds < margin_for_min_quantity:
             msg = f"[ {crucial_details} ] - total available funds: [ {total_available_funds} ] to trade are less than margin for min quantity: {margin_for_min_quantity}"
             logging.error(msg)
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
-        available_funds = Decimal(total_available_funds * strategy_schema.funds_usage_percent)
+        available_funds = Decimal(
+            total_available_funds * strategy_pydantic_model.funds_usage_percent
+        )
         available_funds = round(available_funds, 2)
         logging.info(f"[ {crucial_details} ] - available funds: {available_funds}")
 
@@ -449,31 +458,31 @@ def get_lots_to_open(
                 f"[ {crucial_details} ] - Available Funds: [ {available_funds} ] are less than margin for min quantity: [ {margin_for_min_quantity} ]"
             )
             logging.info(
-                f"[ {crucial_details} ] - lots to open [ {strategy_schema.min_quantity} ]"
+                f"[ {crucial_details} ] - lots to open [ {strategy_pydantic_model.min_quantity} ]"
             )
-            return strategy_schema.min_quantity
+            return strategy_pydantic_model.min_quantity
 
-        if not strategy_schema.compounding:
+        if not strategy_pydantic_model.compounding:
             logging.info(
-                f"[ {crucial_details} ] - Compounding is not enabled, so we will trade fixed contracts: [ {strategy_schema.contracts} ]"
+                f"[ {crucial_details} ] - Compounding is not enabled, so we will trade fixed contracts: [ {strategy_pydantic_model.contracts} ]"
             )
             funds_required_for_fixed_contracts = Decimal(
-                (margin_for_min_quantity / strategy_schema.min_quantity)
-                * strategy_schema.contracts
+                (margin_for_min_quantity / strategy_pydantic_model.min_quantity)
+                * strategy_pydantic_model.contracts
             )
 
             if available_funds >= funds_required_for_fixed_contracts:
-                lots_to_trade = strategy_schema.contracts
+                lots_to_trade = strategy_pydantic_model.contracts
                 logging.info(
                     f"[ {crucial_details} ] - Available Funds: [ {available_funds} ] are more than funds required for contracts: [ {funds_required_for_fixed_contracts} ]"
                 )
             else:
-                lots_to_trade = _get_lots_to_trade(available_funds, strategy_schema)
+                lots_to_trade = _get_lots_to_trade(available_funds, strategy_pydantic_model)
                 logging.info(
                     f"[ {crucial_details} ] - Available Funds: [ {available_funds} ] are less than funds required for contracts: [ {funds_required_for_fixed_contracts} ]. So we will trade [ {lots_to_trade} ] contracts"
                 )
         else:
-            lots_to_trade = _get_lots_to_trade(available_funds, strategy_schema)
+            lots_to_trade = _get_lots_to_trade(available_funds, strategy_pydantic_model)
             logging.info(
                 f"[ {crucial_details} ] - Compounding is enabled so we can trade [ {lots_to_trade} ] contracts in [ {total_available_funds} ] funds"
             )
@@ -494,20 +503,20 @@ async def get_margin_required(
     async_redis_client: Redis,
     angel_one_trading_symbol: str,
     signal_type: SignalTypeEnum,
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
     crucial_details: str,
 ):
     instrument_json = await async_redis_client.get(angel_one_trading_symbol)
     instrument = json.loads(instrument_json)
-    instrument_schema = AngelOneInstrumentSchema(**instrument)
+    instrument_pydantic_model = AngelOneInstrumentPydanticModel(**instrument)
 
     # exchange = NSE, BSE, NFO, CDS, MCX, NCDEX and BFO
     # product_type = CARRYFORWARD, INTRADAY, DELIVERY, MARGIN, BO, and CO.
     #  tradeType = BUY or SELL
-    if strategy_schema.instrument_type == InstrumentTypeEnum.OPTIDX:
+    if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.OPTIDX:
         trade_type = (
             SignalTypeEnum.BUY
-            if strategy_schema.position == PositionEnum.LONG
+            if strategy_pydantic_model.position == PositionEnum.LONG
             else SignalTypeEnum.SELL
         )
     else:
@@ -516,11 +525,11 @@ async def get_margin_required(
     params = {
         "positions": [
             {
-                "exchange": instrument_schema.exch_seg,
-                "qty": instrument_schema.lotsize,
+                "exchange": instrument_pydantic_model.exch_seg,
+                "qty": instrument_pydantic_model.lotsize,
                 "price": price,
                 "productType": ProductTypeEnum.CARRYFORWARD,
-                "token": instrument_schema.token,
+                "token": instrument_pydantic_model.token,
                 "tradeType": trade_type.upper(),
             }
         ]
@@ -529,9 +538,9 @@ async def get_margin_required(
     if margin_api_response["message"] == "SUCCESS":
         return margin_api_response["data"]["totalMarginRequired"]
     logging.info(
-        f"[ {crucial_details} ] - margin required to {trade_type.upper()} lots: [ {instrument_schema.lotsize} ] is {strategy_schema.margin_for_min_quantity}"
+        f"[ {crucial_details} ] - margin required to {trade_type.upper()} lots: [ {instrument_pydantic_model.lotsize} ] is {strategy_pydantic_model.margin_for_min_quantity}"
     )
-    return strategy_schema.margin_for_min_quantity
+    return strategy_pydantic_model.margin_for_min_quantity
 
 
 def get_angel_one_options_trading_symbol(

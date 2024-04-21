@@ -15,8 +15,8 @@ from app.database.base import get_db_url
 from app.database.base import get_redis_client
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
-from app.schemas.broker import BrokerSchema
-from app.schemas.enums import BrokerNameEnum
+from app.pydantic_models.broker import BrokerPydanticModel
+from app.pydantic_models.enums import BrokerNameEnum
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -70,21 +70,23 @@ async def task_update_angelone_session_token(
     )
     broker_models = fetch_broker_query.scalars().all()
     for broker_model in broker_models:
-        broker_schema = BrokerSchema.model_validate(broker_model)
-        client = AsyncAngelOneClient(broker_schema.api_key)
+        broker_pydantic_model = BrokerPydanticModel.model_validate(broker_model)
+        client = AsyncAngelOneClient(broker_pydantic_model.api_key)
         await client.generate_session(
-            client_code=broker_schema.username,
-            password=broker_schema.password,
-            totp=pyotp.TOTP(broker_schema.totp).now(),
+            client_code=broker_pydantic_model.username,
+            password=broker_pydantic_model.password,
+            totp=pyotp.TOTP(broker_pydantic_model.totp).now(),
         )
         broker_model.access_token = client.access_token
         await async_session.commit()
-        broker_schema.access_token = client.access_token
-        broker_schema.refresh_token = client.refresh_token
-        broker_schema.feed_token = client.feed_token
+        broker_pydantic_model.access_token = client.access_token
+        broker_pydantic_model.refresh_token = client.refresh_token
+        broker_pydantic_model.feed_token = client.feed_token
 
         # update redis cache with new session_id
-        await async_redis_client.set(str(broker_model.id), broker_schema.model_dump_json())
+        await async_redis_client.set(
+            str(broker_model.id), broker_pydantic_model.model_dump_json()
+        )
         logging.info(
             f"successfully updated session token for: [ {broker_model.name} ] user: [ {broker_model.username} ] in db and redis"
         )

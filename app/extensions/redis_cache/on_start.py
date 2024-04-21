@@ -6,9 +6,9 @@ from sqlalchemy import select
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
-from app.schemas.enums import PositionEnum
-from app.schemas.strategy import StrategySchema
-from app.schemas.trade import RedisTradeSchema
+from app.pydantic_models.enums import PositionEnum
+from app.pydantic_models.strategy import StrategyPydanticModel
+from app.pydantic_models.trade import RedisTradePydanticModel
 from app.utils.constants import FUT
 
 
@@ -17,16 +17,16 @@ async def cache_ongoing_trades(async_redis_client):
     fetch all ongoing trades using filter exited_at=None from db using sqlalchemy
     create an empty dict redis_key_trade_models_dict ={}
     loop through all the ongoing trades
-        create a key using strategy_id, expiry and option_type
+        create a key using strategy_id, expiry, and option_type
         store all ongoing trades against the key in redis_key_trade_models_dict
 
     now loop through redis_key_trade_models_dict
         if the key has an empty list then delete the key, value from redis
         if the key is not present in redis then store the ongoing trades in redis using the key
-        if the key is present in redis but the length of ongoing trades in redis is not equal to the length of ongoing trades in db
+        if the key is present in redis, but the length of ongoing trades in redis is not equal to the length of ongoing trades in db
         then also store the ongoing trades in redis using the key
 
-    this will make sure that if theres any discrepancy in db and redis, then redis will be updated
+    this will make sure that if there's any discrepancy in db and redis, then redis will be updated
 
     """
 
@@ -43,7 +43,7 @@ async def cache_ongoing_trades(async_redis_client):
                 pipe.hset(
                     str(strategy_model.id),
                     "strategy",
-                    StrategySchema.model_validate(strategy_model).model_dump_json(),
+                    StrategyPydanticModel.model_validate(strategy_model).model_dump_json(),
                 )
             await pipe.execute()
 
@@ -100,8 +100,8 @@ async def cache_ongoing_trades(async_redis_client):
                         or trades_in_redis
                         and len(trades_in_redis) != len(trade_models_list)
                     ):
-                        redis_trades_schema_json_list = [
-                            RedisTradeSchema.model_validate(trade_model).model_dump_json(
+                        redis_trades_pydantic_model_json_list = [
+                            RedisTradePydanticModel.model_validate(trade_model).model_dump_json(
                                 exclude_none=True
                             )
                             for trade_model in trade_models_list
@@ -109,7 +109,7 @@ async def cache_ongoing_trades(async_redis_client):
                         result = await async_redis_client.hset(
                             strategy_id,
                             redis_strategy_hash,
-                            json.dumps(redis_trades_schema_json_list),
+                            json.dumps(redis_trades_pydantic_model_json_list),
                         )
                         if result:
                             logging.info(

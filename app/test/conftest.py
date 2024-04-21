@@ -19,9 +19,9 @@ from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
-from app.schemas.broker import BrokerSchema
-from app.schemas.enums import BrokerNameEnum
-from app.schemas.strategy import StrategySchema
+from app.pydantic_models.broker import BrokerPydanticModel
+from app.pydantic_models.enums import BrokerNameEnum
+from app.pydantic_models.strategy import StrategyPydanticModel
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_close_trades
 from app.utils.constants import ANGELONE_BROKER
@@ -43,7 +43,7 @@ logging.basicConfig(
 #     import httpx
 #     import pandas as pd
 #     from app.utils.constants import REDIS_DATE_FORMAT
-#     from app.schemas.enums import InstrumentTypeEnum
+#     from app.pydantic_models.enums import InstrumentTypeEnum
 #     from app.utils.constants import AB_NFO_CONTRACTS_URL, INSTRUMENT_COLUMN
 #     from app.api.trade.IndianFNO.utils import (
 #         get_monthly_expiry_date_from_redis,
@@ -219,7 +219,7 @@ async def test_async_redis_client():
     else:
         logging.error("test redis client connection failed")
 
-    broker_schema = BrokerSchema(
+    broker_pydantic_model = BrokerPydanticModel(
         id=test_config.data[ANGELONE_BROKER]["id"],
         name=BrokerNameEnum.ANGELONE,
         username=test_config.data[ANGELONE_BROKER]["username"],
@@ -227,7 +227,9 @@ async def test_async_redis_client():
         totp=test_config.data[ANGELONE_BROKER]["totp"],
         api_key=test_config.data[ANGELONE_BROKER]["api_key"],
     )
-    await _test_async_redis_client.set(str(broker_schema.id), broker_schema.model_dump_json())
+    await _test_async_redis_client.set(
+        str(broker_pydantic_model.id), broker_pydantic_model.model_dump_json()
+    )
     yield _test_async_redis_client
     await _test_async_redis_client.close()
     logging.info("test redis client closed")
@@ -331,15 +333,15 @@ async def buy_task_payload_dict(test_async_redis_client: aioredis.Redis):
     async with Database() as async_session:
         fetch_strategy_query_ = await async_session.execute(select(StrategyModel))
         strategy_model = fetch_strategy_query_.scalars().one_or_none()
-        strategy_schema = StrategySchema.model_validate(strategy_model)
+        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_model)
         (
             current_expiry_date,
             next_expiry_date,
             is_today_expiry,
         ) = await get_current_and_next_expiry_from_redis(
             async_redis_client=test_async_redis_client,
-            instrument_type=strategy_schema.instrument_type,
-            symbol=strategy_schema.symbol,
+            instrument_type=strategy_pydantic_model.instrument_type,
+            symbol=strategy_pydantic_model.symbol,
         )
 
         post_trade_payload["strategy_id"] = strategy_model.id

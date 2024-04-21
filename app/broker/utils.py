@@ -23,11 +23,11 @@ from sqlalchemy import select
 from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
 from app.database.models import BrokerModel
 from app.database.session_manager.db_session import Database
-from app.schemas.broker import BrokerSchema
-from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.strategy import StrategySchema
-from app.schemas.trade import RedisTradeSchema
-from app.schemas.trade import SignalPayloadSchema
+from app.pydantic_models.broker import BrokerPydanticModel
+from app.pydantic_models.enums import InstrumentTypeEnum
+from app.pydantic_models.strategy import StrategyPydanticModel
+from app.pydantic_models.trade import RedisTradePydanticModel
+from app.pydantic_models.trade import SignalPydanticModel
 from app.utils.constants import OptionType
 from app.utils.constants import Status
 
@@ -86,7 +86,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
     broker_json = await async_redis_client.get(broker_id)
 
     if broker_json:
-        broker_schema = BrokerSchema.parse_raw(broker_json)
+        broker_pydantic_model = BrokerPydanticModel.parse_raw(broker_json)
     else:
         async with Database() as async_session:
             # We have a cron that update session token every 1 hour,
@@ -102,18 +102,18 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
 
             if not broker_model:
                 raise HTTPException(status_code=404, detail=f"Broker: {broker_id} not found")
-            broker_schema = BrokerSchema.model_validate(broker_model)
-            await async_redis_client.set(broker_id, broker_schema.model_dump_json())
+            broker_pydantic_model = BrokerPydanticModel.model_validate(broker_model)
+            await async_redis_client.set(broker_id, broker_pydantic_model.model_dump_json())
 
     # TODO: update cron updating alice blue access token to update redis as well with the latest access token
     pya3_obj = AsyncPya3Aliceblue(
-        user_id=broker_schema.username,
-        password=broker_schema.password,
-        api_key=broker_schema.api_key,
-        totp=broker_schema.totp,
-        twoFA=broker_schema.twoFA,
-        app_id=broker_schema.app_id,
-        session_id=broker_schema.access_token,
+        user_id=broker_pydantic_model.username,
+        password=broker_pydantic_model.password,
+        api_key=broker_pydantic_model.api_key,
+        totp=broker_pydantic_model.totp,
+        twoFA=broker_pydantic_model.twoFA,
+        app_id=broker_pydantic_model.app_id,
+        session_id=broker_pydantic_model.access_token,
         async_httpx_client=async_httpx_client,
     )
     return pya3_obj
@@ -122,8 +122,8 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
 async def buy_alice_blue_trades(
     *,
     strike: Optional[float],
-    signal_payload_schema: SignalPayloadSchema,
-    strategy_schema: StrategySchema,
+    signal_pydantic_model: SignalPydanticModel,
+    strategy_pydantic_model: StrategyPydanticModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
 ):
@@ -138,17 +138,17 @@ async def buy_alice_blue_trades(
     """
 
     pya3_obj = await get_pya3_obj(
-        async_redis_client, str(strategy_schema.broker_id), async_httpx_client
+        async_redis_client, str(strategy_pydantic_model.broker_id), async_httpx_client
     )
 
     strike, order_id = await place_ablue_order(
         pya3_obj=pya3_obj,
-        strategy_schema=strategy_schema,
+        strategy_pydantic_model=strategy_pydantic_model,
         async_redis_client=async_redis_client,
         strike=strike,
-        quantity=signal_payload_schema.quantity,
-        expiry=signal_payload_schema.expiry,
-        is_CE=signal_payload_schema.option_type == OptionType.CE,
+        quantity=signal_pydantic_model.quantity,
+        expiry=signal_pydantic_model.expiry,
+        is_CE=signal_pydantic_model.option_type == OptionType.CE,
         is_buy=True,
     )
 
@@ -167,12 +167,12 @@ async def buy_alice_blue_trades(
                 if "Reason:Exchange issue" in order_status["RejReason"]:
                     strike, order_id = await place_ablue_order(
                         pya3_obj=pya3_obj,
-                        strategy_schema=strategy_schema,
+                        strategy_pydantic_model=strategy_pydantic_model,
                         async_redis_client=async_redis_client,
                         strike=strike,
-                        quantity=signal_payload_schema.quantity,
-                        expiry=signal_payload_schema.expiry,
-                        is_CE=signal_payload_schema.option_type == OptionType.CE,
+                        quantity=signal_pydantic_model.quantity,
+                        expiry=signal_pydantic_model.expiry,
+                        is_CE=signal_pydantic_model.option_type == OptionType.CE,
                         is_buy=True,
                     )
                 else:
@@ -211,21 +211,27 @@ async def buy_alice_blue_trades(
         return None
 
 
-def get_exiting_trades_insights(redis_trade_schema_list: list[RedisTradeSchema]):
+def get_exiting_trades_insights(redis_trade_pydantic_model_list: list[RedisTradePydanticModel]):
     strike_quantity_dict = defaultdict(int)
 
-    for redis_trade_schema in redis_trade_schema_list:
-        strike_quantity_dict[redis_trade_schema.strike] += redis_trade_schema.quantity
+    for redis_trade_pydantic_model in redis_trade_pydantic_model_list:
+        strike_quantity_dict[
+            redis_trade_pydantic_model.strike
+        ] += redis_trade_pydantic_model.quantity
 
     if len(strike_quantity_dict):
         # even though loop is over, we still have the access to the last element
-        return strike_quantity_dict, redis_trade_schema.expiry, redis_trade_schema.option_type
+        return (
+            strike_quantity_dict,
+            redis_trade_pydantic_model.expiry,
+            redis_trade_pydantic_model.option_type,
+        )
 
 
 async def place_ablue_order(
     *,
     pya3_obj: AsyncPya3Aliceblue,
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
     async_redis_client: Redis,
     strike: float,
     quantity: int,
@@ -235,9 +241,9 @@ async def place_ablue_order(
 ):
     instrument = await pya3_obj.get_fno_instrument_from_redis(
         async_redis_client=async_redis_client,
-        symbol=strategy_schema.symbol,
+        symbol=strategy_pydantic_model.symbol,
         expiry_date=expiry,
-        is_fut=strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX,
+        is_fut=strategy_pydantic_model.instrument_type == InstrumentTypeEnum.FUTIDX,
         strike=strike,
         is_CE=is_CE,
     )
@@ -336,8 +342,8 @@ async def place_ablue_order(
 
 
 async def close_alice_blue_trades(
-    redis_trade_schema_list: list[RedisTradeSchema],
-    strategy_schema: StrategySchema,
+    redis_trade_pydantic_model_list: list[RedisTradePydanticModel],
+    strategy_pydantic_model: StrategyPydanticModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
 ):
@@ -351,11 +357,11 @@ async def close_alice_blue_trades(
     """
 
     strike_quantity_dict, expiry, option_type = get_exiting_trades_insights(
-        redis_trade_schema_list
+        redis_trade_pydantic_model_list
     )
 
     pya3_obj = await get_pya3_obj(
-        async_redis_client, str(strategy_schema.broker_id), async_httpx_client
+        async_redis_client, str(strategy_pydantic_model.broker_id), async_httpx_client
     )
 
     tasks = []
@@ -365,7 +371,7 @@ async def close_alice_blue_trades(
                 place_ablue_order(
                     pya3_obj=pya3_obj,
                     async_redis_client=async_redis_client,
-                    strategy_schema=strategy_schema,
+                    strategy_pydantic_model=strategy_pydantic_model,
                     strike=strike,
                     quantity=quantity,
                     expiry=expiry,
@@ -420,7 +426,7 @@ async def update_ablue_session_token(pya3_obj: AsyncPya3Aliceblue, async_redis_c
 
         # update redis cache with new session_id
         await async_redis_client.set(
-            str(broker_model.id), BrokerSchema.model_validate(broker_model).json()
+            str(broker_model.id), BrokerPydanticModel.model_validate(broker_model).json()
         )
         logging.info(f"access_token updated for user: {pya3_obj.user_id} in db and redis")
         return session_id

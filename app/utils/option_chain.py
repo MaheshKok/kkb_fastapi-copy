@@ -1,7 +1,7 @@
 import logging
 
-from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.strategy import StrategySchema
+from app.pydantic_models.enums import InstrumentTypeEnum
+from app.pydantic_models.strategy import StrategyPydanticModel
 from app.utils.constants import OptionType
 
 
@@ -9,7 +9,7 @@ async def get_option_chain(
     *,
     async_redis_client,
     expiry,
-    strategy_schema: StrategySchema,
+    strategy_pydantic_model: StrategyPydanticModel,
     option_type=None,
     is_future=False,
 ):
@@ -17,7 +17,7 @@ async def get_option_chain(
         raise ValueError("Futures don't have option_type")
 
     future_or_option_type = "FUT" if is_future else option_type
-    key = f"{strategy_schema.symbol} {expiry} {future_or_option_type}"
+    key = f"{strategy_pydantic_model.symbol} {expiry} {future_or_option_type}"
     option_chain = await async_redis_client.hgetall(key)
     if option_chain:
         if option_type == OptionType.CE:
@@ -37,11 +37,11 @@ async def get_option_chain(
         else:
             return option_chain
 
-    if strategy_schema.instrument_type == InstrumentTypeEnum.FUTIDX:
+    if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.FUTIDX:
         raise Exception(
-            f"Option chain data for: [{strategy_schema.symbol} {expiry} {future_or_option_type}] NOT found in redis"
+            f"Option chain data for: [{strategy_pydantic_model.symbol} {expiry} {future_or_option_type}] NOT found in redis"
         )
     else:
         logging.error(
-            f"Option chain data for: [{strategy_schema.symbol} {expiry} {future_or_option_type}] NOT found in redis"
+            f"Option chain data for: [{strategy_pydantic_model.symbol} {expiry} {future_or_option_type}] NOT found in redis"
         )

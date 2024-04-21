@@ -6,7 +6,7 @@ import factory
 import pytest
 
 from app.database.models import StrategyModel
-from app.schemas.enums import PositionEnum
+from app.pydantic_models.enums import PositionEnum
 from app.test.factory.base_factory import AsyncSQLAlchemyFactory
 from app.test.factory.create_async_session import async_session
 from app.test.factory.user import UserFactory

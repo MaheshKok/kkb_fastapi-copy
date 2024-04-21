@@ -12,8 +12,8 @@ from cron.update_session_token import cron_update_session_token
 
 from app.core.config import get_config
 from app.create_app import register_sentry
-from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.enums import PositionEnum
+from app.pydantic_models.enums import InstrumentTypeEnum
+from app.pydantic_models.enums import PositionEnum
 
 
 logging.basicConfig(level=logging.INFO)

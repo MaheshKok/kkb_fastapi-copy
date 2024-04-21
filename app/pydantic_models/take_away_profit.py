@@ -8,7 +8,7 @@ from pydantic import Field
 from pydantic import condecimal
 
 
-class TakeAwayProfitSchema(BaseModel):
+class TakeAwayProfitPydanticModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID = Field(

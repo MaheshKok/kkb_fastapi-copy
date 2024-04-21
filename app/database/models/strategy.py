@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
-from app.schemas.enums import PositionEnum
+from app.pydantic_models.enums import PositionEnum
 
 
 class StrategyModel(Base):

@@ -9,11 +9,11 @@ from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.models import User
 from app.database.session_manager.db_session import Database
-from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.enums import PositionEnum
-from app.schemas.enums import SignalTypeEnum
-from app.schemas.strategy import StrategySchema
-from app.schemas.trade import RedisTradeSchema
+from app.pydantic_models.enums import InstrumentTypeEnum
+from app.pydantic_models.enums import PositionEnum
+from app.pydantic_models.enums import SignalTypeEnum
+from app.pydantic_models.strategy import StrategyPydanticModel
+from app.pydantic_models.trade import RedisTradePydanticModel
 from app.test.factory.broker import BrokerFactory
 from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
@@ -59,7 +59,7 @@ async def test_buy_alice_blue_trade(
         await test_async_redis_client.hset(
             str(strategy_model.id),
             STRATEGY,
-            StrategySchema.model_validate(strategy_model).model_dump_json(),
+            StrategyPydanticModel.model_validate(strategy_model).model_dump_json(),
         )
 
         # set trades in redis
@@ -71,7 +71,7 @@ async def test_buy_alice_blue_trade(
             await test_async_redis_client.hset(
                 f"{strategy_model.id}",
                 f"{trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.model_validate(trade_model).model_dump_json(),
+                RedisTradePydanticModel.model_validate(trade_model).model_dump_json(),
             )
 
         await async_session.commit()
@@ -115,10 +115,10 @@ async def test_buy_alice_blue_trade(
         assert len(redis_trade_json_list) == 1
 
         redis_trade_list = [
-            RedisTradeSchema.model_validate_json(trade) for trade in redis_trade_json_list
+            RedisTradePydanticModel.model_validate_json(trade) for trade in redis_trade_json_list
         ]
         assert redis_trade_list == [
-            RedisTradeSchema.model_validate(trade_model) for trade_model in trade_models
+            RedisTradePydanticModel.model_validate(trade_model) for trade_model in trade_models
         ]
 
 
@@ -150,7 +150,7 @@ async def test_buy_alice_blue_trade_raise_401(
         await test_async_redis_client.hset(
             str(strategy_model.id),
             STRATEGY,
-            StrategySchema.model_validate(strategy_model).model_dump_json(),
+            StrategyPydanticModel.model_validate(strategy_model).model_dump_json(),
         )
 
         # set trades in redis
@@ -162,7 +162,7 @@ async def test_buy_alice_blue_trade_raise_401(
             await test_async_redis_client.hset(
                 str(strategy_model.id),
                 f"{trade_model.expiry} {trade_model.option_type}",
-                RedisTradeSchema.model_validate(trade_model).model_dump_json(),
+                RedisTradePydanticModel.model_validate(trade_model).model_dump_json(),
             )
 
         await async_session.commit()
@@ -220,8 +220,8 @@ async def test_buy_alice_blue_trade_raise_401(
         assert len(redis_trade_json_list) == 1
 
         redis_trade_list = [
-            RedisTradeSchema.model_validate_json(trade) for trade in redis_trade_json_list
+            RedisTradePydanticModel.model_validate_json(trade) for trade in redis_trade_json_list
         ]
         assert redis_trade_list == [
-            RedisTradeSchema.model_validate(trade_model) for trade_model in trade_models
+            RedisTradePydanticModel.model_validate(trade_model) for trade_model in trade_models
         ]

@@ -1,4 +1,4 @@
-from app.schemas.enums import SignalTypeEnum
+from app.pydantic_models.enums import SignalTypeEnum
 
 
 def get_test_post_trade_payload(action: SignalTypeEnum = "buy"):

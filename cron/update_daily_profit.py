@@ -20,7 +20,7 @@ from app.database.models import DailyProfitModel
 from app.database.models import StrategyModel
 from app.database.models import TradeModel
 from app.database.session_manager.db_session import Database
-from app.schemas.enums import InstrumentTypeEnum
+from app.pydantic_models.enums import InstrumentTypeEnum
 
 
 nse_headers = {

@@ -5,9 +5,9 @@ from sqlalchemy import select
 
 from app.database.models import StrategyModel
 from app.database.session_manager.db_session import Database
-from app.schemas.enums import InstrumentTypeEnum
-from app.schemas.enums import PositionEnum
-from app.schemas.strategy import StrategyCreateSchema
+from app.pydantic_models.enums import InstrumentTypeEnum
+from app.pydantic_models.enums import PositionEnum
+from app.pydantic_models.strategy import StrategyCreatePydanticModel
 from app.test.factory.strategy import StrategyFactory
 from app.test.factory.user import UserFactory
 
@@ -45,7 +45,7 @@ async def test_post_strategys(test_async_client):
         strategy_ids = strategy_query.all()
         assert len(strategy_ids) == 0
 
-        strategy_payload = StrategyCreateSchema(
+        strategy_payload = StrategyCreatePydanticModel(
             instrument_type=InstrumentTypeEnum.OPTIDX,
             symbol="BANKNIFTY",
             name="BANKNIFTY1! TF:2 Brick_Size:35 Pyramiding:100",
@@ -67,4 +67,4 @@ async def test_post_strategys(test_async_client):
         )
         assert response.status_code == 200
         del response.json()["id"]
-        assert StrategyCreateSchema(**response.json()) == strategy_payload
+        assert StrategyCreatePydanticModel(**response.json()) == strategy_payload
