@@ -5,7 +5,7 @@ from datetime import timedelta
 import factory
 import pytest
 
-from app.database.models import StrategyModel
+from app.database.schemas import StrategyDBModel
 from app.pydantic_models.enums import PositionEnum
 from app.test.factory.base_factory import AsyncSQLAlchemyFactory
 from app.test.factory.create_async_session import async_session
@@ -15,7 +15,7 @@ from app.test.factory.user import UserFactory
 @pytest.mark.asyncio
 class StrategyFactory(AsyncSQLAlchemyFactory):
     class Meta:
-        model = StrategyModel
+        model = StrategyDBModel
         sqlalchemy_session_persistence = "commit"
         sqlalchemy_session = async_session
 

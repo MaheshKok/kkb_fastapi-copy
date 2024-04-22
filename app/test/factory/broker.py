@@ -3,14 +3,14 @@ import uuid
 
 import factory
 
-from app.database.models import BrokerModel
+from app.database.schemas import BrokerDBModel
 from app.test.factory.base_factory import AsyncSQLAlchemyFactory
 from app.test.factory.create_async_session import async_session
 
 
 class BrokerFactory(AsyncSQLAlchemyFactory):
     class Meta:
-        model = BrokerModel
+        model = BrokerDBModel
         sqlalchemy_session_persistence = "commit"
         sqlalchemy_session = async_session
 

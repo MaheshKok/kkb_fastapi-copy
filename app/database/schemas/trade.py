@@ -14,7 +14,7 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 
-class TradeModel(Base):
+class TradeDBModel(Base):
     __tablename__ = "trade"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -46,4 +46,4 @@ class TradeModel(Base):
         nullable=False,
         index=True,
     )
-    strategy = relationship("StrategyModel", back_populates="trades")
+    strategy = relationship("StrategyDBModel", back_populates="trades")

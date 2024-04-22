@@ -13,7 +13,7 @@ from app.broker.utils import update_ablue_session_token
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
-from app.database.models import BrokerModel
+from app.database.schemas import BrokerDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.broker import BrokerPydanticModel
 from app.pydantic_models.enums import BrokerNameEnum
@@ -27,19 +27,19 @@ async def task_update_ablue_session_token(async_session, async_redis_client):
     try:
         # get broker model from db filtered by username
         fetch_broker_query = await async_session.execute(
-            select(BrokerModel).filter_by(name=BrokerNameEnum.ALICEBLUE.value)
+            select(BrokerDBModel).filter_by(name=BrokerNameEnum.ALICEBLUE.value)
         )
-        broker_models = fetch_broker_query.scalars().all()
+        broker_db_models = fetch_broker_query.scalars().all()
 
         async with httpx.AsyncClient() as httpx_client:
             tasks = []
-            for broker_model in broker_models:
-                if broker_model.username != "921977":
+            for broker_db_model in broker_db_models:
+                if broker_db_model.username != "921977":
                     continue
 
                 # fetch pya3 object
                 pya3_obj = await get_pya3_obj(
-                    async_redis_client, str(broker_model.id), httpx_client
+                    async_redis_client, str(broker_db_model.id), httpx_client
                 )
 
                 # create a Task for each update operation
@@ -54,11 +54,11 @@ async def task_update_ablue_session_token(async_session, async_redis_client):
             await asyncio.gather(*tasks)
 
         logging.info(
-            f"successfully updated session token for: [ {broker_model.name} ] user: [ {broker_model.username} ] in db and redis"
+            f"successfully updated session token for: [ {broker_db_model.name} ] user: [ {broker_db_model.username} ] in db and redis"
         )
     except Exception as e:
         logging.error(
-            f"Error while updating session token for: [ {broker_model.name} ] user: [ {broker_model.username} ], {e}"
+            f"Error while updating session token for: [ {broker_db_model.name} ] user: [ {broker_db_model.username} ], {e}"
         )
 
 
@@ -66,18 +66,18 @@ async def task_update_angelone_session_token(
     async_redis_client: Redis, async_session: AsyncSession
 ):
     fetch_broker_query = await async_session.execute(
-        select(BrokerModel).filter_by(name=BrokerNameEnum.ANGELONE.value)
+        select(BrokerDBModel).filter_by(name=BrokerNameEnum.ANGELONE.value)
     )
-    broker_models = fetch_broker_query.scalars().all()
-    for broker_model in broker_models:
-        broker_pydantic_model = BrokerPydanticModel.model_validate(broker_model)
+    broker_db_models = fetch_broker_query.scalars().all()
+    for broker_db_model in broker_db_models:
+        broker_pydantic_model = BrokerPydanticModel.model_validate(broker_db_model)
         client = AsyncAngelOneClient(broker_pydantic_model.api_key)
         await client.generate_session(
             client_code=broker_pydantic_model.username,
             password=broker_pydantic_model.password,
             totp=pyotp.TOTP(broker_pydantic_model.totp).now(),
         )
-        broker_model.access_token = client.access_token
+        broker_db_model.access_token = client.access_token
         await async_session.commit()
         broker_pydantic_model.access_token = client.access_token
         broker_pydantic_model.refresh_token = client.refresh_token
@@ -85,10 +85,10 @@ async def task_update_angelone_session_token(
 
         # update redis cache with new session_id
         await async_redis_client.set(
-            str(broker_model.id), broker_pydantic_model.model_dump_json()
+            str(broker_db_model.id), broker_pydantic_model.model_dump_json()
         )
         logging.info(
-            f"successfully updated session token for: [ {broker_model.name} ] user: [ {broker_model.username} ] in db and redis"
+            f"successfully updated session token for: [ {broker_db_model.name} ] user: [ {broker_db_model.username} ] in db and redis"
         )
 
 

@@ -25,8 +25,8 @@ from app.api.trade.IndianFNO.utils import get_strike_and_exit_price_dict
 from app.api.trade.IndianFNO.utils import set_quantity
 from app.broker.AsyncAngelOne import AsyncAngelOneClient
 from app.broker.utils import buy_alice_blue_trades
-from app.database.models import StrategyModel
-from app.database.models import TradeModel
+from app.database.schemas import StrategyDBModel
+from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.enums import SignalTypeEnum
@@ -198,20 +198,20 @@ async def calculate_profits(
 async def push_trade_to_redis(
     *,
     async_redis_client: aioredis.StrictRedis,
-    trade_model: TradeModel,
+    trade_db_model: TradeDBModel,
     signal_type: SignalTypeEnum,
     crucial_details: str,
 ):
     # Add trade to redis, which was earlier taken care by @event.listens_for(TradeModel, "after_insert")
     # it works I confirmed this with python_console with test double data,
     # interesting part is to get such trades I have to call lrange with 0, -1
-    redis_key = str(trade_model.strategy_id)
-    if trade_model.option_type:
-        redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
+    redis_key = str(trade_db_model.strategy_id)
+    if trade_db_model.option_type:
+        redis_hash = f"{trade_db_model.expiry} {trade_db_model.option_type}"
     else:
-        redis_hash = f"{trade_model.expiry} {PositionEnum.LONG if signal_type == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
+        redis_hash = f"{trade_db_model.expiry} {PositionEnum.LONG if signal_type == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
     redis_trades_json = await async_redis_client.hget(redis_key, redis_hash)
-    new_trade_json = RedisTradePydanticModel.model_validate(trade_model).model_dump_json(
+    new_trade_json = RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json(
         exclude={"received_at"}, exclude_none=True
     )
     redis_trades_list = []
@@ -219,7 +219,7 @@ async def push_trade_to_redis(
         redis_trades_list = json.loads(redis_trades_json)
     redis_trades_list.append(new_trade_json)
     await async_redis_client.hset(redis_key, redis_hash, json.dumps(redis_trades_list))
-    logging.info(f"[ {crucial_details} ] - new trade: [{trade_model.id}] added to Redis")
+    logging.info(f"[ {crucial_details} ] - new trade: [{trade_db_model.id}] added to Redis")
 
 
 async def dump_trade_in_db_and_redis(
@@ -240,18 +240,18 @@ async def dump_trade_in_db_and_redis(
             **signal_pydantic_model.model_dump(exclude={"premium"}, exclude_none=True),
         )
 
-        trade_model = TradeModel(
+        trade_db_model = TradeDBModel(
             **trade_pydatic_model.model_dump(
                 exclude={"premium", "broker_id", "symbol", "received_at"},
                 exclude_none=True,
             )
         )
-        async_session.add(trade_model)
+        async_session.add(trade_db_model)
         await async_session.commit()
-        logging.info(f"[ {crucial_details} ] - new trade: [{trade_model.id}] added to DB")
+        logging.info(f"[ {crucial_details} ] - new trade: [{trade_db_model.id}] added to DB")
         await push_trade_to_redis(
             async_redis_client=async_redis_client,
-            trade_model=trade_model,
+            trade_db_model=trade_db_model,
             signal_type=signal_pydantic_model.action,
             crucial_details=crucial_details,
         )
@@ -279,8 +279,8 @@ async def close_trades_in_db_and_remove_from_redis(
             strategy_pydantic_model.future_funds + total_future_profit, 2
         )
         stmt = (
-            update(StrategyModel)
-            .where(StrategyModel.id == strategy_pydantic_model.id)
+            update(StrategyDBModel)
+            .where(StrategyDBModel.id == strategy_pydantic_model.id)
             .values(funds=updated_funds, future_funds=updated_futures_funds)
         )
         await async_session.execute(stmt)

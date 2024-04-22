@@ -5,9 +5,9 @@ import pytest
 from sqlalchemy import select
 
 from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
-from app.database.models import StrategyModel
-from app.database.models import TradeModel
-from app.database.models import User
+from app.database.schemas import StrategyDBModel
+from app.database.schemas import TradeDBModel
+from app.database.schemas import User
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
@@ -47,31 +47,31 @@ async def test_buy_alice_blue_trade(
 
     async with Database() as async_session:
         user_model = await async_session.scalar(select(User))
-        broker_model = await BrokerFactory(user_id=user_model.id)
-        strategy_model = await async_session.scalar(select(StrategyModel))
-        strategy_model.broker_id = broker_model.id
+        broker_db_model = await BrokerFactory(user_id=user_model.id)
+        strategy_db_model = await async_session.scalar(select(StrategyDBModel))
+        strategy_db_model.broker_id = broker_db_model.id
         await async_session.flush()
 
         payload = get_test_post_trade_payload(action=action)
-        payload["strategy_id"] = str(strategy_model.id)
+        payload["strategy_id"] = str(strategy_db_model.id)
 
         # set strategy in redis
         await test_async_redis_client.hset(
-            str(strategy_model.id),
+            str(strategy_db_model.id),
             STRATEGY,
-            StrategyPydanticModel.model_validate(strategy_model).model_dump_json(),
+            StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
         )
 
         # set trades in redis
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(strategy_id=strategy_model.id)
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(strategy_id=strategy_db_model.id)
         )
-        trade_models = fetch_trade_models_query.scalars().all()
-        for trade_model in trade_models:
+        trade_db_models = fetch_trade__query.scalars().all()
+        for trade_db_model in trade_db_models:
             await test_async_redis_client.hset(
-                f"{strategy_model.id}",
-                f"{trade_model.expiry} {trade_model.option_type}",
-                RedisTradePydanticModel.model_validate(trade_model).model_dump_json(),
+                f"{strategy_db_model.id}",
+                f"{trade_db_model.expiry} {trade_db_model.option_type}",
+                RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json(),
             )
 
         await async_session.commit()
@@ -98,19 +98,21 @@ async def test_buy_alice_blue_trade(
 
     async with Database() as async_session:
         # assert trade in db
-        strategy_model = await async_session.scalar(select(StrategyModel))
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(strategy_id=strategy_model.id)
+        strategy_db_model = await async_session.scalar(select(StrategyDBModel))
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(strategy_id=strategy_db_model.id)
         )
-        trade_models = fetch_trade_models_query.scalars().all()
-        assert len(trade_models) == 1
+        trade_db_models = fetch_trade__query.scalars().all()
+        assert len(trade_db_models) == 1
 
         # assert trade in redis
         if instrument_type == InstrumentTypeEnum.OPTIDX:
-            redis_hash = f"{trade_models[0].expiry} {trade_models[0].option_type}"
+            redis_hash = f"{trade_db_models[0].expiry} {trade_db_models[0].option_type}"
         else:
-            redis_hash = f"{trade_models[0].expiry} {PositionEnum.LONG if payload['action'] == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
-        redis_trade_json = await test_async_redis_client.hget(f"{strategy_model.id}", redis_hash)
+            redis_hash = f"{trade_db_models[0].expiry} {PositionEnum.LONG if payload['action'] == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
+        redis_trade_json = await test_async_redis_client.hget(
+            f"{strategy_db_model.id}", redis_hash
+        )
         redis_trade_json_list = json.loads(redis_trade_json)
         assert len(redis_trade_json_list) == 1
 
@@ -118,7 +120,8 @@ async def test_buy_alice_blue_trade(
             RedisTradePydanticModel.model_validate_json(trade) for trade in redis_trade_json_list
         ]
         assert redis_trade_list == [
-            RedisTradePydanticModel.model_validate(trade_model) for trade_model in trade_models
+            RedisTradePydanticModel.model_validate(trade_db_model)
+            for trade_db_model in trade_db_models
         ]
 
 
@@ -135,34 +138,34 @@ async def test_buy_alice_blue_trade_raise_401(
 
     async with Database() as async_session:
         user_model = await async_session.scalar(select(User))
-        broker_model = await BrokerFactory(user_id=user_model.id)
-        strategy_model = await async_session.scalar(select(StrategyModel))
-        strategy_model.broker_id = broker_model.id
+        broker_db_model = await BrokerFactory(user_id=user_model.id)
+        strategy_db_model = await async_session.scalar(select(StrategyDBModel))
+        strategy_db_model.broker_id = broker_db_model.id
         await async_session.flush()
 
         payload = get_test_post_trade_payload()
-        payload["strategy_id"] = str(strategy_model.id)
+        payload["strategy_id"] = str(strategy_db_model.id)
 
         if option_type == OptionType.PE:
             payload["option_type"] = OptionType.PE
 
         # set strategy in redis
         await test_async_redis_client.hset(
-            str(strategy_model.id),
+            str(strategy_db_model.id),
             STRATEGY,
-            StrategyPydanticModel.model_validate(strategy_model).model_dump_json(),
+            StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
         )
 
         # set trades in redis
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(strategy_id=strategy_model.id)
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(strategy_id=strategy_db_model.id)
         )
-        trade_models = fetch_trade_models_query.scalars().all()
-        for trade_model in trade_models:
+        trade_db_models = fetch_trade__query.scalars().all()
+        for trade_db_model in trade_db_models:
             await test_async_redis_client.hset(
-                str(strategy_model.id),
-                f"{trade_model.expiry} {trade_model.option_type}",
-                RedisTradePydanticModel.model_validate(trade_model).model_dump_json(),
+                str(strategy_db_model.id),
+                f"{trade_db_model.expiry} {trade_db_model.option_type}",
+                RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json(),
             )
 
         await async_session.commit()
@@ -203,17 +206,17 @@ async def test_buy_alice_blue_trade_raise_401(
 
     async with Database() as async_session:
         # assert trade in db
-        strategy_model = await async_session.scalar(select(StrategyModel))
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(strategy_id=strategy_model.id)
+        strategy_db_model = await async_session.scalar(select(StrategyDBModel))
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(strategy_id=strategy_db_model.id)
         )
-        trade_models = fetch_trade_models_query.scalars().all()
-        assert len(trade_models) == 1
+        trade_db_models = fetch_trade__query.scalars().all()
+        assert len(trade_db_models) == 1
 
         # assert trade in redis
         redis_trade_json = await test_async_redis_client.hget(
-            f"{strategy_model.id}",
-            f"{trade_models[0].expiry} {trade_models[0].option_type}",
+            f"{strategy_db_model.id}",
+            f"{trade_db_models[0].expiry} {trade_db_models[0].option_type}",
         )
 
         redis_trade_json_list = json.loads(redis_trade_json)
@@ -223,5 +226,6 @@ async def test_buy_alice_blue_trade_raise_401(
             RedisTradePydanticModel.model_validate_json(trade) for trade in redis_trade_json_list
         ]
         assert redis_trade_list == [
-            RedisTradePydanticModel.model_validate(trade_model) for trade_model in trade_models
+            RedisTradePydanticModel.model_validate(trade_db_model)
+            for trade_db_model in trade_db_models
         ]

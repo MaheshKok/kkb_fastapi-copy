@@ -23,7 +23,7 @@ from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.IndianFNO.utils import get_opposite_trade_option_type
 from app.api.trade.IndianFNO.utils import set_option_type
 from app.broker.AsyncAngelOne import AsyncAngelOneClient
-from app.database.models import TradeModel
+from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
@@ -50,10 +50,10 @@ fno_router = APIRouter(
 async def get_open_trades():
     async with Database() as async_session:
         fetch_open_trades_query_ = await async_session.execute(
-            select(TradeModel).filter(TradeModel.exit_at == None)  # noqa
+            select(TradeDBModel).filter(TradeDBModel.exit_at == None)  # noqa
         )
-        trade_models = fetch_open_trades_query_.scalars().all()
-        return trade_models
+        trade_db_models = fetch_open_trades_query_.scalars().all()
+        return trade_db_models
 
 
 def get_expiry_date_to_trade(

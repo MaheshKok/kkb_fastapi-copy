@@ -3,7 +3,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
-from app.database.models import StrategyModel
+from app.database.schemas import StrategyDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
@@ -27,7 +27,7 @@ async def test_get_strategys(test_async_client):
         await StrategyFactory(user=user)
 
     async with Database() as async_session:
-        strategy_query = await async_session.scalars(select(StrategyModel.id, StrategyModel))
+        strategy_query = await async_session.scalars(select(StrategyDBModel.id, StrategyDBModel))
         strategy_ids = strategy_query.all()
 
         response = await test_async_client.get("/api/strategy")
@@ -41,7 +41,7 @@ async def test_post_strategys(test_async_client):
     user = await UserFactory()
 
     async with Database() as async_session:
-        strategy_query = await async_session.scalars(select(StrategyModel.id, StrategyModel))
+        strategy_query = await async_session.scalars(select(StrategyDBModel.id, StrategyDBModel))
         strategy_ids = strategy_query.all()
         assert len(strategy_ids) == 0
 

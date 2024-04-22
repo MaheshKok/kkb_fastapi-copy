@@ -19,7 +19,7 @@ from app.api.trade.IndianFNO.utils import set_option_type
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
-from app.database.models import StrategyModel
+from app.database.schemas import StrategyDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
@@ -31,21 +31,21 @@ from app.utils.constants import OptionType
 
 
 def get_action(
-    strategy_pydantic_model: StrategyPydanticModel, trade_model: RedisTradePydanticModel
+    strategy_pydantic_model: StrategyPydanticModel, trade_db_model: RedisTradePydanticModel
 ):
     if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.OPTIDX:
         if strategy_pydantic_model.position == PositionEnum.LONG:
-            if trade_model.option_type == OptionType.CE:
+            if trade_db_model.option_type == OptionType.CE:
                 return SignalTypeEnum.BUY
             else:
                 return SignalTypeEnum.SELL
         else:
-            if trade_model.option_type == OptionType.CE:
+            if trade_db_model.option_type == OptionType.CE:
                 return SignalTypeEnum.SELL
             else:
                 return SignalTypeEnum.BUY
     else:
-        if trade_model.quantity > 0:
+        if trade_db_model.quantity > 0:
             return SignalTypeEnum.BUY
         else:
             return SignalTypeEnum.SELL
@@ -68,23 +68,23 @@ async def rollover_to_next_expiry(
     async with Database() as async_session:
         # get all strategies from database
         if position:
-            strategy_models_query = await async_session.execute(
-                select(StrategyModel).filter_by(
+            strategy_db__query = await async_session.execute(
+                select(StrategyDBModel).filter_by(
                     instrument_type=instrument_type,
                     position=position,
                 )
             )
         else:
-            strategy_models_query = await async_session.execute(
-                select(StrategyModel).filter_by(
+            strategy_db__query = await async_session.execute(
+                select(StrategyDBModel).filter_by(
                     instrument_type=instrument_type,
                 )
             )
-        strategy_models = strategy_models_query.scalars().all()
+        strategy_db_models = strategy_db__query.scalars().all()
 
         tasks = []
-        for strategy_model in strategy_models:
-            strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_model)
+        for strategy_db_model in strategy_db_models:
+            strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_db_model)
 
             # TODO: consider caching this expiry in local memory
             (

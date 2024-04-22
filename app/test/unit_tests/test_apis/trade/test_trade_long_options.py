@@ -8,8 +8,8 @@ from app.api.trade.IndianFNO.tasks import get_futures_profit
 from app.api.trade.IndianFNO.tasks import get_options_profit
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.IndianFNO.utils import get_future_price_from_redis
-from app.database.models import StrategyModel
-from app.database.models import TradeModel
+from app.database.schemas import StrategyDBModel
+from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import SignalTypeEnum
@@ -66,15 +66,15 @@ async def test_trading_nfo_options_first_ever_trade(
     )
 
     async with Database() as async_session:
-        strategy_model = await async_session.scalar(select(StrategyModel))
+        strategy_db_model = await async_session.scalar(select(StrategyDBModel))
         payload = get_test_post_trade_payload(action.value)
-        payload["strategy_id"] = str(strategy_model.id)
+        payload["strategy_id"] = str(strategy_db_model.id)
 
         # set strategy in redis
         await test_async_redis_client.hset(
-            str(strategy_model.id),
+            str(strategy_db_model.id),
             "strategy",
-            StrategyPydanticModel.model_validate(strategy_model).model_dump_json(),
+            StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
         )
 
         response = await test_async_client.post(trading_options_url, json=payload)
@@ -83,33 +83,33 @@ async def test_trading_nfo_options_first_ever_trade(
         assert response.json() == "successfully bought a new trade"
 
         # assert trade in db
-        trade_model = await async_session.scalar(select(TradeModel))
-        await async_session.refresh(strategy_model)
-        assert trade_model.strategy_id == strategy_model.id
+        trade_db_model = await async_session.scalar(select(TradeDBModel))
+        await async_session.refresh(strategy_db_model)
+        assert trade_db_model.strategy_id == strategy_db_model.id
 
-        # expunge all trade models from session
+        # expunge all trade schemas from session
         async_session.expunge_all()
 
-        trade_models = [trade_model]
+        trade_db_models = [trade_db_model]
         # assert all trades are closed
         updated_values_dict = [
-            getattr(trade_model, key)
+            getattr(trade_db_model, key)
             for key in update_trade_columns
             if key in options_entry_columns_captured
-            for trade_model in trade_models
+            for trade_db_model in trade_db_models
         ]
         # all parameters of a trade are updated
         assert all(updated_values_dict)
 
         # assert trade in redis
         redis_trade_json = await test_async_redis_client.hget(
-            f"{strategy_model.id}", f"{trade_model.expiry} {trade_model.option_type}"
+            f"{strategy_db_model.id}", f"{trade_db_model.expiry} {trade_db_model.option_type}"
         )
         redis_trade_list = [
             RedisTradePydanticModel.model_validate_json(trade)
             for trade in json.loads(redis_trade_json)
         ]
-        assert redis_trade_list == [RedisTradePydanticModel.model_validate(trade_model)]
+        assert redis_trade_list == [RedisTradePydanticModel.model_validate(trade_db_model)]
 
 
 @pytest.mark.asyncio
@@ -129,29 +129,29 @@ async def test_long_nfo_options_add_to_pyramiding(
     )
 
     async with Database() as async_session:
-        strategy_model = await async_session.scalar(select(StrategyModel))
+        strategy_db_model = await async_session.scalar(select(StrategyDBModel))
         payload = get_test_post_trade_payload(action.value)
-        payload["strategy_id"] = str(strategy_model.id)
+        payload["strategy_id"] = str(strategy_db_model.id)
 
         # set strategy in redis
         await test_async_redis_client.hset(
-            str(strategy_model.id),
+            str(strategy_db_model.id),
             "strategy",
-            StrategyPydanticModel.model_validate(strategy_model).model_dump_json(),
+            StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
         )
 
         # set trades in redis
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(strategy_id=strategy_model.id)
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(strategy_id=strategy_db_model.id)
         )
-        trade_models = fetch_trade_models_query.scalars().all()
+        trade_db_models = fetch_trade__query.scalars().all()
         redis_trades_list = [
-            RedisTradePydanticModel.model_validate(trade_model).model_dump_json()
-            for trade_model in trade_models
+            RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json()
+            for trade_db_model in trade_db_models
         ]
         await test_async_redis_client.hset(
-            f"{strategy_model.id}",
-            f"{trade_models[0].expiry} {trade_models[0].option_type}",
+            f"{strategy_db_model.id}",
+            f"{trade_db_models[0].expiry} {trade_db_models[0].option_type}",
             json.dumps(redis_trades_list),
         )
 
@@ -161,16 +161,17 @@ async def test_long_nfo_options_add_to_pyramiding(
         assert response.json() == "successfully bought a new trade"
 
         # assert trade in db
-        await async_session.refresh(strategy_model)
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(strategy_id=strategy_model.id)
+        await async_session.refresh(strategy_db_model)
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(strategy_id=strategy_db_model.id)
         )
-        trade_models = fetch_trade_models_query.scalars().all()
-        assert len(trade_models) == 11
+        trade_db_models = fetch_trade__query.scalars().all()
+        assert len(trade_db_models) == 11
 
         # assert trade in redis
         redis_trade_json_list = await test_async_redis_client.hget(
-            f"{strategy_model.id}", f"{trade_models[0].expiry} {trade_models[0].option_type}"
+            f"{strategy_db_model.id}",
+            f"{trade_db_models[0].expiry} {trade_db_models[0].option_type}",
         )
         assert len(json.loads(redis_trade_json_list)) == 11
 
@@ -179,7 +180,8 @@ async def test_long_nfo_options_add_to_pyramiding(
             for trade in json.loads(redis_trade_json_list)
         ]
         assert redis_trade_list == [
-            RedisTradePydanticModel.model_validate(trade_model) for trade_model in trade_models
+            RedisTradePydanticModel.model_validate(trade_db_model)
+            for trade_db_model in trade_db_models
         ]
 
 
@@ -200,46 +202,46 @@ async def test_trading_nfo_options_opposite_direction(
     )
 
     async with Database() as async_session:
-        strategy_model = await async_session.scalar(
-            select(StrategyModel).options(selectinload(StrategyModel.trades))
+        strategy_db_model = await async_session.scalar(
+            select(StrategyDBModel).options(selectinload(StrategyDBModel.trades))
         )
         current_monthly_expiry, _, _ = await get_current_and_next_expiry_from_redis(
             async_redis_client=test_async_redis_client,
             instrument_type=InstrumentTypeEnum.FUTIDX,
-            symbol=strategy_model.symbol,
+            symbol=strategy_db_model.symbol,
         )
         future_exit_price = await get_future_price_from_redis(
             async_redis_client=test_async_redis_client,
-            strategy_pydantic_model=StrategyPydanticModel.model_validate(strategy_model),
+            strategy_pydantic_model=StrategyPydanticModel.model_validate(strategy_db_model),
             expiry_date=current_monthly_expiry,
         )
         payload = get_test_post_trade_payload(action.value)
         payload["future_entry_price_received"] = str(future_exit_price)
-        payload["strategy_id"] = str(strategy_model.id)
+        payload["strategy_id"] = str(strategy_db_model.id)
 
-        old_funds = strategy_model.funds
-        old_future_funds = strategy_model.future_funds
+        old_funds = strategy_db_model.funds
+        old_future_funds = strategy_db_model.future_funds
         # set strategy in redis
         await test_async_redis_client.hset(
-            str(strategy_model.id),
+            str(strategy_db_model.id),
             "strategy",
-            StrategyPydanticModel.model_validate(strategy_model).model_dump_json(),
+            StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
         )
 
-        await async_session.refresh(strategy_model)
+        await async_session.refresh(strategy_db_model)
 
         # set trades in redis
         redis_trade_pydantic_model_list = json.dumps(
             [
                 RedisTradePydanticModel.model_validate(trade).model_dump_json()
-                for trade in strategy_model.trades
+                for trade in strategy_db_model.trades
             ]
         )
 
-        trade_model = strategy_model.trades[0]
+        trade_db_model = strategy_db_model.trades[0]
         await test_async_redis_client.hset(
-            f"{strategy_model.id}",
-            f"{trade_model.expiry} {trade_model.option_type}",
+            f"{strategy_db_model.id}",
+            f"{trade_db_model.expiry} {trade_db_model.option_type}",
             redis_trade_pydantic_model_list,
         )
 
@@ -248,76 +250,76 @@ async def test_trading_nfo_options_opposite_direction(
         assert response.status_code == 200
         assert response.json() == "successfully closed existing trades and bought a new trade"
 
-        # expunge all trade models from session
+        # expunge all trade schemas from session
         async_session.expunge_all()
         # fetch closed trades in db
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(
-                strategy_id=strategy_model.id,
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(
+                strategy_id=strategy_db_model.id,
                 option_type=OptionType.CE if action == SignalTypeEnum.SELL else OptionType.PE,
             )
         )
-        exited_trade_models = fetch_trade_models_query.scalars().all()
-        assert len(exited_trade_models) == 10
+        exited_trade_db_models = fetch_trade__query.scalars().all()
+        assert len(exited_trade_db_models) == 10
 
         # assert all trades are closed
         updated_values_dict = [
-            getattr(trade_model, key)
+            getattr(trade_db_model, key)
             for key in update_trade_columns
             if key in options_exit_columns_captured
-            for trade_model in exited_trade_models
+            for trade_db_model in exited_trade_db_models
         ]
         # all parameters of a trade are updated
         assert all(updated_values_dict)
 
         # assert exiting trades are deleted from redis
         assert not await test_async_redis_client.hget(
-            str(strategy_model.id),
-            f"{exited_trade_models[0].expiry} {exited_trade_models[0].option_type}",
+            str(strategy_db_model.id),
+            f"{exited_trade_db_models[0].expiry} {exited_trade_db_models[0].option_type}",
         )
 
         # assert new trade in redis
         redis_trade_list_json = await test_async_redis_client.hget(
-            str(strategy_model.id),
-            f"{exited_trade_models[0].expiry} {OptionType.CE if action == SignalTypeEnum.BUY else OptionType.PE}",
+            str(strategy_db_model.id),
+            f"{exited_trade_db_models[0].expiry} {OptionType.CE if action == SignalTypeEnum.BUY else OptionType.PE}",
         )
         assert len(json.loads(redis_trade_list_json)) == 1
 
         # assert strategy funds are updated
         strategy_query = await async_session.execute(
-            select(StrategyModel).filter_by(id=strategy_model.id)
+            select(StrategyDBModel).filter_by(id=strategy_db_model.id)
         )
-        strategy_model = strategy_query.scalars().one_or_none()
-        strategy_json = await test_async_redis_client.hget(str(strategy_model.id), STRATEGY)
+        strategy_db_model = strategy_query.scalars().one_or_none()
+        strategy_json = await test_async_redis_client.hget(str(strategy_db_model.id), STRATEGY)
         redis_strategy_pydantic_model = StrategyPydanticModel.model_validate_json(strategy_json)
 
         actual_total_profit = round(
-            sum(trade_model.profit for trade_model in exited_trade_models), 2
+            sum(trade_db_model.profit for trade_db_model in exited_trade_db_models), 2
         )
         actual_future_profit = round(
-            sum(trade_model.future_profit for trade_model in exited_trade_models), 2
+            sum(trade_db_model.future_profit for trade_db_model in exited_trade_db_models), 2
         )
-        trade_model = exited_trade_models[0]
+        trade_db_model = exited_trade_db_models[0]
         option_chain = await get_option_chain(
             async_redis_client=test_async_redis_client,
-            expiry=trade_model.expiry,
+            expiry=trade_db_model.expiry,
             strategy_pydantic_model=redis_strategy_pydantic_model,
-            option_type=trade_model.option_type,
+            option_type=trade_db_model.option_type,
         )
-        exit_price = option_chain.get(trade_model.strike)
+        exit_price = option_chain.get(trade_db_model.strike)
         expected_total_profit = 0
         expected_future_profit = 0
-        for trade_model in exited_trade_models:
+        for trade_db_model in exited_trade_db_models:
             expected_total_profit += get_options_profit(
-                entry_price=trade_model.entry_price,
+                entry_price=trade_db_model.entry_price,
                 exit_price=exit_price,
-                quantity=trade_model.quantity,
+                quantity=trade_db_model.quantity,
                 position=redis_strategy_pydantic_model.position,
             )
             expected_future_profit += get_futures_profit(
-                entry_price=trade_model.future_entry_price_received,
+                entry_price=trade_db_model.future_entry_price_received,
                 exit_price=future_exit_price,
-                quantity=trade_model.quantity,
+                quantity=trade_db_model.quantity,
                 # reason being existing trade has the action opposite to the current signal
                 signal=(
                     SignalTypeEnum.SELL if action == SignalTypeEnum.BUY else SignalTypeEnum.BUY
@@ -332,5 +334,5 @@ async def test_trading_nfo_options_opposite_direction(
         assert (
             redis_strategy_pydantic_model.future_funds == old_future_funds + actual_future_profit
         )
-        assert strategy_model.funds == old_funds + actual_total_profit
-        assert strategy_model.future_funds == old_future_funds + actual_future_profit
+        assert strategy_db_model.funds == old_funds + actual_total_profit
+        assert strategy_db_model.future_funds == old_future_funds + actual_future_profit

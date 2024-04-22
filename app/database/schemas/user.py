@@ -21,13 +21,13 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime)
 
-    brokermodels = relationship(
-        "BrokerModel",
+    brokerdbmodels = relationship(
+        "BrokerDBModel",
         backref="user",
         cascade="all, delete",
     )
-    strategymodels = relationship(
-        "StrategyModel",
+    strategydbmodels = relationship(
+        "StrategyDBModel",
         backref="user",
         cascade="all, delete",
     )

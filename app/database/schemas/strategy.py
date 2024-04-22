@@ -14,7 +14,7 @@ from app.database import Base
 from app.pydantic_models.enums import PositionEnum
 
 
-class StrategyModel(Base):
+class StrategyDBModel(Base):
     """
     RULES:
     1. Strategy can be either LONG or SHORT, it cannot be both
@@ -58,7 +58,7 @@ class StrategyModel(Base):
         UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
-    daily_profit_models = relationship(
-        "DailyProfitModel", backref="strategy", cascade="all, delete"
+    daily_profit_db_models = relationship(
+        "DailyProfitDBModel", backref="strategy", cascade="all, delete"
     )
-    trades = relationship("TradeModel", back_populates="strategy", cascade="all, delete")
+    trades = relationship("TradeDBModel", back_populates="strategy", cascade="all, delete")

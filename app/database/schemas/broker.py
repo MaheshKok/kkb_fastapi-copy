@@ -10,7 +10,7 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 
-class BrokerModel(Base):
+class BrokerDBModel(Base):
     __tablename__ = "broker"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -26,4 +26,4 @@ class BrokerModel(Base):
     user_id = Column(
         UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    strategymodels = relationship("StrategyModel", backref="strategy", cascade="all, delete")
+    strategydbmodels = relationship("StrategyDBModel", backref="strategy", cascade="all, delete")

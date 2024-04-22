@@ -19,7 +19,7 @@ from app.api.dependency import get_cfd_strategy_pydantic_model
 from app.api.trade import trading_router
 from app.api.trade.Capital.utils import update_cfd_strategy_funds
 from app.broker.AsyncPyOanda import AsyncAPI
-from app.database.models import BrokerModel
+from app.database.schemas import BrokerDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import SignalTypeEnum
 from app.pydantic_models.strategy import CFDStrategyPydanticModel
@@ -323,10 +323,10 @@ async def get_oanda_access_token(
 
     async with Database() as async_session:
         # fetch broker model from database
-        stmt = select(BrokerModel).filter_by(id=cfd_strategy_pydantic_model.broker_id)
+        stmt = select(BrokerDBModel).filter_by(id=cfd_strategy_pydantic_model.broker_id)
         _query = await async_session.execute(stmt)
-        broker_model = _query.scalars().one_or_none()
-        if not broker_model:
+        broker_db_model = _query.scalars().one_or_none()
+        if not broker_db_model:
             msg = f"[ {crucial_details} ] - Broker model not found for broker_id: [ {cfd_strategy_pydantic_model.broker_id} ]"
             logging.error(msg)
             raise HTTPException(status_code=404, detail=msg)
@@ -334,8 +334,8 @@ async def get_oanda_access_token(
         # set access token into oanda_access_token_cache
         oanda_access_token_cache[
             cfd_strategy_pydantic_model.broker_id
-        ] = broker_model.access_token
-        return broker_model.access_token
+        ] = broker_db_model.access_token
+        return broker_db_model.access_token
         # access_token = "c1a1da5b257e3eb61082d88d6c41108d-3c1a484c1cf2b8ee215bef4e36807aad"
 
 

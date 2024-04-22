@@ -21,7 +21,7 @@ from pya3 import TransactionType
 from sqlalchemy import select
 
 from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
-from app.database.models import BrokerModel
+from app.database.schemas import BrokerDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.broker import BrokerPydanticModel
 from app.pydantic_models.enums import InstrumentTypeEnum
@@ -96,13 +96,13 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
 
             # TODO: fetch it from redis
             fetch_broker_query = await async_session.execute(
-                select(BrokerModel).filter_by(id=str(broker_id))
+                select(BrokerDBModel).filter_by(id=str(broker_id))
             )
-            broker_model = fetch_broker_query.scalars().one_or_none()
+            broker_db_model = fetch_broker_query.scalars().one_or_none()
 
-            if not broker_model:
+            if not broker_db_model:
                 raise HTTPException(status_code=404, detail=f"Broker: {broker_id} not found")
-            broker_pydantic_model = BrokerPydanticModel.model_validate(broker_model)
+            broker_pydantic_model = BrokerPydanticModel.model_validate(broker_db_model)
             await async_redis_client.set(broker_id, broker_pydantic_model.model_dump_json())
 
     # TODO: update cron updating alice blue access token to update redis as well with the latest access token
@@ -418,15 +418,15 @@ async def update_ablue_session_token(pya3_obj: AsyncPya3Aliceblue, async_redis_c
     async with Database() as async_session:
         # get broker model from db filtered by username
         fetch_broker_query = await async_session.execute(
-            select(BrokerModel).where(BrokerModel.username == pya3_obj.user_id)
+            select(BrokerDBModel).where(BrokerDBModel.username == pya3_obj.user_id)
         )
-        broker_model = fetch_broker_query.scalars().one_or_none()
-        broker_model.access_token = session_id
+        broker_db_model = fetch_broker_query.scalars().one_or_none()
+        broker_db_model.access_token = session_id
         await async_session.commit()
 
         # update redis cache with new session_id
         await async_redis_client.set(
-            str(broker_model.id), BrokerPydanticModel.model_validate(broker_model).json()
+            str(broker_db_model.id), BrokerPydanticModel.model_validate(broker_db_model).json()
         )
         logging.info(f"access_token updated for user: {pya3_obj.user_id} in db and redis")
         return session_id

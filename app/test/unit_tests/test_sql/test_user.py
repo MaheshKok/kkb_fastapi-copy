@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.database.models import User
+from app.database.schemas import User
 from app.database.session_manager.db_session import Database
 from app.test.factory.user import UserFactory
 

@@ -17,7 +17,7 @@ from app.create_app import get_app
 from app.database import Base
 from app.database.base import engine_kw
 from app.database.base import get_db_url
-from app.database.models import StrategyModel
+from app.database.schemas import StrategyDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.broker import BrokerPydanticModel
 from app.pydantic_models.enums import BrokerNameEnum
@@ -331,9 +331,9 @@ async def buy_task_payload_dict(test_async_redis_client: aioredis.Redis):
     # query database for stragey
 
     async with Database() as async_session:
-        fetch_strategy_query_ = await async_session.execute(select(StrategyModel))
-        strategy_model = fetch_strategy_query_.scalars().one_or_none()
-        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_model)
+        fetch_strategy_query_ = await async_session.execute(select(StrategyDBModel))
+        strategy_db_model = fetch_strategy_query_.scalars().one_or_none()
+        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_db_model)
         (
             current_expiry_date,
             next_expiry_date,
@@ -344,7 +344,7 @@ async def buy_task_payload_dict(test_async_redis_client: aioredis.Redis):
             symbol=strategy_pydantic_model.symbol,
         )
 
-        post_trade_payload["strategy_id"] = strategy_model.id
+        post_trade_payload["strategy_id"] = strategy_db_model.id
         post_trade_payload["expiry"] = current_expiry_date
 
         return post_trade_payload
@@ -398,12 +398,12 @@ async def buy_task_payload_dict(test_async_redis_client: aioredis.Redis):
 # async def patch_redis_add_trade_to_ongoing_trades(test_async_session, monkeypatch):
 #     await create_open_trades(test_async_redis_client=test_async_redis_client,async_session=test_async_session, trades=10, ce_trade=True)
 #     fetch_trades_query_ = await test_async_session.execute(select(TradeModel))
-#     trade_models = fetch_trades_query_.scalars().all()
+#     trade_db_models = fetch_trades_query_.scalars().all()
 #     mock_redis = MagicMock()
 #     mock_redis.exists = AsyncMock(return_value=True)
 #     mock_redis.lrange = AsyncMock(
 #         return_value=[
-#             RedisTradeSchema.model_validate(trade_model).json() for trade_model in trade_models
+#             RedisTradeSchema.model_validate(trade_db_model).json() for trade_db_model in trade_db_models
 #         ]
 #     )
 #     mock_redis.delete = AsyncMock(return_value=True)

@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy import update
 
 from app.broker.AsyncCapital import AsyncCapitalClient
-from app.database.models import CFDStrategyModel
+from app.database.schemas import CFDStrategyDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.strategy import CFDStrategyPydanticModel
 from app.pydantic_models.strategy import StrategyPydanticModel
@@ -263,8 +263,8 @@ async def update_cfd_strategy_funds(
     updated_funds = round(cfd_strategy_pydantic_model.funds + profit_or_loss, 2)
     async with Database() as async_session:
         await async_session.execute(
-            update(CFDStrategyModel)
-            .where(CFDStrategyModel.id == cfd_strategy_pydantic_model.id)
+            update(CFDStrategyDBModel)
+            .where(CFDStrategyDBModel.id == cfd_strategy_pydantic_model.id)
             .values(funds=updated_funds)
         )
         await async_session.commit()

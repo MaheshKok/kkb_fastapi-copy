@@ -10,9 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.broker.AsyncAngelOne import AsyncAngelOneClient
 from app.core.config import Config
-from app.database.models import BrokerModel
-from app.database.models import CFDStrategyModel
-from app.database.models import StrategyModel
+from app.database.schemas import BrokerDBModel
+from app.database.schemas import CFDStrategyDBModel
+from app.database.schemas import StrategyDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.broker import BrokerPydanticModel
 from app.pydantic_models.enums import BrokerNameEnum
@@ -51,35 +51,37 @@ async def get_strategy_pydantic_model(
     if not redis_strategy_json:
         async with Database() as async_session:
             fetch_strategy_query = await async_session.execute(
-                select(StrategyModel).where(StrategyModel.id == signal_pydantic_model.strategy_id)
+                select(StrategyDBModel).where(
+                    StrategyDBModel.id == signal_pydantic_model.strategy_id
+                )
             )
-            strategy_model = fetch_strategy_query.scalar()
-            if not strategy_model:
+            strategy_db_model = fetch_strategy_query.scalar()
+            if not strategy_db_model:
                 raise HTTPException(
                     status_code=404,
                     detail=f"Strategy: {signal_pydantic_model.strategy_id} not found in redis or database",
                 )
             redis_set_result = await async_redis_client.hset(
-                str(strategy_model.id),
+                str(strategy_db_model.id),
                 STRATEGY,
-                StrategyPydanticModel.model_validate(strategy_model).model_dump_json(),
+                StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
             )
             if not redis_set_result:
-                raise Exception(f"Redis set strategy: {strategy_model.id} failed")
+                raise Exception(f"Redis set strategy: {strategy_db_model.id} failed")
 
-            return StrategyPydanticModel.model_validate(strategy_model)
+            return StrategyPydanticModel.model_validate(strategy_db_model)
     return StrategyPydanticModel.model_validate_json(redis_strategy_json)
 
 
 async def get_cfd_strategy_pydantic_model(cfd_payload_pydantic_model: CFDPayloadPydanticModel):
     async with Database() as async_session:
         fetch_strategy_query = await async_session.execute(
-            select(CFDStrategyModel).where(
-                CFDStrategyModel.id == cfd_payload_pydantic_model.strategy_id
+            select(CFDStrategyDBModel).where(
+                CFDStrategyDBModel.id == cfd_payload_pydantic_model.strategy_id
             )
         )
-        if strategy_model := fetch_strategy_query.scalar():
-            return CFDStrategyPydanticModel.model_validate(strategy_model)
+        if strategy_db_model := fetch_strategy_query.scalar():
+            return CFDStrategyPydanticModel.model_validate(strategy_db_model)
         else:
             raise HTTPException(
                 status_code=404,
@@ -107,11 +109,11 @@ async def get_broker_pydantic_model(
     else:
         async with Database() as async_session:
             fetch_broker_query = await async_session.execute(
-                select(BrokerModel).filter_by(id=str(broker_id))
+                select(BrokerDBModel).filter_by(id=str(broker_id))
             )
-            broker_model = fetch_broker_query.scalars().one_or_none()
+            broker_db_model = fetch_broker_query.scalars().one_or_none()
 
-            if not broker_model:
+            if not broker_db_model:
                 broker_pydantic_model = BrokerPydanticModel(
                     id=str(broker_id),
                     username=config.data[ANGELONE_BROKER]["username"],
@@ -119,7 +121,7 @@ async def get_broker_pydantic_model(
                     totp=config.data[ANGELONE_BROKER]["totp"],
                     api_key=config.data[ANGELONE_BROKER]["api_key"],
                 )
-                broker_model = BrokerModel(
+                broker_db_model = BrokerDBModel(
                     id=str(broker_id),
                     name=BrokerNameEnum.ANGELONE.value,
                     username=broker_pydantic_model.username,
@@ -127,11 +129,11 @@ async def get_broker_pydantic_model(
                     totp=broker_pydantic_model.totp,
                     api_key=broker_pydantic_model.api_key,
                 )
-                await async_session.add(broker_model)
+                await async_session.add(broker_db_model)
                 await async_session.commit()
             else:
                 broker_pydantic_model: BrokerPydanticModel = BrokerPydanticModel.model_validate(
-                    broker_model
+                    broker_db_model
                 )
 
             await async_redis_client.set(broker_id, broker_pydantic_model.model_dump_json())

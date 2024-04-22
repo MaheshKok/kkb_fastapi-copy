@@ -5,7 +5,7 @@ from datetime import timedelta
 import factory
 from factory import Sequence
 
-from app.database.models import User
+from app.database.schemas import User
 from app.test.factory.base_factory import AsyncSQLAlchemyFactory
 from app.test.factory.create_async_session import async_session
 

@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import factory
 
-from app.database.models import TradeModel
+from app.database.schemas import TradeDBModel
 from app.pydantic_models.enums import OptionTypeEnum
 from app.pydantic_models.enums import SignalTypeEnum
 from app.test.factory.base_factory import AsyncSQLAlchemyFactory
@@ -28,7 +28,7 @@ def generate_instrument():
 
 class LiveTradeFactory(AsyncSQLAlchemyFactory):
     class Meta:
-        model = TradeModel
+        model = TradeDBModel
         sqlalchemy_session_persistence = "commit"
         sqlalchemy_session = async_session
 
@@ -53,7 +53,7 @@ class LiveTradeFactory(AsyncSQLAlchemyFactory):
 
 class CompletedTradeFactory(AsyncSQLAlchemyFactory):
     class Meta:
-        model = TradeModel
+        model = TradeDBModel
         sqlalchemy_session_persistence = "commit"
         sqlalchemy_session = async_session
 

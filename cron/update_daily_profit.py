@@ -16,9 +16,9 @@ from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
-from app.database.models import DailyProfitModel
-from app.database.models import StrategyModel
-from app.database.models import TradeModel
+from app.database.schemas import DailyProfitDBModel
+from app.database.schemas import StrategyDBModel
+from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 
@@ -107,9 +107,9 @@ async def get_strategy_id_ongoing_profit_dict(
     strategy_id_ongoing_profit_dict = {}
     # fetch live trades from db
     fetch_live_trades_query = await async_session.execute(
-        select(TradeModel)
-        .options(selectinload(TradeModel.strategy))
-        .filter(TradeModel.exit_at == None, TradeModel.expiry >= todays_date)  # noqa
+        select(TradeDBModel)
+        .options(selectinload(TradeDBModel.strategy))
+        .filter(TradeDBModel.exit_at == None, TradeDBModel.expiry >= todays_date)  # noqa
     )
     live_trades_db = fetch_live_trades_query.scalars().all()
     for live_trade_db in live_trades_db:
@@ -175,8 +175,8 @@ async def get_strategy_id_yesterdays_profit_model_dict(
 ):
     # fetch last working day profit from db
     fetch_yesterdays_profit_query = await async_session.execute(
-        select(DailyProfitModel).filter(
-            DailyProfitModel.date == get_last_working_date(holidays_list)
+        select(DailyProfitDBModel).filter(
+            DailyProfitDBModel.date == get_last_working_date(holidays_list)
         )
     )
     yesterdays_profit_models = fetch_yesterdays_profit_query.scalars().all()
@@ -187,40 +187,44 @@ async def get_strategy_id_yesterdays_profit_model_dict(
 
 
 async def get_updated_values_for_only_expiry_strategy(
-    *, async_session, strategy_model, todays_date
+    *, async_session, strategy_db_model, todays_date
 ):
     todays_trade_query = await async_session.execute(
-        select(TradeModel).filter(
-            TradeModel.strategy_id == strategy_model.id,
-            TradeModel.entry_at >= todays_date,
+        select(TradeDBModel).filter(
+            TradeDBModel.strategy_id == strategy_db_model.id,
+            TradeDBModel.entry_at >= todays_date,
         )
     )
-    todays_trade_models = todays_trade_query.scalars().all()
-    todays_profit = round(sum(trade.profit for trade in todays_trade_models), 2)
-    todays_future_profit = round(sum(trade.future_profit for trade in todays_trade_models), 2)
-    total_profit = round(strategy_model.funds, 2)
-    total_future_profit = round(strategy_model.future_funds, 2)
+    todays_trade_db_models = todays_trade_query.scalars().all()
+    todays_profit = round(sum(trade.profit for trade in todays_trade_db_models), 2)
+    todays_future_profit = round(sum(trade.future_profit for trade in todays_trade_db_models), 2)
+    total_profit = round(strategy_db_model.funds, 2)
+    total_future_profit = round(strategy_db_model.future_funds, 2)
     return todays_profit, total_profit, todays_future_profit, total_future_profit
 
 
 async def get_updated_daily_profit_values_for_first_time(
     *,
     ongoing_profit: dict,
-    strategy_model: StrategyModel,
-    trade_models: List[TradeModel],
+    strategy_db_model: StrategyDBModel,
+    trade_db_models: List[TradeDBModel],
 ):
-    closed_profit = sum(trade_model.profit for trade_model in trade_models if trade_model.profit)
+    closed_profit = sum(
+        trade_db_model.profit for trade_db_model in trade_db_models if trade_db_model.profit
+    )
     closed_future_profit = sum(
-        trade_model.future_profit for trade_model in trade_models if trade_model.future_profit
+        trade_db_model.future_profit
+        for trade_db_model in trade_db_models
+        if trade_db_model.future_profit
     )
     todays_profit = round(closed_profit + ongoing_profit["profit"], 2)
     todays_future_profit = round(closed_future_profit + ongoing_profit["future_profit"], 2)
     total_profit = round(
-        strategy_model.funds + ongoing_profit["profit"],
+        strategy_db_model.funds + ongoing_profit["profit"],
         2,
     )
     total_future_profit = round(
-        strategy_model.future_funds + todays_future_profit,
+        strategy_db_model.future_funds + todays_future_profit,
         2,
     )
     return todays_profit, total_profit, todays_future_profit, total_future_profit
@@ -229,11 +233,11 @@ async def get_updated_daily_profit_values_for_first_time(
 def get_updated_daily_profit_values(
     *,
     ongoing_profit: dict,
-    strategy_model: StrategyModel,
-    till_yesterdays_profit_model: DailyProfitModel,
+    strategy_db_model: StrategyDBModel,
+    till_yesterdays_profit_model: DailyProfitDBModel,
 ):
     total_profit = round(
-        ongoing_profit["profit"] + strategy_model.funds,
+        ongoing_profit["profit"] + strategy_db_model.funds,
         2,
     )
     todays_profit = round(
@@ -241,7 +245,7 @@ def get_updated_daily_profit_values(
         2,
     )
     total_future_profit = round(
-        ongoing_profit["future_profit"] + strategy_model.future_funds,
+        ongoing_profit["future_profit"] + strategy_db_model.future_funds,
         2,
     )
     todays_future_profit = round(
@@ -270,19 +274,19 @@ async def update_daily_profit(config):
                     async_session=async_session, holidays_list=holidays_list
                 )
             )
-            strategy_query = await async_session.execute(select(StrategyModel).filter_by())
-            strategy_models = strategy_query.scalars().all()
+            strategy_query = await async_session.execute(select(StrategyDBModel).filter_by())
+            strategy_db_models = strategy_query.scalars().all()
 
             daily_profit_models = []
             # for strategy_id, ongoing_profit in strategy_id_ongoing_profit_dict.items():
-            for strategy_model in strategy_models:
-                if strategy_model.only_on_expiry:
+            for strategy_db_model in strategy_db_models:
+                if strategy_db_model.only_on_expiry:
                     # we don't have ongoing profit for only on expiry as it is exited on 9:45 am UTC,
                     # so today's profit is the sum of all profit of trade executed on expiry date
                     current_expiry, _, _ = await get_current_and_next_expiry_from_redis(
                         async_redis_client=async_redis_client,
-                        instrument_type=strategy_model.instrument_type,
-                        symbol=strategy_model.symbol,
+                        instrument_type=strategy_db_model.instrument_type,
+                        symbol=strategy_db_model.symbol,
                     )
                     if current_expiry == todays_date:
                         (
@@ -292,18 +296,18 @@ async def update_daily_profit(config):
                             total_future_profit,
                         ) = await get_updated_values_for_only_expiry_strategy(
                             async_session=async_session,
-                            strategy_model=strategy_model,
+                            strategy_db_model=strategy_db_model,
                             todays_date=todays_date,
                         )
                     else:
                         # if today is not expiry then we don't update daily profit for this strategy as we don't have any trade executed
                         continue
                 else:
-                    ongoing_profit = strategy_id_ongoing_profit_dict.get(strategy_model.id)
+                    ongoing_profit = strategy_id_ongoing_profit_dict.get(strategy_db_model.id)
                     if not ongoing_profit:
                         continue
                     till_yesterdays_profit_model = strategy_id_yesterdays_profit_model_dict.get(
-                        strategy_model.id
+                        strategy_db_model.id
                     )
                     if till_yesterdays_profit_model:
                         (
@@ -313,18 +317,18 @@ async def update_daily_profit(config):
                             total_future_profit,
                         ) = get_updated_daily_profit_values(
                             ongoing_profit=ongoing_profit,
-                            strategy_model=strategy_model,
+                            strategy_db_model=strategy_db_model,
                             till_yesterdays_profit_model=till_yesterdays_profit_model,
                         )
                     else:
-                        strategy_id = str(strategy_model.id)
+                        strategy_id = str(strategy_db_model.id)
                         trade_query = await async_session.execute(
-                            select(TradeModel).filter_by(
+                            select(TradeDBModel).filter_by(
                                 strategy_id=strategy_id,
                             )
                         )
-                        trade_models = trade_query.scalars().all()
-                        if not trade_models:
+                        trade_db_models = trade_query.scalars().all()
+                        if not trade_db_models:
                             # it means that this strategy has no trade executed till date
                             continue
                         (
@@ -334,19 +338,19 @@ async def update_daily_profit(config):
                             total_future_profit,
                         ) = await get_updated_daily_profit_values_for_first_time(
                             ongoing_profit=ongoing_profit,
-                            strategy_model=strategy_model,
-                            trade_models=trade_models,
+                            strategy_db_model=strategy_db_model,
+                            trade_db_models=trade_db_models,
                         )
 
                 daily_profit_models.append(
-                    DailyProfitModel(
+                    DailyProfitDBModel(
                         **{
                             "todays_profit": todays_profit,
                             "todays_future_profit": todays_future_profit,
                             "total_profit": total_profit,
                             "total_future_profit": total_future_profit,
                             "date": todays_date,
-                            "strategy_id": str(strategy_model.id),
+                            "strategy_id": str(strategy_db_model.id),
                         }
                     )
                 )

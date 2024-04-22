@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import factory
 
-from app.database.models import DailyProfitModel
+from app.database.schemas import DailyProfitDBModel
 from app.test.factory.base_factory import AsyncSQLAlchemyFactory
 from app.test.factory.create_async_session import async_session
 from app.test.factory.strategy import StrategyFactory
@@ -12,7 +12,7 @@ from app.test.factory.strategy import StrategyFactory
 
 class DailyProfitFactory(AsyncSQLAlchemyFactory):
     class Meta:
-        model = DailyProfitModel
+        model = DailyProfitDBModel
         sqlalchemy_session_persistence = "commit"
         sqlalchemy_session = async_session
 

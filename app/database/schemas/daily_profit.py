@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
 
 
-class DailyProfitModel(Base):
+class DailyProfitDBModel(Base):
     __tablename__ = "daily_profit"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

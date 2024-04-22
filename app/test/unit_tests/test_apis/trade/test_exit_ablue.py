@@ -6,9 +6,9 @@ from sqlalchemy import select
 
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
-from app.database.models import StrategyModel
-from app.database.models import TradeModel
-from app.database.models import User
+from app.database.schemas import StrategyDBModel
+from app.database.schemas import TradeDBModel
+from app.database.schemas import User
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
@@ -60,40 +60,40 @@ async def test_exit_alice_blue_trade_for_long_strategy(
 
     async with Database() as async_session:
         user_model = await async_session.scalar(select(User))
-        broker_model = await BrokerFactory(user_id=user_model.id)
-        strategy_model = await async_session.scalar(select(StrategyModel))
-        strategy_model.broker_id = broker_model.id
+        broker_db_model = await BrokerFactory(user_id=user_model.id)
+        strategy_db_model = await async_session.scalar(select(StrategyDBModel))
+        strategy_db_model.broker_id = broker_db_model.id
         await async_session.flush()
 
         payload = get_test_post_trade_payload(action.value)
-        payload["strategy_id"] = str(strategy_model.id)
-        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_model)
+        payload["strategy_id"] = str(strategy_db_model.id)
+        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_db_model)
         # set strategy in redis
         await test_async_redis_client.hset(
-            str(strategy_model.id),
+            str(strategy_db_model.id),
             STRATEGY,
             strategy_pydantic_model.model_dump_json(),
         )
 
         # set trades in redis
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(strategy_id=strategy_model.id)
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(strategy_id=strategy_db_model.id)
         )
-        trade_models = fetch_trade_models_query.scalars().all()
-        trade_model = trade_models[0]
+        trade_db_models = fetch_trade__query.scalars().all()
+        trade_db_model = trade_db_models[0]
         # assert trade in redis
         if instrument_type == InstrumentTypeEnum.OPTIDX:
-            redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
+            redis_hash = f"{trade_db_model.expiry} {trade_db_model.option_type}"
         else:
-            redis_hash = f"{trade_model.expiry} {PositionEnum.SHORT if payload['action'] == SignalTypeEnum.BUY else PositionEnum.LONG} {FUT}"
+            redis_hash = f"{trade_db_model.expiry} {PositionEnum.SHORT if payload['action'] == SignalTypeEnum.BUY else PositionEnum.LONG} {FUT}"
 
         await test_async_redis_client.hset(
-            f"{strategy_model.id}",
+            f"{strategy_db_model.id}",
             redis_hash,
             json.dumps(
                 [
-                    RedisTradePydanticModel.model_validate(trade_model).model_dump_json()
-                    for trade_model in trade_models
+                    RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json()
+                    for trade_db_model in trade_db_models
                 ]
             ),
         )
@@ -139,46 +139,48 @@ async def test_exit_alice_blue_trade_for_long_strategy(
     async with Database() as async_session:
         # fetch closed trades in db
         # if signal is buy then we have closed sell trades
-        strategy_model = await async_session.scalar(select(StrategyModel))
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(
-                strategy_id=strategy_model.id,
+        strategy_db_model = await async_session.scalar(select(StrategyDBModel))
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(
+                strategy_id=strategy_db_model.id,
                 action=(
                     SignalTypeEnum.SELL if action == SignalTypeEnum.BUY else SignalTypeEnum.BUY
                 ),
             )
         )
-        exited_trade_models = fetch_trade_models_query.scalars().all()
-        assert len(exited_trade_models) == 10
+        exited_trade_db_models = fetch_trade__query.scalars().all()
+        assert len(exited_trade_db_models) == 10
 
         # assert all trades are closed
         updated_values_dict = [
-            {key: getattr(trade_model, key) for key in update_trade_columns}
-            for trade_model in exited_trade_models
+            {key: getattr(trade_db_model, key) for key in update_trade_columns}
+            for trade_db_model in exited_trade_db_models
         ]
         # all parameters of a trade are updated
         assert all(updated_values_dict)
 
         # assert exiting trades are deleted from redis
         assert not await test_async_redis_client.hget(
-            f"{strategy_model.id}",
-            f"{exited_trade_models[0].expiry} {exited_trade_models[0].option_type}",
+            f"{strategy_db_model.id}",
+            f"{exited_trade_db_models[0].expiry} {exited_trade_db_models[0].option_type}",
         )
 
         open_trade_query = await async_session.execute(
-            select(TradeModel).filter(TradeModel.action == action.value)
+            select(TradeDBModel).filter(TradeDBModel.action == action.value)
         )
-        trade_models = open_trade_query.scalars().all()
-        assert len(trade_models) == 1
-        trade_model = trade_models[0]
+        trade_db_models = open_trade_query.scalars().all()
+        assert len(trade_db_models) == 1
+        trade_db_model = trade_db_models[0]
         # assert trade in redis
         if instrument_type == InstrumentTypeEnum.OPTIDX:
-            redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
+            redis_hash = f"{trade_db_model.expiry} {trade_db_model.option_type}"
         else:
-            redis_hash = f"{trade_model.expiry} {PositionEnum.LONG if payload['action'] == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
+            redis_hash = f"{trade_db_model.expiry} {PositionEnum.LONG if payload['action'] == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
 
         # assert new trade in redis
-        redis_trade_json = await test_async_redis_client.hget(f"{strategy_model.id}", redis_hash)
+        redis_trade_json = await test_async_redis_client.hget(
+            f"{strategy_db_model.id}", redis_hash
+        )
         assert len(json.loads(redis_trade_json)) == 1
 
 
@@ -215,41 +217,41 @@ async def test_exit_alice_blue_trade_for_short_strategy(
 
     async with Database() as async_session:
         user_model = await async_session.scalar(select(User))
-        broker_model = await BrokerFactory(user_id=user_model.id)
-        strategy_model = await async_session.scalar(select(StrategyModel))
-        strategy_model.broker_id = broker_model.id
+        broker_db_model = await BrokerFactory(user_id=user_model.id)
+        strategy_db_model = await async_session.scalar(select(StrategyDBModel))
+        strategy_db_model.broker_id = broker_db_model.id
         await async_session.flush()
 
         payload = get_test_post_trade_payload(action.value)
-        payload["strategy_id"] = str(strategy_model.id)
+        payload["strategy_id"] = str(strategy_db_model.id)
 
-        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_model)
+        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_db_model)
         # set strategy in redis
         await test_async_redis_client.hset(
-            str(strategy_model.id),
+            str(strategy_db_model.id),
             STRATEGY,
             strategy_pydantic_model.model_dump_json(),
         )
 
         # set trades in redis
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(strategy_id=strategy_model.id)
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(strategy_id=strategy_db_model.id)
         )
-        trade_models = fetch_trade_models_query.scalars().all()
-        trade_model = trade_models[0]
+        trade_db_models = fetch_trade__query.scalars().all()
+        trade_db_model = trade_db_models[0]
         # assert trade in redis
         if instrument_type == InstrumentTypeEnum.OPTIDX:
-            redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
+            redis_hash = f"{trade_db_model.expiry} {trade_db_model.option_type}"
         else:
-            redis_hash = f"{trade_model.expiry} {PositionEnum.SHORT if payload['action'] == SignalTypeEnum.BUY else PositionEnum.LONG} {FUT}"
+            redis_hash = f"{trade_db_model.expiry} {PositionEnum.SHORT if payload['action'] == SignalTypeEnum.BUY else PositionEnum.LONG} {FUT}"
 
         await test_async_redis_client.hset(
-            f"{strategy_model.id}",
+            f"{strategy_db_model.id}",
             redis_hash,
             json.dumps(
                 [
-                    RedisTradePydanticModel.model_validate(trade_model).model_dump_json()
-                    for trade_model in trade_models
+                    RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json()
+                    for trade_db_model in trade_db_models
                 ]
             ),
         )
@@ -294,46 +296,48 @@ async def test_exit_alice_blue_trade_for_short_strategy(
 
     async with Database() as async_session:
         # fetch closed trades in db
-        strategy_model = await async_session.scalar(select(StrategyModel))
-        fetch_trade_models_query = await async_session.execute(
-            select(TradeModel).filter_by(
-                strategy_id=strategy_model.id,
+        strategy_db_model = await async_session.scalar(select(StrategyDBModel))
+        fetch_trade__query = await async_session.execute(
+            select(TradeDBModel).filter_by(
+                strategy_id=strategy_db_model.id,
                 action=(
                     SignalTypeEnum.SELL if action == SignalTypeEnum.BUY else SignalTypeEnum.BUY
                 ),
             )
         )
-        exited_trade_models = fetch_trade_models_query.scalars().all()
-        assert len(exited_trade_models) == 10
+        exited_trade_db_models = fetch_trade__query.scalars().all()
+        assert len(exited_trade_db_models) == 10
 
         # assert all trades are closed
         updated_values_dict = [
-            {key: getattr(trade_model, key) for key in update_trade_columns}
-            for trade_model in exited_trade_models
+            {key: getattr(trade_db_model, key) for key in update_trade_columns}
+            for trade_db_model in exited_trade_db_models
         ]
         # all parameters of a trade are updated
         assert all(updated_values_dict)
 
         # assert exiting trades are deleted from redis
         assert not await test_async_redis_client.hget(
-            f"{strategy_model.id}",
-            f"{exited_trade_models[0].expiry} {exited_trade_models[0].option_type}",
+            f"{strategy_db_model.id}",
+            f"{exited_trade_db_models[0].expiry} {exited_trade_db_models[0].option_type}",
         )
 
         open_trade_query = await async_session.execute(
-            select(TradeModel).filter(TradeModel.action == action.value)
+            select(TradeDBModel).filter(TradeDBModel.action == action.value)
         )
-        trade_models = open_trade_query.scalars().all()
-        assert len(trade_models) == 1
-        trade_model = trade_models[0]
+        trade_db_models = open_trade_query.scalars().all()
+        assert len(trade_db_models) == 1
+        trade_db_model = trade_db_models[0]
         # assert trade in redis
         if instrument_type == InstrumentTypeEnum.OPTIDX:
-            redis_hash = f"{trade_model.expiry} {trade_model.option_type}"
+            redis_hash = f"{trade_db_model.expiry} {trade_db_model.option_type}"
         else:
-            redis_hash = f"{trade_model.expiry} {PositionEnum.LONG if payload['action'] == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
+            redis_hash = f"{trade_db_model.expiry} {PositionEnum.LONG if payload['action'] == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
 
         # assert new trade in redis
-        redis_trade_json = await test_async_redis_client.hget(f"{strategy_model.id}", redis_hash)
+        redis_trade_json = await test_async_redis_client.hget(
+            f"{strategy_db_model.id}", redis_hash
+        )
         assert len(json.loads(redis_trade_json)) == 1
 
 
@@ -352,31 +356,31 @@ async def test_exit_alice_blue_trade_for_short_strategy(
 #
 #     async with Database() as async_session:
 #         user_model = await async_session.scalar(select(User))
-#         broker_model = await BrokerFactory(user_id=user_model.id)
-#         strategy_model = await async_session.scalar(select(StrategyModel))
-#         strategy_model.broker_id = broker_model.id
+#         broker_db_model = await BrokerFactory(user_id=user_model.id)
+#         strategy_db_model = await async_session.scalar(select(StrategyModel))
+#         strategy_db_model.broker_id = broker_db_model.id
 #         await async_session.flush()
 #
 #         payload = get_test_post_trade_payload()
-#         payload["strategy_id"] = str(strategy_model.id)
+#         payload["strategy_id"] = str(strategy_db_model.id)
 #
 #         if option_type == OptionType.PE:
 #             payload["option_type"] = OptionType.PE
 #
 #         # set strategy in redis
 #         await test_async_redis_client.set(
-#             str(strategy_model.id), StrategySchema.model_validate(strategy_model).json()
+#             str(strategy_db_model.id), StrategySchema.model_validate(strategy_db_model).json()
 #         )
 #
 #         # set trades in redis
-#         fetch_trade_models_query = await async_session.execute(
-#             select(TradeModel).filter_by(strategy_id=strategy_model.id)
+#         fetch_trade__query = await async_session.execute(
+#             select(TradeModel).filter_by(strategy_id=strategy_db_model.id)
 #         )
-#         trade_models = fetch_trade_models_query.scalars().all()
-#         for trade_model in trade_models:
+#         trade_db_models = fetch_trade__query.scalars().all()
+#         for trade_db_model in trade_db_models:
 #             await test_async_redis_client.rpush(
-#                 f"{strategy_model.id} {trade_model.expiry} {trade_model.option_type}",
-#                 RedisTradeSchema.model_validate(trade_model).json(),
+#                 f"{strategy_db_model.id} {trade_db_model.expiry} {trade_db_model.option_type}",
+#                 RedisTradeSchema.model_validate(trade_db_model).json(),
 #             )
 #
 #         await async_session.commit()
@@ -416,33 +420,33 @@ async def test_exit_alice_blue_trade_for_short_strategy(
 #
 #     async with Database() as async_session:
 #         # fetch closed trades in db
-#         strategy_model = await async_session.scalar(select(StrategyModel))
-#         fetch_trade_models_query = await async_session.execute(
+#         strategy_db_model = await async_session.scalar(select(StrategyModel))
+#         fetch_trade__query = await async_session.execute(
 #             select(TradeModel).filter_by(
-#                 strategy_id=strategy_model.id,
+#                 strategy_id=strategy_db_model.id,
 #                 option_type=OptionType.CE if option_type == OptionType.PE else OptionType.PE,
 #             )
 #         )
-#         exited_trade_models = fetch_trade_models_query.scalars().all()
-#         assert len(exited_trade_models) == 10
+#         exited_trade_db_models = fetch_trade__query.scalars().all()
+#         assert len(exited_trade_db_models) == 10
 #
 #         # assert all trades are closed
 #         updated_values_dict = [
-#             {key: getattr(trade_model, key) for key in update_trade_mappings}
-#             for trade_model in exited_trade_models
+#             {key: getattr(trade_db_model, key) for key in update_trade_mappings}
+#             for trade_db_model in exited_trade_db_models
 #         ]
 #         # all parameters of a trade are updated
 #         assert all(updated_values_dict)
 #
 #         # assert exiting trades are deleted from redis
 #         assert not await test_async_redis_client.lrange(
-#             f"{strategy_model.id} {exited_trade_models[0].expiry} {exited_trade_models[0].option_type}",
+#             f"{strategy_db_model.id} {exited_trade_db_models[0].expiry} {exited_trade_db_models[0].option_type}",
 #             0,
 #             -1,
 #         )
 #
 #         # assert new trade in redis
 #         redis_trade_list_json = await test_async_redis_client.lrange(
-#             f"{strategy_model.id} {exited_trade_models[0].expiry} {option_type}", 0, -1
+#             f"{strategy_db_model.id} {exited_trade_db_models[0].expiry} {option_type}", 0, -1
 #         )
 #         assert len(redis_trade_list_json) == 1
