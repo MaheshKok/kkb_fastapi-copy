@@ -58,6 +58,8 @@ logging.basicConfig(
 #         password=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["password"],
 #         encoding="utf-8",
 #         decode_responses=True,
+#         ssl=True,
+#         ssl_cert_reqs=None,
 #     )
 #     await _test_async_redis_client.dbsize()
 #     await _test_async_redis_client.flushdb()
@@ -210,7 +212,10 @@ async def test_async_redis_client():
         password=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["password"],
         encoding="utf-8",
         decode_responses=True,
+        ssl=True,
+        ssl_cert_reqs=None,
     )
+
     logging.info("test redis client created")
     # Check Redis connection
     ping = await _test_async_redis_client.ping()
