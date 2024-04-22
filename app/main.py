@@ -10,9 +10,7 @@ from app.create_app import register_sentry
 from app.utils.constants import ConfigFile
 
 
-logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.DEBUG)
 
 register_sentry()
 

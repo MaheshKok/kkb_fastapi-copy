@@ -11,15 +11,12 @@ from cron.update_fno_expiry import sync_expiry_dates_from_alice_blue_to_redis
 from cron.update_session_token import cron_update_session_token
 
 from app.core.config import get_config
-from app.create_app import register_sentry
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
 
 
 logging.basicConfig(level=logging.INFO)
 
-# this is to capture exceptions raised during cron jobs
-register_sentry()
 
 base_urls = {
     # "flaskstockpi": "https://flaskstockapi.herokuapp.com/api",
@@ -176,11 +173,12 @@ aiocron.crontab(
 # aiocron.crontab("0 10 * * *", func=task_scale_down_dynos)  # Every day at 10:00
 aiocron.crontab("5 10 * * *", func=task_update_daily_profit)  # Every day at 10:05
 
-# Run the main loop
-loop = asyncio.get_event_loop()
-try:
-    loop.run_forever()
-except KeyboardInterrupt:
-    pass
-finally:
-    loop.close()
+if __name__ == "__main__":
+    # Run the main loop
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.close()
