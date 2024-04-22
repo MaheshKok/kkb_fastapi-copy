@@ -1,3 +1,4 @@
+import logging
 from contextvars import ContextVar
 from typing import Dict
 from typing import Optional
@@ -49,6 +50,8 @@ class Database(metaclass=DBSessionMeta):
     async def __aexit__(self, exc_type, exc_value, traceback):
         _async_session = _AsyncSession.get()
         if exc_type is not None:
+            # Log the error along with its traceback
+            logging.error("Database transaction failed and rolled back", exc_info=True)
             await _async_session.rollback()
 
         if self.commit_on_exit:

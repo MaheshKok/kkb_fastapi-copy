@@ -18,7 +18,7 @@ class StrategyDBModel(Base):
     """
     RULES:
     1. Strategy can be either LONG or SHORT, it cannot be both
-          i.e if its LONG then CE or PE will be bought and if its SHORT then CE or PE will be sold
+          i.e., if its LONG then CE or PE is bought and if its SHORT then CE or PE will be sold
     2. Only one symbol is allowed per Strategy like Banknifty or Nifty50
 
     """
