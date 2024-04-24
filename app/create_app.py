@@ -32,6 +32,7 @@ from app.database.base import get_db_url
 from app.database.base import get_redis_client
 from app.database.session_manager.db_session import Database
 from app.extensions.redis_cache.on_start import cache_ongoing_trades
+from app.utils.constants import ConfigFile
 
 
 logging.basicConfig(
@@ -129,7 +130,9 @@ def get_app(config_file) -> FastAPI:
         allow_headers=["*"],
     )
 
-    start_schedular()
+    # For Some reason, heroku doesn't support APScheduler, investigate why
+    if config_file != ConfigFile.TEST:
+        start_schedular()
 
     # TODO: register scout and new relic
 
