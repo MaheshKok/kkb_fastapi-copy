@@ -10,9 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.trade.IndianFNO.tasks import get_futures_profit
-from app.api.trade.IndianFNO.tasks import get_options_profit
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
+from app.api.trade.IndianFNO.utils import get_futures_profit
+from app.api.trade.IndianFNO.utils import get_options_profit
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client

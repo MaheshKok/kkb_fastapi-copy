@@ -4,10 +4,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.api.trade.IndianFNO.tasks import get_futures_profit
-from app.api.trade.IndianFNO.tasks import get_options_profit
 from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.IndianFNO.utils import get_future_price_from_redis
+from app.api.trade.IndianFNO.utils import get_futures_profit
+from app.api.trade.IndianFNO.utils import get_options_profit
 from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
