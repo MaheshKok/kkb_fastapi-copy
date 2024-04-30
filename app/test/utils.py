@@ -64,7 +64,7 @@ async def create_open_trades(
             future_option_chain = await get_option_chain(
                 async_redis_client=test_async_redis_client,
                 expiry=futures_expiry_date,
-                strategy_pydantic_model=StrategyPydanticModel.model_validate(strategy),
+                strategy_pyd_model=StrategyPydanticModel.model_validate(strategy),
                 is_future=True,
             )
             future_entry_price_received = float(future_option_chain.get("FUT"))
@@ -75,7 +75,7 @@ async def create_open_trades(
                 option_chain = await get_option_chain(
                     async_redis_client=test_async_redis_client,
                     expiry=options_expiry_date,
-                    strategy_pydantic_model=StrategyPydanticModel.model_validate(strategy),
+                    strategy_pyd_model=StrategyPydanticModel.model_validate(strategy),
                     option_type=OptionType.CE if ce_trade else OptionType.PE,
                     is_future=False,
                 )
@@ -138,7 +138,7 @@ async def create_close_trades(
             future_option_chain = await get_option_chain(
                 async_redis_client=test_async_redis_client,
                 expiry=futures_expiry_date,
-                strategy_pydantic_model=StrategyPydanticModel.model_validate(strategy),
+                strategy_pyd_model=StrategyPydanticModel.model_validate(strategy),
                 is_future=True,
             )
             if instrument_type == InstrumentTypeEnum.OPTIDX:
@@ -148,7 +148,7 @@ async def create_close_trades(
                 option_chain = await get_option_chain(
                     async_redis_client=test_async_redis_client,
                     expiry=options_expiry_date,
-                    strategy_pydantic_model=StrategyPydanticModel.model_validate(strategy),
+                    strategy_pyd_model=StrategyPydanticModel.model_validate(strategy),
                     option_type=OptionType.CE,
                     is_future=False,
                 )

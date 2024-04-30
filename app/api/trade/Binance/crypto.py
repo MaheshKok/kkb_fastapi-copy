@@ -17,9 +17,9 @@ binance_router = APIRouter(
 
 @binance_router.post("/futures", status_code=200)
 async def post_binance_futures(
-    futures_payload_pydantic_model: BinanceFuturesPayloadPydanticModel,
+    futures_payload_pyd_model: BinanceFuturesPayloadPydanticModel,
 ):
-    if futures_payload_pydantic_model.is_live:
+    if futures_payload_pyd_model.is_live:
         api_key = "8eV439YeuT1JM5mYF0mX34jKSOakRukolfGayaF9Sj6FMBC4FV1qTHKUqycrpQ4T"
         api_secret = "gFdKzcNXMvDoNfy1YbLNuS0hifnpE5gphs9iTkkyECv6TuYz5pRM4U4vwoNPQy6Q"
         bnc_async_client = BinanceAsyncClient(
@@ -32,20 +32,20 @@ async def post_binance_futures(
             api_key=api_key, api_secret=api_secret, testnet=True
         )
 
-    ltp = round(float(futures_payload_pydantic_model.ltp), 2)
-    if futures_payload_pydantic_model.symbol == "BTCUSDT":
+    ltp = round(float(futures_payload_pyd_model.ltp), 2)
+    if futures_payload_pyd_model.symbol == "BTCUSDT":
         offset = 5
         ltp = int(ltp)
-    elif futures_payload_pydantic_model.symbol == "ETHUSDT":
+    elif futures_payload_pyd_model.symbol == "ETHUSDT":
         offset = 0.5
-    elif futures_payload_pydantic_model.symbol == "LTCUSDT":
+    elif futures_payload_pyd_model.symbol == "LTCUSDT":
         offset = 0.05
-    elif futures_payload_pydantic_model.symbol == "ETCUSDT":
+    elif futures_payload_pyd_model.symbol == "ETCUSDT":
         offset = 0.03
     else:
-        return f"Invalid Symbol: {futures_payload_pydantic_model.symbol}"
+        return f"Invalid Symbol: {futures_payload_pyd_model.symbol}"
 
-    if futures_payload_pydantic_model.side == SignalTypeEnum.BUY.value.upper():
+    if futures_payload_pyd_model.side == SignalTypeEnum.BUY.value.upper():
         price = round(ltp + offset, 2)
     else:
         price = round(ltp - offset, 2)
@@ -54,20 +54,18 @@ async def post_binance_futures(
     while attempt <= 10:
         try:
             existing_position = await bnc_async_client.futures_position_information(
-                symbol=futures_payload_pydantic_model.symbol
+                symbol=futures_payload_pyd_model.symbol
             )
 
             existing_quantity = 0
             if existing_position:
                 existing_quantity = abs(float(existing_position[0]["positionAmt"]))
 
-            quantity_to_place = round(
-                futures_payload_pydantic_model.quantity + existing_quantity, 2
-            )
+            quantity_to_place = round(futures_payload_pyd_model.quantity + existing_quantity, 2)
             result = await bnc_async_client.futures_create_order(
-                symbol=futures_payload_pydantic_model.symbol,
-                side=futures_payload_pydantic_model.side,
-                type=futures_payload_pydantic_model.type,
+                symbol=futures_payload_pyd_model.symbol,
+                side=futures_payload_pyd_model.side,
+                type=futures_payload_pyd_model.type,
                 quantity=quantity_to_place,
                 timeinforce="GTC",
                 price=price,

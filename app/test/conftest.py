@@ -225,7 +225,7 @@ async def test_async_redis_client():
     else:
         logging.error("test redis client connection failed")
 
-    broker_pydantic_model = BrokerPydanticModel(
+    broker_pyd_model = BrokerPydanticModel(
         id=test_config.data[ANGELONE_BROKER]["id"],
         name=BrokerNameEnum.ANGELONE,
         username=test_config.data[ANGELONE_BROKER]["username"],
@@ -234,7 +234,7 @@ async def test_async_redis_client():
         api_key=test_config.data[ANGELONE_BROKER]["api_key"],
     )
     await _test_async_redis_client.set(
-        str(broker_pydantic_model.id), broker_pydantic_model.model_dump_json()
+        str(broker_pyd_model.id), broker_pyd_model.model_dump_json()
     )
     yield _test_async_redis_client
     await _test_async_redis_client.close()
@@ -339,15 +339,15 @@ async def buy_task_payload_dict(test_async_redis_client: aioredis.Redis):
     async with Database() as async_session:
         fetch_strategy_query_ = await async_session.execute(select(StrategyDBModel))
         strategy_db_model = fetch_strategy_query_.scalars().one_or_none()
-        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_db_model)
+        strategy_pyd_model = StrategyPydanticModel.model_validate(strategy_db_model)
         (
             current_expiry_date,
             next_expiry_date,
             is_today_expiry,
         ) = await get_current_and_next_expiry_from_redis(
             async_redis_client=test_async_redis_client,
-            instrument_type=strategy_pydantic_model.instrument_type,
-            symbol=strategy_pydantic_model.symbol,
+            instrument_type=strategy_pyd_model.instrument_type,
+            symbol=strategy_pyd_model.symbol,
         )
 
         post_trade_payload["strategy_id"] = strategy_db_model.id

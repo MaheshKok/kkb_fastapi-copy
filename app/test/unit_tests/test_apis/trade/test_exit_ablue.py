@@ -67,12 +67,12 @@ async def test_exit_alice_blue_trade_for_long_strategy(
 
         payload = get_test_post_trade_payload(action.value)
         payload["strategy_id"] = str(strategy_db_model.id)
-        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_db_model)
+        strategy_pyd_model = StrategyPydanticModel.model_validate(strategy_db_model)
         # set strategy in redis
         await test_async_redis_client.hset(
             str(strategy_db_model.id),
             STRATEGY,
-            strategy_pydantic_model.model_dump_json(),
+            strategy_pyd_model.model_dump_json(),
         )
 
         # set trades in redis
@@ -103,12 +103,12 @@ async def test_exit_alice_blue_trade_for_long_strategy(
     current_expiry_date, _, _ = await get_current_and_next_expiry_from_redis(
         async_redis_client=test_async_redis_client,
         instrument_type=InstrumentTypeEnum.FUTIDX,
-        symbol=strategy_pydantic_model.symbol,
+        symbol=strategy_pyd_model.symbol,
     )
     future_option_chain = await get_option_chain(
         async_redis_client=test_async_redis_client,
         expiry=current_expiry_date,
-        strategy_pydantic_model=strategy_pydantic_model,
+        strategy_pyd_model=strategy_pyd_model,
         is_future=True,
     )
     future_entry_price = float(future_option_chain.get("FUT"))
@@ -225,12 +225,12 @@ async def test_exit_alice_blue_trade_for_short_strategy(
         payload = get_test_post_trade_payload(action.value)
         payload["strategy_id"] = str(strategy_db_model.id)
 
-        strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_db_model)
+        strategy_pyd_model = StrategyPydanticModel.model_validate(strategy_db_model)
         # set strategy in redis
         await test_async_redis_client.hset(
             str(strategy_db_model.id),
             STRATEGY,
-            strategy_pydantic_model.model_dump_json(),
+            strategy_pyd_model.model_dump_json(),
         )
 
         # set trades in redis
@@ -261,12 +261,12 @@ async def test_exit_alice_blue_trade_for_short_strategy(
     current_expiry_date, _, _ = await get_current_and_next_expiry_from_redis(
         async_redis_client=test_async_redis_client,
         instrument_type=InstrumentTypeEnum.FUTIDX,
-        symbol=strategy_pydantic_model.symbol,
+        symbol=strategy_pyd_model.symbol,
     )
     future_option_chain = await get_option_chain(
         async_redis_client=test_async_redis_client,
         expiry=current_expiry_date,
-        strategy_pydantic_model=strategy_pydantic_model,
+        strategy_pyd_model=strategy_pyd_model,
         is_future=True,
     )
     future_entry_price = float(future_option_chain.get("FUT"))

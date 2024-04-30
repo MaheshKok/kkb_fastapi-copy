@@ -31,10 +31,10 @@ from app.utils.constants import OptionType
 
 
 def get_action(
-    strategy_pydantic_model: StrategyPydanticModel, trade_db_model: RedisTradePydanticModel
+    strategy_pyd_model: StrategyPydanticModel, trade_db_model: RedisTradePydanticModel
 ):
-    if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if strategy_pydantic_model.position == PositionEnum.LONG:
+    if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
+        if strategy_pyd_model.position == PositionEnum.LONG:
             if trade_db_model.option_type == OptionType.CE:
                 return SignalTypeEnum.BUY
             else:
@@ -84,7 +84,7 @@ async def rollover_to_next_expiry(
 
         tasks = []
         for strategy_db_model in strategy_db_models:
-            strategy_pydantic_model = StrategyPydanticModel.model_validate(strategy_db_model)
+            strategy_pyd_model = StrategyPydanticModel.model_validate(strategy_db_model)
 
             # TODO: consider caching this expiry in local memory
             (
@@ -94,10 +94,10 @@ async def rollover_to_next_expiry(
             ) = await get_current_and_next_expiry_from_redis(
                 async_redis_client=async_redis_client,
                 instrument_type=InstrumentTypeEnum.FUTIDX,
-                symbol=strategy_pydantic_model.symbol,
+                symbol=strategy_pyd_model.symbol,
             )
 
-            if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.OPTIDX:
+            if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
                 (
                     options_current_expiry,
                     options_next_expiry,
@@ -105,7 +105,7 @@ async def rollover_to_next_expiry(
                 ) = await get_current_and_next_expiry_from_redis(
                     async_redis_client=async_redis_client,
                     instrument_type=InstrumentTypeEnum.OPTIDX,
-                    symbol=strategy_pydantic_model.symbol,
+                    symbol=strategy_pyd_model.symbol,
                 )
 
                 if not is_today_options_expiry:
@@ -115,10 +115,8 @@ async def rollover_to_next_expiry(
                     continue
 
             # fetch redis trades
-            redis_strategy_data = await async_redis_client.hgetall(
-                str(strategy_pydantic_model.id)
-            )
-            if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.OPTIDX:
+            redis_strategy_data = await async_redis_client.hgetall(str(strategy_pyd_model.id))
+            if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
                 redis_trades_hash_list = [
                     key
                     for key in redis_strategy_data.keys()
@@ -136,46 +134,46 @@ async def rollover_to_next_expiry(
                 redis_hash = redis_trades_hash_list[0]
             else:
                 logging.warning(
-                    f"No trades found for strategy [ {strategy_pydantic_model.symbol} ] in redis"
+                    f"No trades found for strategy [ {strategy_pyd_model.symbol} ] in redis"
                 )
                 continue
 
             exiting_trades_json_list = json.loads(redis_strategy_data[redis_hash])
             logging.info(f"Existing total: {len(exiting_trades_json_list)} trades to be closed")
-            redis_trade_pydantic_model_list = TypeAdapter(
+            redis_trade_pyd_model_list = TypeAdapter(
                 List[RedisTradePydanticModel]
             ).validate_python([json.loads(trade) for trade in exiting_trades_json_list])
 
-            if strategy_pydantic_model.symbol in future_price_cache:
-                future_entry_price_received = future_price_cache[strategy_pydantic_model.symbol]
+            if strategy_pyd_model.symbol in future_price_cache:
+                future_entry_price_received = future_price_cache[strategy_pyd_model.symbol]
             else:
                 future_entry_price_received = await get_future_price_from_redis(
                     async_redis_client=async_redis_client,
-                    strategy_pydantic_model=strategy_pydantic_model,
+                    strategy_pyd_model=strategy_pyd_model,
                     expiry_date=futures_current_expiry,
                 )
-                future_price_cache[strategy_pydantic_model.symbol] = future_entry_price_received
+                future_price_cache[strategy_pyd_model.symbol] = future_entry_price_received
 
-            trade_pydantic_model = redis_trade_pydantic_model_list[0]
+            trade_pyd_model = redis_trade_pyd_model_list[0]
             signal_payload = {
                 "future_entry_price_received": future_entry_price_received,
-                "strategy_id": strategy_pydantic_model.id,
-                "action": trade_pydantic_model.action,
+                "strategy_id": strategy_pyd_model.id,
+                "action": trade_pyd_model.action,
                 "received_at": str(datetime.utcnow().isoformat()),
             }
 
-            signal_pydantic_model = SignalPydanticModel(**signal_payload)
+            signal_pyd_model = SignalPydanticModel(**signal_payload)
             kwargs = {
-                "signal_pydantic_model": signal_pydantic_model,
-                "strategy_pydantic_model": strategy_pydantic_model,
+                "signal_pyd_model": signal_pyd_model,
+                "strategy_pyd_model": strategy_pyd_model,
                 "async_redis_client": async_redis_client,
                 "async_httpx_client": async_httpx_client,
                 "only_futures": True,
                 "futures_expiry_date": futures_current_expiry,
-                "crucial_details": f"{strategy_pydantic_model.symbol} {strategy_pydantic_model.id} {strategy_pydantic_model.instrument_type} {trade_pydantic_model.action}",
+                "crucial_details": f"{strategy_pyd_model.symbol} {strategy_pyd_model.id} {strategy_pyd_model.instrument_type} {trade_pyd_model.action}",
             }
 
-            if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.OPTIDX:
+            if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
                 kwargs.update(
                     {
                         "only_futures": False,
@@ -186,24 +184,24 @@ async def rollover_to_next_expiry(
             ongoing_profit = await task_exit_trade(
                 **kwargs,
                 redis_hash=redis_hash,
-                redis_trade_pydantic_model_list=redis_trade_pydantic_model_list,
+                redis_trade_pyd_model_list=redis_trade_pyd_model_list,
             )
 
-            if strategy_pydantic_model.only_on_expiry:
+            if strategy_pyd_model.only_on_expiry:
                 # do not carry forward if only on expiry
                 continue
 
-            if strategy_pydantic_model.instrument_type == InstrumentTypeEnum.OPTIDX:
+            if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
                 # set option_type
-                set_option_type(strategy_pydantic_model, signal_pydantic_model)
+                set_option_type(strategy_pyd_model, signal_pyd_model)
 
-            if not strategy_pydantic_model.instrument_type == InstrumentTypeEnum.FUTIDX:
+            if not strategy_pyd_model.instrument_type == InstrumentTypeEnum.FUTIDX:
                 kwargs["options_expiry_date"] = options_next_expiry
-                signal_pydantic_model.expiry = options_next_expiry
+                signal_pyd_model.expiry = options_next_expiry
             else:
                 # update expiry in kwargs
                 kwargs["futures_expiry_date"] = futures_next_expiry
-                signal_pydantic_model.expiry = futures_next_expiry
+                signal_pyd_model.expiry = futures_next_expiry
 
             kwargs["ongoing_profit"] = ongoing_profit
             buy_task = asyncio.create_task(

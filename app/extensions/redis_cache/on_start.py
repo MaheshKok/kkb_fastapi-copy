@@ -102,7 +102,7 @@ async def cache_ongoing_trades(async_redis_client):
                         or trades_in_redis
                         and len(trades_in_redis) != len(trade_db_models_list)
                     ):
-                        redis_trades_pydantic_model_json_list = [
+                        redis_trades_pyd_model_json_list = [
                             RedisTradePydanticModel.model_validate(
                                 trade_db_model
                             ).model_dump_json(exclude_none=True)
@@ -111,7 +111,7 @@ async def cache_ongoing_trades(async_redis_client):
                         result = await async_redis_client.hset(
                             strategy_id,
                             redis_strategy_hash,
-                            json.dumps(redis_trades_pydantic_model_json_list),
+                            json.dumps(redis_trades_pyd_model_json_list),
                         )
                         if result:
                             logging.info(

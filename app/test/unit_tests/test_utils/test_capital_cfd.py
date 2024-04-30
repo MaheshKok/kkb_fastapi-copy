@@ -13,7 +13,7 @@ from app.pydantic_models.strategy import CFDStrategyPydanticModel
 @pytest.mark.asyncio
 async def test_get_lots_to_trade():
     getcontext().prec = 28
-    cfd_strategy_pydantic_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=10,
@@ -32,7 +32,7 @@ async def test_get_lots_to_trade():
     )
 
     lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
-        1000, cfd_strategy_pydantic_model, 500
+        1000, cfd_strategy_pyd_model, 500
     )
     assert update_profit_or_loss_in_db == 500
     assert lots_to_open == 201.2
@@ -43,7 +43,7 @@ async def test_get_lots_to_trade_for_banknifty():
     # funds required for 45 is just above the available funds even after profit or loss into consideration
     # get_lots_to_trade_and_profit_or_loss produces 30.0 as ans
     getcontext().prec = 28
-    cfd_strategy_pydantic_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=15,
@@ -62,7 +62,7 @@ async def test_get_lots_to_trade_for_banknifty():
     )
 
     lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
-        1000, cfd_strategy_pydantic_model, 70000
+        1000, cfd_strategy_pyd_model, 70000
     )
     assert update_profit_or_loss_in_db == 70000
     assert lots_to_open == 30.0
@@ -73,7 +73,7 @@ async def test_get_lots_to_trade_20_percent_usage():
     # funds usage percent is 0.2 which comes around 600 and margin required for min quantity is 1000,
     # so in this case 1000 funds would be used to calculate trade lots
     getcontext().prec = 28
-    cfd_strategy_pydantic_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=10,
@@ -92,7 +92,7 @@ async def test_get_lots_to_trade_20_percent_usage():
     )
 
     lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
-        1000, cfd_strategy_pydantic_model, 500
+        1000, cfd_strategy_pyd_model, 500
     )
     assert update_profit_or_loss_in_db == 500
     # ideally ans should be 10.0, but 9.9 is very close and we have to ignore it because of how Decimal works
@@ -106,7 +106,7 @@ async def test_get_lots_to_trade_20_percent_usage_for_banknifty():
     # funds usage percent is 0.2 which comes around 600 and margin required for min quantity is 1000,
     # so in this case 1000 funds would be used to calculate trade lots
     getcontext().prec = 28
-    cfd_strategy_pydantic_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=15,
@@ -125,7 +125,7 @@ async def test_get_lots_to_trade_20_percent_usage_for_banknifty():
     )
 
     lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
-        1000, cfd_strategy_pydantic_model, 500
+        1000, cfd_strategy_pyd_model, 500
     )
     assert update_profit_or_loss_in_db == 500
     assert lots_to_open == 15.0
@@ -134,7 +134,7 @@ async def test_get_lots_to_trade_20_percent_usage_for_banknifty():
 @pytest.mark.asyncio
 async def test_get_lots_to_trade_for_fixed_contracts():
     getcontext().prec = 28
-    cfd_strategy_pydantic_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=10,
@@ -154,7 +154,7 @@ async def test_get_lots_to_trade_for_fixed_contracts():
     )
 
     lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
-        1000, cfd_strategy_pydantic_model, 500
+        1000, cfd_strategy_pyd_model, 500
     )
     assert update_profit_or_loss_in_db == 500
     assert lots_to_open == 150.0
@@ -163,7 +163,7 @@ async def test_get_lots_to_trade_for_fixed_contracts():
 @pytest.mark.asyncio
 async def test_get_lots_to_trade_for_fixed_contracts__when_funds_required_is_less():
     getcontext().prec = 28
-    cfd_strategy_pydantic_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=10,
@@ -183,7 +183,7 @@ async def test_get_lots_to_trade_for_fixed_contracts__when_funds_required_is_les
     )
 
     lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
-        1000, cfd_strategy_pydantic_model, 500
+        1000, cfd_strategy_pyd_model, 500
     )
     assert update_profit_or_loss_in_db == 500
     assert lots_to_open == 6.6

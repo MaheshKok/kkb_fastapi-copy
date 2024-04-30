@@ -41,25 +41,23 @@ async def get_async_redis_client(app: FastAPI = Depends(get_app)) -> Redis:
     yield app.state.async_redis_client
 
 
-async def get_strategy_pydantic_model(
-    signal_pydantic_model: SignalPydanticModel,
+async def get_strategy_pyd_model(
+    signal_pyd_model: SignalPydanticModel,
     async_redis_client: Redis = Depends(get_async_redis_client),
 ) -> StrategyPydanticModel:
     redis_strategy_json = await async_redis_client.hget(
-        str(signal_pydantic_model.strategy_id), "strategy"
+        str(signal_pyd_model.strategy_id), "strategy"
     )
     if not redis_strategy_json:
         async with Database() as async_session:
             fetch_strategy_query = await async_session.execute(
-                select(StrategyDBModel).where(
-                    StrategyDBModel.id == signal_pydantic_model.strategy_id
-                )
+                select(StrategyDBModel).where(StrategyDBModel.id == signal_pyd_model.strategy_id)
             )
             strategy_db_model = fetch_strategy_query.scalar()
             if not strategy_db_model:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Strategy: {signal_pydantic_model.strategy_id} not found in redis or database",
+                    detail=f"Strategy: {signal_pyd_model.strategy_id} not found in redis or database",
                 )
             redis_set_result = await async_redis_client.hset(
                 str(strategy_db_model.id),
@@ -73,11 +71,11 @@ async def get_strategy_pydantic_model(
     return StrategyPydanticModel.model_validate_json(redis_strategy_json)
 
 
-async def get_cfd_strategy_pydantic_model(cfd_payload_pydantic_model: CFDPayloadPydanticModel):
+async def get_cfd_strategy_pyd_model(cfd_payload_pyd_model: CFDPayloadPydanticModel):
     async with Database() as async_session:
         fetch_strategy_query = await async_session.execute(
             select(CFDStrategyDBModel).where(
-                CFDStrategyDBModel.id == cfd_payload_pydantic_model.strategy_id
+                CFDStrategyDBModel.id == cfd_payload_pyd_model.strategy_id
             )
         )
         if strategy_db_model := fetch_strategy_query.scalar():
@@ -85,7 +83,7 @@ async def get_cfd_strategy_pydantic_model(cfd_payload_pydantic_model: CFDPayload
         else:
             raise HTTPException(
                 status_code=404,
-                detail=f"CFD Strategy: {cfd_payload_pydantic_model.strategy_id} not found in database",
+                detail=f"CFD Strategy: {cfd_payload_pyd_model.strategy_id} not found in database",
             )
 
 
@@ -98,14 +96,14 @@ async def get_async_httpx_client() -> AsyncClient:
         await client.aclose()
 
 
-async def get_broker_pydantic_model(
+async def get_broker_pyd_model(
     config: Config,
     async_redis_client: Redis = Depends(get_async_redis_client),
 ) -> BrokerPydanticModel:
     broker_id = config.data[ANGELONE_BROKER]["id"]
     broker_json = await async_redis_client.get(broker_id)
     if broker_json:
-        broker_pydantic_model: BrokerPydanticModel = BrokerPydanticModel.parse_raw(broker_json)
+        broker_pyd_model: BrokerPydanticModel = BrokerPydanticModel.parse_raw(broker_json)
     else:
         async with Database() as async_session:
             fetch_broker_query = await async_session.execute(
@@ -114,7 +112,7 @@ async def get_broker_pydantic_model(
             broker_db_model = fetch_broker_query.scalars().one_or_none()
 
             if not broker_db_model:
-                broker_pydantic_model = BrokerPydanticModel(
+                broker_pyd_model = BrokerPydanticModel(
                     id=str(broker_id),
                     username=config.data[ANGELONE_BROKER]["username"],
                     password=config.data[ANGELONE_BROKER]["password"],
@@ -124,38 +122,38 @@ async def get_broker_pydantic_model(
                 broker_db_model = BrokerDBModel(
                     id=str(broker_id),
                     name=BrokerNameEnum.ANGELONE.value,
-                    username=broker_pydantic_model.username,
-                    password=broker_pydantic_model.password,
-                    totp=broker_pydantic_model.totp,
-                    api_key=broker_pydantic_model.api_key,
+                    username=broker_pyd_model.username,
+                    password=broker_pyd_model.password,
+                    totp=broker_pyd_model.totp,
+                    api_key=broker_pyd_model.api_key,
                 )
                 await async_session.add(broker_db_model)
                 await async_session.commit()
             else:
-                broker_pydantic_model: BrokerPydanticModel = BrokerPydanticModel.model_validate(
+                broker_pyd_model: BrokerPydanticModel = BrokerPydanticModel.model_validate(
                     broker_db_model
                 )
 
-            await async_redis_client.set(broker_id, broker_pydantic_model.model_dump_json())
+            await async_redis_client.set(broker_id, broker_pyd_model.model_dump_json())
 
-    return broker_pydantic_model
+    return broker_pyd_model
 
 
 async def get_angelone_client(
     config: Config = Depends(get_config),
     async_redis_client: Redis = Depends(get_async_redis_client),
 ) -> AsyncAngelOneClient:
-    broker_pydantic_model = await get_broker_pydantic_model(config, async_redis_client)
+    broker_pyd_model = await get_broker_pyd_model(config, async_redis_client)
     async_angelone_client = AsyncAngelOneClient(
-        broker_pydantic_model.api_key,
-        access_token=broker_pydantic_model.access_token,
-        refresh_token=broker_pydantic_model.refresh_token,
-        feed_token=broker_pydantic_model.feed_token,
+        broker_pyd_model.api_key,
+        access_token=broker_pyd_model.access_token,
+        refresh_token=broker_pyd_model.refresh_token,
+        feed_token=broker_pyd_model.feed_token,
     )
     # async_angelone_client.generateSession(
-    #     clientCode=broker_pydantic_model.username,
-    #     password=broker_pydantic_model.password,
-    #     totp=pyotp.TOTP(broker_pydantic_model.totp).now(),
+    #     clientCode=broker_pyd_model.username,
+    #     password=broker_pyd_model.password,
+    #     totp=pyotp.TOTP(broker_pyd_model.totp).now(),
     # )
     #
     # update_broker_in_redis = False
@@ -166,14 +164,14 @@ async def get_angelone_client(
     # ]
     #
     # for token_name, client_token in tokens:
-    #     broker_token = getattr(broker_pydantic_model, token_name)
+    #     broker_token = getattr(broker_pyd_model, token_name)
     #     if not broker_token or broker_token != client_token:
-    #         setattr(broker_pydantic_model, token_name, client_token)
+    #         setattr(broker_pyd_model, token_name, client_token)
     #         update_broker_in_redis = True
     #
     # if update_broker_in_redis:
     #     await async_redis_client.set(
-    #         str(broker_pydantic_model.id), BrokerSchema.model_validate(broker_pydantic_model).model_dump_json()
+    #         str(broker_pyd_model.id), BrokerSchema.model_validate(broker_pyd_model).model_dump_json()
     #     )
 
     return async_angelone_client

@@ -28,11 +28,11 @@ async def get_strategies():
 
 @strategy_router.post("/strategy", response_model=StrategyPydanticModel)
 async def post_strategy(
-    strategy_pydantic_model: StrategyCreatePydanticModel,
+    strategy_pyd_model: StrategyCreatePydanticModel,
     async_redis_client: Redis = Depends(get_async_redis_client),
 ):
     async with Database() as async_session:
-        strategy_db_model = StrategyDBModel(**strategy_pydantic_model.model_dump())
+        strategy_db_model = StrategyDBModel(**strategy_pyd_model.model_dump())
         async_session.add(strategy_db_model)
         await async_session.flush()
         await async_session.refresh(strategy_db_model)

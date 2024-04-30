@@ -212,7 +212,7 @@ async def test_trading_nfo_options_opposite_direction(
         )
         future_exit_price = await get_future_price_from_redis(
             async_redis_client=test_async_redis_client,
-            strategy_pydantic_model=StrategyPydanticModel.model_validate(strategy_db_model),
+            strategy_pyd_model=StrategyPydanticModel.model_validate(strategy_db_model),
             expiry_date=current_monthly_expiry,
         )
         payload = get_test_post_trade_payload(action.value)
@@ -231,7 +231,7 @@ async def test_trading_nfo_options_opposite_direction(
         await async_session.refresh(strategy_db_model)
 
         # set trades in redis
-        redis_trade_pydantic_model_list = json.dumps(
+        redis_trade_pyd_model_list = json.dumps(
             [
                 RedisTradePydanticModel.model_validate(trade).model_dump_json()
                 for trade in strategy_db_model.trades
@@ -242,7 +242,7 @@ async def test_trading_nfo_options_opposite_direction(
         await test_async_redis_client.hset(
             f"{strategy_db_model.id}",
             f"{trade_db_model.expiry} {trade_db_model.option_type}",
-            redis_trade_pydantic_model_list,
+            redis_trade_pyd_model_list,
         )
 
         response = await test_async_client.post(trading_options_url, json=payload)
@@ -291,7 +291,7 @@ async def test_trading_nfo_options_opposite_direction(
         )
         strategy_db_model = strategy_query.scalars().one_or_none()
         strategy_json = await test_async_redis_client.hget(str(strategy_db_model.id), STRATEGY)
-        redis_strategy_pydantic_model = StrategyPydanticModel.model_validate_json(strategy_json)
+        redis_strategy_pyd_model = StrategyPydanticModel.model_validate_json(strategy_json)
 
         actual_total_profit = round(
             sum(trade_db_model.profit for trade_db_model in exited_trade_db_models), 2
@@ -303,7 +303,7 @@ async def test_trading_nfo_options_opposite_direction(
         option_chain = await get_option_chain(
             async_redis_client=test_async_redis_client,
             expiry=trade_db_model.expiry,
-            strategy_pydantic_model=redis_strategy_pydantic_model,
+            strategy_pyd_model=redis_strategy_pyd_model,
             option_type=trade_db_model.option_type,
         )
         exit_price = option_chain.get(trade_db_model.strike)
@@ -314,7 +314,7 @@ async def test_trading_nfo_options_opposite_direction(
                 entry_price=trade_db_model.entry_price,
                 exit_price=exit_price,
                 quantity=trade_db_model.quantity,
-                position=redis_strategy_pydantic_model.position,
+                position=redis_strategy_pyd_model.position,
             )
             expected_future_profit += get_futures_profit(
                 entry_price=trade_db_model.future_entry_price_received,
@@ -330,9 +330,7 @@ async def test_trading_nfo_options_opposite_direction(
         expected_future_profit = round(expected_future_profit, 2)
         assert expected_total_profit == actual_total_profit
         assert expected_future_profit == actual_future_profit
-        assert redis_strategy_pydantic_model.funds == old_funds + actual_total_profit
-        assert (
-            redis_strategy_pydantic_model.future_funds == old_future_funds + actual_future_profit
-        )
+        assert redis_strategy_pyd_model.funds == old_funds + actual_total_profit
+        assert redis_strategy_pyd_model.future_funds == old_future_funds + actual_future_profit
         assert strategy_db_model.funds == old_funds + actual_total_profit
         assert strategy_db_model.future_funds == old_future_funds + actual_future_profit

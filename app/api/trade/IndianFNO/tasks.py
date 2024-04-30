@@ -30,9 +30,9 @@ from app.utils.option_chain import get_option_chain
 # @profile
 async def task_entry_trade(
     *,
-    signal_pydantic_model: SignalPydanticModel,
+    signal_pyd_model: SignalPydanticModel,
     async_redis_client: aioredis.StrictRedis,
-    strategy_pydantic_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydanticModel,
     async_httpx_client: AsyncClient,
     crucial_details: str,
     async_angelone_client: AsyncAngelOneClient,
@@ -45,20 +45,20 @@ async def task_entry_trade(
         option_chain = await get_option_chain(
             async_redis_client=async_redis_client,
             expiry=options_expiry_date,
-            option_type=signal_pydantic_model.option_type,
-            strategy_pydantic_model=strategy_pydantic_model,
+            option_type=signal_pyd_model.option_type,
+            strategy_pyd_model=strategy_pyd_model,
         )
 
         future_entry_price, strike_and_entry_price = await asyncio.gather(
             get_future_price_from_redis(
                 async_redis_client=async_redis_client,
-                strategy_pydantic_model=strategy_pydantic_model,
+                strategy_pyd_model=strategy_pyd_model,
                 expiry_date=futures_expiry_date,
             ),
             get_strike_and_entry_price(
                 option_chain=option_chain,
-                signal_pydantic_model=signal_pydantic_model,
-                strategy_pydantic_model=strategy_pydantic_model,
+                signal_pyd_model=signal_pyd_model,
+                strategy_pyd_model=strategy_pyd_model,
                 async_redis_client=async_redis_client,
                 async_httpx_client=async_httpx_client,
                 crucial_details=crucial_details,
@@ -75,20 +75,20 @@ async def task_entry_trade(
             )
             return None
 
-        signal_pydantic_model.strike = strike
+        signal_pyd_model.strike = strike
         angel_one_trading_symbol = get_angel_one_options_trading_symbol(
-            symbol=strategy_pydantic_model.symbol,
-            expiry_date=signal_pydantic_model.expiry,
+            symbol=strategy_pyd_model.symbol,
+            expiry_date=signal_pyd_model.expiry,
             strike=int(strike),
-            option_type=signal_pydantic_model.option_type,
+            option_type=signal_pyd_model.option_type,
         )
     else:
-        if strategy_pydantic_model.broker_id:
+        if strategy_pyd_model.broker_id:
             entry_price = await buy_alice_blue_trades(
                 strike=None,
-                signal_pydantic_model=signal_pydantic_model,
+                signal_pyd_model=signal_pyd_model,
                 async_redis_client=async_redis_client,
-                strategy_pydantic_model=strategy_pydantic_model,
+                strategy_pyd_model=strategy_pyd_model,
                 async_httpx_client=async_httpx_client,
             )
             logging.info(
@@ -97,7 +97,7 @@ async def task_entry_trade(
         else:
             entry_price = await get_future_price_from_redis(
                 async_redis_client=async_redis_client,
-                strategy_pydantic_model=strategy_pydantic_model,
+                strategy_pyd_model=strategy_pyd_model,
                 expiry_date=futures_expiry_date,
             )
             logging.info(
@@ -105,38 +105,38 @@ async def task_entry_trade(
             )
 
         angel_one_trading_symbol = get_angel_one_futures_trading_symbol(
-            symbol=strategy_pydantic_model.symbol,
-            expiry_date=signal_pydantic_model.expiry,
+            symbol=strategy_pyd_model.symbol,
+            expiry_date=signal_pyd_model.expiry,
         )
         logging.info(
-            f"[ {crucial_details} ] - Slippage: [ {entry_price - signal_pydantic_model.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_pydantic_model.future_entry_price_received} ] "
+            f"[ {crucial_details} ] - Slippage: [ {entry_price - signal_pyd_model.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_pyd_model.future_entry_price_received} ] "
         )
 
     margin_for_min_quantity = await get_margin_required(
         client=async_angelone_client,
         price=entry_price,
-        signal_type=signal_pydantic_model.action,
-        strategy_pydantic_model=strategy_pydantic_model,
+        signal_type=signal_pyd_model.action,
+        strategy_pyd_model=strategy_pyd_model,
         async_redis_client=async_redis_client,
         angel_one_trading_symbol=angel_one_trading_symbol,
         crucial_details=crucial_details,
     )
     lots_to_open = get_lots_to_open(
-        strategy_pydantic_model=strategy_pydantic_model,
+        strategy_pyd_model=strategy_pyd_model,
         crucial_details=crucial_details,
         ongoing_profit_or_loss=ongoing_profit,
         margin_for_min_quantity=margin_for_min_quantity,
     )
     set_quantity(
-        strategy_pydantic_model=strategy_pydantic_model,
-        signal_pydantic_model=signal_pydantic_model,
+        strategy_pyd_model=strategy_pyd_model,
+        signal_pyd_model=signal_pyd_model,
         lots_to_open=lots_to_open,
     )
 
     await dump_trade_in_db_and_redis(
-        strategy_pydantic_model=strategy_pydantic_model,
+        strategy_pyd_model=strategy_pyd_model,
         entry_price=entry_price,
-        signal_pydantic_model=signal_pydantic_model,
+        signal_pyd_model=signal_pyd_model,
         async_redis_client=async_redis_client,
         crucial_details=crucial_details,
     )
@@ -146,18 +146,18 @@ async def task_entry_trade(
 
 async def task_exit_trade(
     *,
-    signal_pydantic_model: SignalPydanticModel,
-    strategy_pydantic_model: StrategyPydanticModel,
+    signal_pyd_model: SignalPydanticModel,
+    strategy_pyd_model: StrategyPydanticModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
     only_futures: bool,
     redis_hash: str,
-    redis_trade_pydantic_model_list: List[RedisTradePydanticModel],
+    redis_trade_pyd_model_list: List[RedisTradePydanticModel],
     crucial_details: str,
     futures_expiry_date: date,
     options_expiry_date: date = None,
 ):
-    trades_key = f"{signal_pydantic_model.strategy_id}"
+    trades_key = f"{signal_pyd_model.strategy_id}"
 
     # TODO: in future decide based on strategy new column, strategy_type:
     # if strategy_position is "every" then close all ongoing trades and buy new trade
@@ -171,10 +171,10 @@ async def task_exit_trade(
             total_ongoing_profit,
             total_future_profit,
         ) = await compute_trade_data_needed_for_closing_trade(
-            signal_pydantic_model=signal_pydantic_model,
-            redis_trade_pydantic_model_list=redis_trade_pydantic_model_list,
+            signal_pyd_model=signal_pyd_model,
+            redis_trade_pyd_model_list=redis_trade_pyd_model_list,
             async_redis_client=async_redis_client,
-            strategy_pydantic_model=strategy_pydantic_model,
+            strategy_pyd_model=strategy_pyd_model,
             async_httpx_client=async_httpx_client,
             only_futures=only_futures,
             futures_expiry_date=futures_expiry_date,
@@ -185,10 +185,10 @@ async def task_exit_trade(
         # update database with the updated data
         await close_trades_in_db_and_remove_from_redis(
             updated_data=updated_data,
-            strategy_pydantic_model=strategy_pydantic_model,
+            strategy_pyd_model=strategy_pyd_model,
             total_profit=total_ongoing_profit,
             total_future_profit=total_future_profit,
-            total_redis_trades=len(redis_trade_pydantic_model_list),
+            total_redis_trades=len(redis_trade_pyd_model_list),
             async_redis_client=async_redis_client,
             redis_strategy_key_hash=f"{trades_key} {redis_hash}",
             crucial_details=crucial_details,

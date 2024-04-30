@@ -15,7 +15,7 @@ from oandapyV20.endpoints.trades import TradeClose
 from oandapyV20.endpoints.trades import TradesList
 from sqlalchemy import select
 
-from app.api.dependency import get_cfd_strategy_pydantic_model
+from app.api.dependency import get_cfd_strategy_pyd_model
 from app.api.trade import trading_router
 from app.api.trade.Capital.utils import update_cfd_strategy_funds
 from app.broker.AsyncPyOanda import AsyncAPI
@@ -112,18 +112,18 @@ async def get_gbp_to_usd_conversion_rate():
 
 
 async def get_available_funds(
-    strategy_pydantic_model: CFDStrategyPydanticModel, profit_or_loss: float, crucial_details: str
+    strategy_pyd_model: CFDStrategyPydanticModel, profit_or_loss: float, crucial_details: str
 ):
     conversion_rate = await get_gbp_to_usd_conversion_rate()
-    available_funds = round((strategy_pydantic_model.funds + profit_or_loss) * conversion_rate, 2)
+    available_funds = round((strategy_pyd_model.funds + profit_or_loss) * conversion_rate, 2)
     logging.info(f"[ {crucial_details} ] - Available funds are [ {available_funds} $]")
     return available_funds
 
 
 async def get_current_instrument_price(
     client: AsyncAPI,
-    cfd_payload_pydantic_model: CFDPayloadPydanticModel,
-    strategy_pydantic_model: CFDStrategyPydanticModel,
+    cfd_payload_pyd_model: CFDPayloadPydanticModel,
+    strategy_pyd_model: CFDStrategyPydanticModel,
     crucial_details: str,
 ):
     """
@@ -151,8 +151,8 @@ async def get_current_instrument_price(
     try:
         pricing_details = await client.request(
             PricingInfo(
-                cfd_payload_pydantic_model.account_id,
-                params={"instruments": [strategy_pydantic_model.instrument]},
+                cfd_payload_pyd_model.account_id,
+                params={"instruments": [strategy_pyd_model.instrument]},
             )
         )
     except Exception as e:
@@ -161,7 +161,7 @@ async def get_current_instrument_price(
         )
         return None
 
-    if cfd_payload_pydantic_model.direction == SignalTypeEnum.SELL:
+    if cfd_payload_pyd_model.direction == SignalTypeEnum.SELL:
         current_instrument_price = float(pricing_details["prices"][0]["closeoutAsk"])
     else:
         current_instrument_price = float(pricing_details["prices"][0]["closeoutBid"])
@@ -174,8 +174,8 @@ async def get_current_instrument_price(
 
 async def get_instrument(
     client: AsyncAPI,
-    cfd_payload_pydantic_model: CFDPayloadPydanticModel,
-    strategy_pydantic_model: CFDStrategyPydanticModel,
+    cfd_payload_pyd_model: CFDPayloadPydanticModel,
+    strategy_pyd_model: CFDStrategyPydanticModel,
     crucial_details: str,
 ):
     """
@@ -216,34 +216,34 @@ async def get_instrument(
         },
     }
     """
-    instruments_request = AccountInstruments(cfd_payload_pydantic_model.account_id)
+    instruments_request = AccountInstruments(cfd_payload_pyd_model.account_id)
     instruments_response = await client.request(instruments_request)
     instruments = instruments_response["instruments"]
-    # filter out instrument matching cfd_strategy_pydantic_model.instrument
+    # filter out instrument matching cfd_strategy_pyd_model.instrument
     instrument_list = list(
         filter(
-            lambda instrument: instrument["name"] == strategy_pydantic_model.instrument,
+            lambda instrument: instrument["name"] == strategy_pyd_model.instrument,
             instruments,
         )
     )
     if not instrument_list:
         logging.error(
-            f"[ {crucial_details} ] - No Instrument: [ {strategy_pydantic_model.instrument} ] found in the account: [ {cfd_payload_pydantic_model.account_id} ]"
+            f"[ {crucial_details} ] - No Instrument: [ {strategy_pyd_model.instrument} ] found in the account: [ {cfd_payload_pyd_model.account_id} ]"
         )
         return None
     else:
         instrument = instrument_list[0]
         logging.info(
-            f"[ {crucial_details} ] - Instrument: [ {strategy_pydantic_model.instrument}] found in the account: [ {cfd_payload_pydantic_model.account_id} ]"
+            f"[ {crucial_details} ] - Instrument: [ {strategy_pyd_model.instrument}] found in the account: [ {cfd_payload_pyd_model.account_id} ]"
         )
         return instrument
 
 
 async def get_lots_to_open(
     *,
-    strategy_pydantic_model: CFDStrategyPydanticModel,
+    strategy_pyd_model: CFDStrategyPydanticModel,
     profit_or_loss: float,
-    cfd_payload_pydantic_model: CFDPayloadPydanticModel,
+    cfd_payload_pyd_model: CFDPayloadPydanticModel,
     client: AsyncAPI,
     crucial_details: str,
 ):
@@ -251,20 +251,20 @@ async def get_lots_to_open(
 
     available_funds, current_instrument_price, instrument = await asyncio.gather(
         get_available_funds(
-            strategy_pydantic_model=strategy_pydantic_model,
+            strategy_pyd_model=strategy_pyd_model,
             profit_or_loss=profit_or_loss,
             crucial_details=crucial_details,
         ),
         get_current_instrument_price(
             client=client,
-            cfd_payload_pydantic_model=cfd_payload_pydantic_model,
-            strategy_pydantic_model=strategy_pydantic_model,
+            cfd_payload_pyd_model=cfd_payload_pyd_model,
+            strategy_pyd_model=strategy_pyd_model,
             crucial_details=crucial_details,
         ),
         get_instrument(
             client=client,
-            cfd_payload_pydantic_model=cfd_payload_pydantic_model,
-            strategy_pydantic_model=strategy_pydantic_model,
+            cfd_payload_pyd_model=cfd_payload_pyd_model,
+            strategy_pyd_model=strategy_pyd_model,
             crucial_details=crucial_details,
         ),
     )
@@ -276,7 +276,7 @@ async def get_lots_to_open(
     logging.info(f"[ {crucial_details} ] - Margin required is [ {margin_required * 100}% ]")
     tradeUnitsPrecision = int(instrument["tradeUnitsPrecision"])
 
-    if strategy_pydantic_model.compounding:
+    if strategy_pyd_model.compounding:
         logging.info(f"[ {crucial_details} ] - Compounding is enabled")
         # contracts worth that can be traded
         total_worth_of_contracts_to_trade = available_funds / margin_required
@@ -286,7 +286,7 @@ async def get_lots_to_open(
         logging.info(f"[ {crucial_details} ] - Lots : [ {lots_to_trade} ] to trade")
     else:
         logging.info(f"[ {crucial_details} ] - Compounding is disabled")
-        fixed_lots_to_trade = strategy_pydantic_model.contracts
+        fixed_lots_to_trade = strategy_pyd_model.contracts
         actual_funds_required_to_trade = round(current_instrument_price * fixed_lots_to_trade, 2)
         funds_required_to_trade = round(actual_funds_required_to_trade * margin_required, 2)
 
@@ -316,55 +316,51 @@ async def get_lots_to_open(
 
 
 async def get_oanda_access_token(
-    cfd_strategy_pydantic_model: CFDStrategyPydanticModel, crucial_details: str
+    cfd_strategy_pyd_model: CFDStrategyPydanticModel, crucial_details: str
 ):
-    if cfd_strategy_pydantic_model.broker_id in oanda_access_token_cache:
-        return oanda_access_token_cache[cfd_strategy_pydantic_model.broker_id]
+    if cfd_strategy_pyd_model.broker_id in oanda_access_token_cache:
+        return oanda_access_token_cache[cfd_strategy_pyd_model.broker_id]
 
     async with Database() as async_session:
         # fetch broker model from database
-        stmt = select(BrokerDBModel).filter_by(id=cfd_strategy_pydantic_model.broker_id)
+        stmt = select(BrokerDBModel).filter_by(id=cfd_strategy_pyd_model.broker_id)
         _query = await async_session.execute(stmt)
         broker_db_model = _query.scalars().one_or_none()
         if not broker_db_model:
-            msg = f"[ {crucial_details} ] - Broker model not found for broker_id: [ {cfd_strategy_pydantic_model.broker_id} ]"
+            msg = f"[ {crucial_details} ] - Broker model not found for broker_id: [ {cfd_strategy_pyd_model.broker_id} ]"
             logging.error(msg)
             raise HTTPException(status_code=404, detail=msg)
 
         # set access token into oanda_access_token_cache
-        oanda_access_token_cache[
-            cfd_strategy_pydantic_model.broker_id
-        ] = broker_db_model.access_token
+        oanda_access_token_cache[cfd_strategy_pyd_model.broker_id] = broker_db_model.access_token
         return broker_db_model.access_token
         # access_token = "c1a1da5b257e3eb61082d88d6c41108d-3c1a484c1cf2b8ee215bef4e36807aad"
 
 
 @oanda_forex_router.post("/cfd", status_code=200)
 async def post_oanda_cfd(
-    cfd_payload_pydantic_model: CFDPayloadPydanticModel,
-    cfd_strategy_pydantic_model: CFDStrategyPydanticModel = Depends(
-        get_cfd_strategy_pydantic_model
-    ),
+    cfd_payload_pyd_model: CFDPayloadPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydanticModel = Depends(get_cfd_strategy_pyd_model),
 ):
     start_time = time.perf_counter()
-    demo_or_live = "DEMO" if cfd_strategy_pydantic_model.is_demo else "LIVE"
+    demo_or_live = "DEMO" if cfd_strategy_pyd_model.is_demo else "LIVE"
 
-    crucial_details = f"Oanda {demo_or_live} {cfd_strategy_pydantic_model.instrument} {cfd_payload_pydantic_model.direction}"
+    crucial_details = f"Oanda {demo_or_live} {cfd_strategy_pyd_model.instrument} {cfd_payload_pyd_model.direction}"
     logging.info(f"[ {crucial_details} ] - signal received")
 
     access_token = await get_oanda_access_token(
-        cfd_strategy_pydantic_model=cfd_strategy_pydantic_model, crucial_details=crucial_details
+        cfd_strategy_pyd_model=cfd_strategy_pyd_model, crucial_details=crucial_details
     )
     client = AsyncAPI(access_token=access_token)
 
-    account_id = cfd_payload_pydantic_model.account_id
+    account_id = cfd_payload_pyd_model.account_id
     trades = await client.request(TradesList(accountID=account_id))
 
     profit_or_loss_value = 0
     if trades["trades"]:
         for trade in trades["trades"]:
             trade_instrument = trade["instrument"]
-            if trade_instrument == cfd_strategy_pydantic_model.instrument:
+            if trade_instrument == cfd_strategy_pyd_model.instrument:
                 current_open_lots = trade["currentUnits"]
                 profit_or_loss_value = float(trade["unrealizedPL"])
                 profit_or_loss_str = "profit" if profit_or_loss_value > 0 else "loss"
@@ -384,7 +380,7 @@ async def post_oanda_cfd(
                         f"[ {crucial_details} ] - current open lots: [ {current_open_lots} ] {profit_or_loss_str}: [ {profit_or_loss_value} ] closed"
                     )
                     await update_cfd_strategy_funds(
-                        cfd_strategy_pydantic_model=cfd_strategy_pydantic_model,
+                        cfd_strategy_pyd_model=cfd_strategy_pyd_model,
                         profit_or_loss=profit_or_loss_value,
                         crucial_details=crucial_details,
                     )
@@ -395,9 +391,9 @@ async def post_oanda_cfd(
                     pprint(close_trade_response)
 
     lots_to_open = await get_lots_to_open(
-        strategy_pydantic_model=cfd_strategy_pydantic_model,
+        strategy_pyd_model=cfd_strategy_pyd_model,
         profit_or_loss=profit_or_loss_value,
-        cfd_payload_pydantic_model=cfd_payload_pydantic_model,
+        cfd_payload_pyd_model=cfd_payload_pyd_model,
         client=client,
         crucial_details=crucial_details,
     )
@@ -406,9 +402,9 @@ async def post_oanda_cfd(
     # if its 0 then no decimal is allowed
     # instr_response = await client.request(AccountInstruments(accountID))
 
-    is_buy_signal = cfd_payload_pydantic_model.direction == SignalTypeEnum.BUY
+    is_buy_signal = cfd_payload_pyd_model.direction == SignalTypeEnum.BUY
     market_order_request = MarketOrderRequest(
-        instrument=cfd_strategy_pydantic_model.instrument,
+        instrument=cfd_strategy_pyd_model.instrument,
         units=lots_to_open if is_buy_signal else -lots_to_open,
     )
     response = await client.request(OrderCreate(account_id, data=market_order_request.data))

@@ -18,19 +18,19 @@ from app.pydantic_models.trade import CFDPayloadPydanticModel
 
 def get_lots_to_trade_and_profit_or_loss(
     funds_to_use,
-    strategy_pydantic_model: CFDStrategyPydanticModel | StrategyPydanticModel,
+    strategy_pyd_model: CFDStrategyPydanticModel | StrategyPydanticModel,
     ongoing_profit_or_loss,
     crucial_details: str = None,
 ):
-    def _get_lots_to_trade(strategy_funds_to_trade, strategy_pydantic_model):
+    def _get_lots_to_trade(strategy_funds_to_trade, strategy_pyd_model):
         # below is the core of this function, do not mendle with it
         # Calculate the quantity that can be traded in the current period
         approx_lots_to_trade = strategy_funds_to_trade * (
-            Decimal(strategy_pydantic_model.min_quantity)
-            / Decimal(strategy_pydantic_model.margin_for_min_quantity)
+            Decimal(strategy_pyd_model.min_quantity)
+            / Decimal(strategy_pyd_model.margin_for_min_quantity)
         )
 
-        to_increment = Decimal(strategy_pydantic_model.incremental_step_size)
+        to_increment = Decimal(strategy_pyd_model.incremental_step_size)
         closest_lots_to_trade = (approx_lots_to_trade // to_increment) * to_increment
 
         while closest_lots_to_trade + to_increment <= approx_lots_to_trade:
@@ -52,65 +52,62 @@ def get_lots_to_trade_and_profit_or_loss(
     getcontext().prec = 28  # Set a high precision
     try:
         # below code is to secure funds as per drawdown percentage
-        # drawdown_percentage = Decimal(cfd_strategy_pydantic_model.max_drawdown) / (
-        #     Decimal(cfd_strategy_pydantic_model.margin_for_min_quantity)
+        # drawdown_percentage = Decimal(cfd_strategy_pyd_model.max_drawdown) / (
+        #     Decimal(cfd_strategy_pyd_model.margin_for_min_quantity)
         # )
         #
         # # Calculate the funds that can be traded in the current period
         # funds_to_trade = (
-        #     Decimal(cfd_strategy_pydantic_model.funds) + Decimal(ongoing_profit_or_loss)
+        #     Decimal(cfd_strategy_pyd_model.funds) + Decimal(ongoing_profit_or_loss)
         # ) / (1 + drawdown_percentage)
         #
 
         # i think below code  doesn't make any sense as i have seen if available funds are in negative still i can trade in broker,
         # don't know how it works in indian broker like zerodha , keeping it for now
         # if funds_to_use < ongoing_profit_or_loss:
-        #     funds_to_trade = Decimal(strategy_pydantic_model.funds + (funds_to_use * 0.95))
+        #     funds_to_trade = Decimal(strategy_pyd_model.funds + (funds_to_use * 0.95))
         #     to_update_profit_or_loss_in_db = funds_to_use
         # else:
-        #     funds_to_trade = Decimal(strategy_pydantic_model.funds + (ongoing_profit_or_loss * 0.95))
+        #     funds_to_trade = Decimal(strategy_pyd_model.funds + (ongoing_profit_or_loss * 0.95))
         #     to_update_profit_or_loss_in_db = ongoing_profit_or_loss
 
         strategy_funds_to_trade = Decimal(
-            (strategy_pydantic_model.funds + ongoing_profit_or_loss)
-            * strategy_pydantic_model.funds_usage_percent
+            (strategy_pyd_model.funds + ongoing_profit_or_loss)
+            * strategy_pyd_model.funds_usage_percent
         )
         strategy_funds_to_trade = round(strategy_funds_to_trade, 2)
         logging.info(
             f"[ {crucial_details} ] - strategy_funds_to_trade: {strategy_funds_to_trade}"
         )
 
-        if strategy_funds_to_trade < Decimal(strategy_pydantic_model.margin_for_min_quantity):
+        if strategy_funds_to_trade < Decimal(strategy_pyd_model.margin_for_min_quantity):
             logging.info(
-                f"[ {crucial_details} ] - strategy_funds_to_trade: [ {strategy_funds_to_trade} ] is less than margin for min quantity: {strategy_pydantic_model.margin_for_min_quantity}"
+                f"[ {crucial_details} ] - strategy_funds_to_trade: [ {strategy_funds_to_trade} ] is less than margin for min quantity: {strategy_pyd_model.margin_for_min_quantity}"
             )
-            strategy_funds_to_trade = Decimal(strategy_pydantic_model.margin_for_min_quantity)
+            strategy_funds_to_trade = Decimal(strategy_pyd_model.margin_for_min_quantity)
 
         to_update_profit_or_loss_in_db = ongoing_profit_or_loss
-        if not strategy_pydantic_model.compounding:
+        if not strategy_pyd_model.compounding:
             logging.info(
-                f"[ {crucial_details} ] - Compounding is not enabled, so we will trade fixed contracts: [ {strategy_pydantic_model.contracts} ]"
+                f"[ {crucial_details} ] - Compounding is not enabled, so we will trade fixed contracts: [ {strategy_pyd_model.contracts} ]"
             )
             funds_required_for_contracts = Decimal(
-                (
-                    strategy_pydantic_model.margin_for_min_quantity
-                    / strategy_pydantic_model.min_quantity
-                )
-                * strategy_pydantic_model.contracts
+                (strategy_pyd_model.margin_for_min_quantity / strategy_pyd_model.min_quantity)
+                * strategy_pyd_model.contracts
             )
-            available_funds = Decimal(strategy_pydantic_model.funds + ongoing_profit_or_loss)
+            available_funds = Decimal(strategy_pyd_model.funds + ongoing_profit_or_loss)
             if funds_required_for_contracts <= available_funds:
-                lots_to_trade = strategy_pydantic_model.contracts
+                lots_to_trade = strategy_pyd_model.contracts
                 logging.info(
                     f"[ {crucial_details} ] - Available Funds: [ {available_funds} ] are more than funds required for contracts: [ {funds_required_for_contracts} ]"
                 )
             else:
-                lots_to_trade = _get_lots_to_trade(available_funds, strategy_pydantic_model)
+                lots_to_trade = _get_lots_to_trade(available_funds, strategy_pyd_model)
                 logging.info(
                     f"[ {crucial_details} ] - Available Funds: [ {available_funds} ] are less than funds required for contracts: [ {funds_required_for_contracts} ]. So we will trade [ {lots_to_trade} ] contracts"
                 )
         else:
-            lots_to_trade = _get_lots_to_trade(strategy_funds_to_trade, strategy_pydantic_model)
+            lots_to_trade = _get_lots_to_trade(strategy_funds_to_trade, strategy_pyd_model)
             logging.info(
                 f"[ {crucial_details} ] - Compounding is enabled and we can trade [ {lots_to_trade} ] contracts in [ {strategy_funds_to_trade} ] funds"
             )
@@ -128,7 +125,7 @@ def get_lots_to_trade_and_profit_or_loss(
 
 async def get_all_positions(
     client: AsyncCapitalClient,
-    cfd_strategy_pydantic_model: CFDStrategyPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
     crucial_details: str,
 ) -> dict:
     get_all_positions_attempt = 1
@@ -204,15 +201,15 @@ async def get_all_open_orders(client: AsyncCapitalClient, crucial_details: str) 
 
 async def get_capital_cfd_existing_profit_or_loss(
     client: AsyncCapitalClient,
-    cfd_strategy_pydantic_model: CFDStrategyPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
     crucial_details: str,
 ) -> tuple[int, int, str | None]:
     direction = None
     profit_or_loss_value = 0
     existing_lot = 0
-    positions = await get_all_positions(client, cfd_strategy_pydantic_model, crucial_details)
+    positions = await get_all_positions(client, cfd_strategy_pyd_model, crucial_details)
     for position in positions["positions"]:
-        if position["market"]["epic"] == cfd_strategy_pydantic_model.instrument:
+        if position["market"]["epic"] == cfd_strategy_pyd_model.instrument:
             profit_or_loss_value += position["position"]["upl"]
             existing_lot += position["position"]["size"]
             direction = position["position"]["direction"]
@@ -225,7 +222,7 @@ async def get_capital_cfd_existing_profit_or_loss(
 
 
 async def get_funds_to_use(
-    client, cfd_strategy_pydantic_model: CFDStrategyPydanticModel, crucial_details: str
+    client, cfd_strategy_pyd_model: CFDStrategyPydanticModel, crucial_details: str
 ) -> float:
     get_all_accounts_attempt = 1
     while get_all_accounts_attempt < 10:
@@ -254,30 +251,30 @@ async def get_funds_to_use(
 
 async def update_cfd_strategy_funds(
     *,
-    cfd_strategy_pydantic_model: CFDStrategyPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
     profit_or_loss: float,
     crucial_details: str,
 ):
     log_profit_or_loss = "profit" if profit_or_loss > 0 else "loss"
 
-    updated_funds = round(cfd_strategy_pydantic_model.funds + profit_or_loss, 2)
+    updated_funds = round(cfd_strategy_pyd_model.funds + profit_or_loss, 2)
     async with Database() as async_session:
         await async_session.execute(
             update(CFDStrategyDBModel)
-            .where(CFDStrategyDBModel.id == cfd_strategy_pydantic_model.id)
+            .where(CFDStrategyDBModel.id == cfd_strategy_pyd_model.id)
             .values(funds=updated_funds)
         )
         await async_session.commit()
         logging.info(
-            f"[ {crucial_details} ] - funds balance [ {cfd_strategy_pydantic_model.funds} ] got updated to [ {updated_funds} ] after {log_profit_or_loss}: {profit_or_loss} "
+            f"[ {crucial_details} ] - funds balance [ {cfd_strategy_pyd_model.funds} ] got updated to [ {updated_funds} ] after {log_profit_or_loss}: {profit_or_loss} "
         )
 
 
 async def open_order_found(
     *,
     client: AsyncCapitalClient,
-    cfd_strategy_pydantic_model: CFDStrategyPydanticModel,
-    cfd_payload_pydantic_model: CFDPayloadPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
+    cfd_payload_pyd_model: CFDPayloadPydanticModel,
     lots_size: float,
     crucial_details: str,
 ):
@@ -289,8 +286,8 @@ async def open_order_found(
                 open_order["workingOrder"]["direction"],
             )
             if (
-                instrument == cfd_strategy_pydantic_model.instrument
-                and direction != cfd_payload_pydantic_model.direction
+                instrument == cfd_strategy_pyd_model.instrument
+                and direction != cfd_payload_pyd_model.direction
             ):
                 logging.warning(
                     f"[ {crucial_details} ] - Open order detected for [ {lots_size} ] Lots in [ {direction} ] direction"
@@ -304,14 +301,14 @@ async def find_position(
     *,
     client: AsyncCapitalClient,
     demo_or_live: str,
-    cfd_strategy_pydantic_model: CFDStrategyPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
     current_open_lots: float,
     action: str,
     crucial_details: str,
 ):
-    if positions := await get_all_positions(client, cfd_strategy_pydantic_model, crucial_details):
+    if positions := await get_all_positions(client, cfd_strategy_pyd_model, crucial_details):
         for position in positions["positions"]:
-            if position["market"]["epic"] == cfd_strategy_pydantic_model.instrument:
+            if position["market"]["epic"] == cfd_strategy_pyd_model.instrument:
                 return position
         else:
             logging.warning(
@@ -329,8 +326,8 @@ async def close_capital_lots(
     *,
     client: AsyncCapitalClient,
     lots_to_close: float,
-    cfd_strategy_pydantic_model: CFDStrategyPydanticModel,
-    cfd_payload_pydantic_model: CFDPayloadPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
+    cfd_payload_pyd_model: CFDPayloadPydanticModel,
     demo_or_live: str,
     profit_or_loss: float,
     crucial_details: str,
@@ -339,8 +336,8 @@ async def close_capital_lots(
     while close_lots_attempt <= 10:
         try:
             response = await client.create_position(
-                epic=cfd_strategy_pydantic_model.instrument,
-                direction=cfd_payload_pydantic_model.direction,
+                epic=cfd_strategy_pyd_model.instrument,
+                direction=cfd_payload_pyd_model.direction,
                 size=lots_to_close,
             )
 
@@ -376,8 +373,8 @@ async def close_capital_lots(
 
                 _open_order_found = await open_order_found(
                     client=client,
-                    cfd_strategy_pydantic_model=cfd_strategy_pydantic_model,
-                    cfd_payload_pydantic_model=cfd_payload_pydantic_model,
+                    cfd_strategy_pyd_model=cfd_strategy_pyd_model,
+                    cfd_payload_pyd_model=cfd_payload_pyd_model,
                     lots_size=lots_to_close,
                     crucial_details=crucial_details,
                 )
@@ -389,7 +386,7 @@ async def close_capital_lots(
                 position_found = await find_position(
                     client=client,
                     demo_or_live=demo_or_live,
-                    cfd_strategy_pydantic_model=cfd_strategy_pydantic_model,
+                    cfd_strategy_pyd_model=cfd_strategy_pyd_model,
                     current_open_lots=lots_to_close,
                     action="closed",
                     crucial_details=crucial_details,
@@ -398,13 +395,13 @@ async def close_capital_lots(
                 if position_found:
                     if (
                         position_found["position"]["direction"]
-                        == cfd_payload_pydantic_model.direction.upper()
+                        == cfd_payload_pyd_model.direction.upper()
                     ):
                         logging.warning(
-                            f"[ {crucial_details} ] - Lots [ {lots_to_close} ] are reversed in [ {cfd_payload_pydantic_model.direction} ] direction. so NO need to open lots again"
+                            f"[ {crucial_details} ] - Lots [ {lots_to_close} ] are reversed in [ {cfd_payload_pyd_model.direction} ] direction. so NO need to open lots again"
                         )
                         await update_cfd_strategy_funds(
-                            cfd_strategy_pydantic_model=cfd_strategy_pydantic_model,
+                            cfd_strategy_pyd_model=cfd_strategy_pyd_model,
                             crucial_details=crucial_details,
                             profit_or_loss=profit_or_loss,
                         )
@@ -430,23 +427,23 @@ async def close_capital_lots(
 async def open_capital_lots(
     *,
     client: AsyncCapitalClient,
-    cfd_strategy_pydantic_model: CFDStrategyPydanticModel,
-    cfd_payload_pydantic_model: CFDPayloadPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
+    cfd_payload_pyd_model: CFDPayloadPydanticModel,
     demo_or_live: str,
     profit_or_loss: float,
     funds_to_use=float,
     crucial_details: str,
 ):
     lots_to_open, update_profit_or_loss_in_db = get_lots_to_trade_and_profit_or_loss(
-        funds_to_use, cfd_strategy_pydantic_model, profit_or_loss, crucial_details
+        funds_to_use, cfd_strategy_pyd_model, profit_or_loss, crucial_details
     )
 
     place_order_attempt = 1
     while place_order_attempt < 10:
         try:
             response = await client.create_position(
-                epic=cfd_strategy_pydantic_model.instrument,
-                direction=cfd_payload_pydantic_model.direction,
+                epic=cfd_strategy_pyd_model.instrument,
+                direction=cfd_payload_pyd_model.direction,
                 size=lots_to_open,
             )
 
@@ -457,7 +454,7 @@ async def open_capital_lots(
                     msg = f"[ {crucial_details} ] - Attempt [ {place_order_attempt} ] throttled while opening lots [ {lots_to_open} ] response:  {response_json}"
                     logging.warning(msg)
                     logging.info(
-                        f"[ {demo_or_live} {cfd_strategy_pydantic_model.instrument} ] attempting again to open lots"
+                        f"[ {demo_or_live} {cfd_strategy_pyd_model.instrument} ] attempting again to open lots"
                     )
                     place_order_attempt += 1
                     await client.__log_out__()
@@ -471,13 +468,13 @@ async def open_capital_lots(
                     logging.info(
                         f"[ {crucial_details} ] calculating lots to open again as available funds are updated"
                     )
-                    # funds_to_use = await get_funds_to_use(client, cfd_strategy_pydantic_model)
+                    # funds_to_use = await get_funds_to_use(client, cfd_strategy_pyd_model)
 
                     (
                         lots_to_open,
                         update_profit_or_loss_in_db,
                     ) = get_lots_to_trade_and_profit_or_loss(
-                        0.0, cfd_strategy_pydantic_model, profit_or_loss, crucial_details
+                        0.0, cfd_strategy_pyd_model, profit_or_loss, crucial_details
                     )
                     place_order_attempt += 1
                     await client.__log_out__()
@@ -489,9 +486,7 @@ async def open_capital_lots(
                     )
                     return response_json
             elif response_json["dealStatus"] == "ACCEPTED":
-                long_or_short = (
-                    "LONG" if cfd_payload_pydantic_model.direction == "buy" else "SHORT"
-                )
+                long_or_short = "LONG" if cfd_payload_pyd_model.direction == "buy" else "SHORT"
                 msg = f"[ {crucial_details} ] - successfully [ {long_or_short}  {lots_to_open} ] trades."
                 logging.info(msg)
             else:
@@ -501,7 +496,7 @@ async def open_capital_lots(
             if update_profit_or_loss_in_db:
                 # update funds balance
                 await update_cfd_strategy_funds(
-                    cfd_strategy_pydantic_model=cfd_strategy_pydantic_model,
+                    cfd_strategy_pyd_model=cfd_strategy_pyd_model,
                     crucial_details=crucial_details,
                     profit_or_loss=update_profit_or_loss_in_db,
                 )
@@ -528,13 +523,13 @@ async def open_capital_lots(
                 )
                 await asyncio.sleep(2)
                 logging.info(
-                    f"[ {demo_or_live} {cfd_strategy_pydantic_model.instrument} ] may be lots are opened , so fetching all positions againa and verifying the same"
+                    f"[ {demo_or_live} {cfd_strategy_pyd_model.instrument} ] may be lots are opened , so fetching all positions againa and verifying the same"
                 )
 
                 _open_order_found = await open_order_found(
                     client=client,
-                    cfd_strategy_pydantic_model=cfd_strategy_pydantic_model,
-                    cfd_payload_pydantic_model=cfd_payload_pydantic_model,
+                    cfd_strategy_pyd_model=cfd_strategy_pyd_model,
+                    cfd_payload_pyd_model=cfd_payload_pyd_model,
                     lots_size=lots_to_open,
                     crucial_details=crucial_details,
                 )
@@ -545,7 +540,7 @@ async def open_capital_lots(
                 position_found = await find_position(
                     client=client,
                     demo_or_live=demo_or_live,
-                    cfd_strategy_pydantic_model=cfd_strategy_pydantic_model,
+                    cfd_strategy_pyd_model=cfd_strategy_pyd_model,
                     current_open_lots=lots_to_open,
                     action="open",
                     crucial_details=crucial_details,
@@ -556,16 +551,16 @@ async def open_capital_lots(
                     response_lots = position_found["position"]["size"]
                     if (
                         position_found["position"]["direction"]
-                        == cfd_payload_pydantic_model.direction.upper()
+                        == cfd_payload_pyd_model.direction.upper()
                     ):
                         long_or_short = (
-                            "LONG" if cfd_payload_pydantic_model.direction == "buy" else "SHORT"
+                            "LONG" if cfd_payload_pyd_model.direction == "buy" else "SHORT"
                         )
                         msg = f"[ {crucial_details} ] - successfully [ {long_or_short}  {lots_to_open} ] trades."
                         logging.info(msg)
 
                         await update_cfd_strategy_funds(
-                            cfd_strategy_pydantic_model=cfd_strategy_pydantic_model,
+                            cfd_strategy_pyd_model=cfd_strategy_pyd_model,
                             crucial_details=crucial_details,
                             profit_or_loss=profit_or_loss,
                         )

@@ -86,7 +86,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
     broker_json = await async_redis_client.get(broker_id)
 
     if broker_json:
-        broker_pydantic_model = BrokerPydanticModel.parse_raw(broker_json)
+        broker_pyd_model = BrokerPydanticModel.parse_raw(broker_json)
     else:
         async with Database() as async_session:
             # We have a cron that update session token every 1 hour,
@@ -102,18 +102,18 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
 
             if not broker_db_model:
                 raise HTTPException(status_code=404, detail=f"Broker: {broker_id} not found")
-            broker_pydantic_model = BrokerPydanticModel.model_validate(broker_db_model)
-            await async_redis_client.set(broker_id, broker_pydantic_model.model_dump_json())
+            broker_pyd_model = BrokerPydanticModel.model_validate(broker_db_model)
+            await async_redis_client.set(broker_id, broker_pyd_model.model_dump_json())
 
     # TODO: update cron updating alice blue access token to update redis as well with the latest access token
     pya3_obj = AsyncPya3Aliceblue(
-        user_id=broker_pydantic_model.username,
-        password=broker_pydantic_model.password,
-        api_key=broker_pydantic_model.api_key,
-        totp=broker_pydantic_model.totp,
-        twoFA=broker_pydantic_model.twoFA,
-        app_id=broker_pydantic_model.app_id,
-        session_id=broker_pydantic_model.access_token,
+        user_id=broker_pyd_model.username,
+        password=broker_pyd_model.password,
+        api_key=broker_pyd_model.api_key,
+        totp=broker_pyd_model.totp,
+        twoFA=broker_pyd_model.twoFA,
+        app_id=broker_pyd_model.app_id,
+        session_id=broker_pyd_model.access_token,
         async_httpx_client=async_httpx_client,
     )
     return pya3_obj
@@ -122,8 +122,8 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
 async def buy_alice_blue_trades(
     *,
     strike: Optional[float],
-    signal_pydantic_model: SignalPydanticModel,
-    strategy_pydantic_model: StrategyPydanticModel,
+    signal_pyd_model: SignalPydanticModel,
+    strategy_pyd_model: StrategyPydanticModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
 ):
@@ -138,17 +138,17 @@ async def buy_alice_blue_trades(
     """
 
     pya3_obj = await get_pya3_obj(
-        async_redis_client, str(strategy_pydantic_model.broker_id), async_httpx_client
+        async_redis_client, str(strategy_pyd_model.broker_id), async_httpx_client
     )
 
     strike, order_id = await place_ablue_order(
         pya3_obj=pya3_obj,
-        strategy_pydantic_model=strategy_pydantic_model,
+        strategy_pyd_model=strategy_pyd_model,
         async_redis_client=async_redis_client,
         strike=strike,
-        quantity=signal_pydantic_model.quantity,
-        expiry=signal_pydantic_model.expiry,
-        is_CE=signal_pydantic_model.option_type == OptionType.CE,
+        quantity=signal_pyd_model.quantity,
+        expiry=signal_pyd_model.expiry,
+        is_CE=signal_pyd_model.option_type == OptionType.CE,
         is_buy=True,
     )
 
@@ -167,12 +167,12 @@ async def buy_alice_blue_trades(
                 if "Reason:Exchange issue" in order_status["RejReason"]:
                     strike, order_id = await place_ablue_order(
                         pya3_obj=pya3_obj,
-                        strategy_pydantic_model=strategy_pydantic_model,
+                        strategy_pyd_model=strategy_pyd_model,
                         async_redis_client=async_redis_client,
                         strike=strike,
-                        quantity=signal_pydantic_model.quantity,
-                        expiry=signal_pydantic_model.expiry,
-                        is_CE=signal_pydantic_model.option_type == OptionType.CE,
+                        quantity=signal_pyd_model.quantity,
+                        expiry=signal_pyd_model.expiry,
+                        is_CE=signal_pyd_model.option_type == OptionType.CE,
                         is_buy=True,
                     )
                 else:
@@ -211,27 +211,25 @@ async def buy_alice_blue_trades(
         return None
 
 
-def get_exiting_trades_insights(redis_trade_pydantic_model_list: list[RedisTradePydanticModel]):
+def get_exiting_trades_insights(redis_trade_pyd_model_list: list[RedisTradePydanticModel]):
     strike_quantity_dict = defaultdict(int)
 
-    for redis_trade_pydantic_model in redis_trade_pydantic_model_list:
-        strike_quantity_dict[
-            redis_trade_pydantic_model.strike
-        ] += redis_trade_pydantic_model.quantity
+    for redis_trade_pyd_model in redis_trade_pyd_model_list:
+        strike_quantity_dict[redis_trade_pyd_model.strike] += redis_trade_pyd_model.quantity
 
     if len(strike_quantity_dict):
         # even though loop is over, we still have the access to the last element
         return (
             strike_quantity_dict,
-            redis_trade_pydantic_model.expiry,
-            redis_trade_pydantic_model.option_type,
+            redis_trade_pyd_model.expiry,
+            redis_trade_pyd_model.option_type,
         )
 
 
 async def place_ablue_order(
     *,
     pya3_obj: AsyncPya3Aliceblue,
-    strategy_pydantic_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydanticModel,
     async_redis_client: Redis,
     strike: float,
     quantity: int,
@@ -241,9 +239,9 @@ async def place_ablue_order(
 ):
     instrument = await pya3_obj.get_fno_instrument_from_redis(
         async_redis_client=async_redis_client,
-        symbol=strategy_pydantic_model.symbol,
+        symbol=strategy_pyd_model.symbol,
         expiry_date=expiry,
-        is_fut=strategy_pydantic_model.instrument_type == InstrumentTypeEnum.FUTIDX,
+        is_fut=strategy_pyd_model.instrument_type == InstrumentTypeEnum.FUTIDX,
         strike=strike,
         is_CE=is_CE,
     )
@@ -342,8 +340,8 @@ async def place_ablue_order(
 
 
 async def close_alice_blue_trades(
-    redis_trade_pydantic_model_list: list[RedisTradePydanticModel],
-    strategy_pydantic_model: StrategyPydanticModel,
+    redis_trade_pyd_model_list: list[RedisTradePydanticModel],
+    strategy_pyd_model: StrategyPydanticModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
 ):
@@ -357,11 +355,11 @@ async def close_alice_blue_trades(
     """
 
     strike_quantity_dict, expiry, option_type = get_exiting_trades_insights(
-        redis_trade_pydantic_model_list
+        redis_trade_pyd_model_list
     )
 
     pya3_obj = await get_pya3_obj(
-        async_redis_client, str(strategy_pydantic_model.broker_id), async_httpx_client
+        async_redis_client, str(strategy_pyd_model.broker_id), async_httpx_client
     )
 
     tasks = []
@@ -371,7 +369,7 @@ async def close_alice_blue_trades(
                 place_ablue_order(
                     pya3_obj=pya3_obj,
                     async_redis_client=async_redis_client,
-                    strategy_pydantic_model=strategy_pydantic_model,
+                    strategy_pyd_model=strategy_pyd_model,
                     strike=strike,
                     quantity=quantity,
                     expiry=expiry,

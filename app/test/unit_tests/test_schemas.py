@@ -26,14 +26,14 @@ strategy_payload = {
 @pytest.mark.asyncio
 async def test_strategy_compounding_results_in_0_contracts():
     strategy_payload["compounding"] = True
-    strategy_pydantic_model = StrategyCreatePydanticModel(**strategy_payload)
-    assert strategy_pydantic_model.contracts == 0.0
+    strategy_pyd_model = StrategyCreatePydanticModel(**strategy_payload)
+    assert strategy_pyd_model.contracts == 0.0
 
 
 @pytest.mark.asyncio
 async def test_strategy_futidx_results_in_0_premium():
-    strategy_pydantic_model = StrategyCreatePydanticModel(**strategy_payload)
-    assert strategy_pydantic_model.premium == 0.0
+    strategy_pyd_model = StrategyCreatePydanticModel(**strategy_payload)
+    assert strategy_pyd_model.premium == 0.0
 
 
 @pytest.mark.asyncio
