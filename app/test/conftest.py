@@ -35,159 +35,159 @@ logging.basicConfig(
 )
 
 
-@pytest.fixture(scope="session", autouse=True)
-async def setup_redis():
-    import io
-    import json
-    from datetime import datetime
-
-    import httpx
-    import pandas as pd
-    from cron.download_master_contracts import push_angel_one_instruments
-
-    from app.api.trade.IndianFNO.utils import get_expiry_dict_from_alice_blue
-    from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_redis
-    from app.pydantic_models.enums import InstrumentTypeEnum
-    from app.utils.constants import AB_NFO_CONTRACTS_URL
-    from app.utils.constants import INSTRUMENT_COLUMN
-    from app.utils.constants import REDIS_DATE_FORMAT
-
-    test_config = get_config(ConfigFile.TEST)
-    _test_async_redis_client = aioredis.Redis(
-        host=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["host"],
-        port=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["port"],
-        password=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["password"],
-        encoding="utf-8",
-        decode_responses=True,
-        ssl=True,
-        ssl_cert_reqs=None,
-    )
-    await _test_async_redis_client.dbsize()
-    await _test_async_redis_client.flushdb()
-
-    # update redis with necessary data i.e expiry list, option chain etc
-    expiry_dict = await get_expiry_dict_from_alice_blue()
-    for instrument_type, expiry in expiry_dict.items():
-        await _test_async_redis_client.set(instrument_type, json.dumps(expiry))
-
-    logging.info(f"Updated redis with expiry list: {datetime.now()}")
-    todays_date = datetime.now().date()
-
-    symbols = ["BANKNIFTY", "NIFTY"]
-    keys = []
-    current_expiry_date, next_expiry_date, is_today_expiry = None, None, False
-    for symbol in symbols:
-        for index, expiry_date_str in enumerate(expiry_dict[InstrumentTypeEnum.OPTIDX][symbol]):
-            expiry_date = datetime.strptime(expiry_date_str, REDIS_DATE_FORMAT).date()
-            if todays_date > expiry_date:
-                continue
-            elif expiry_date == todays_date:
-                next_expiry_date = expiry_dict[InstrumentTypeEnum.OPTIDX][symbol][index + 1]
-                current_expiry_date = expiry_date_str
-                is_today_expiry = True
-                break
-            elif todays_date < expiry_date:
-                current_expiry_date = expiry_date_str
-                break
-
-        keys.extend(
-            [
-                f"{symbol} {current_expiry_date} CE",
-                f"{symbol} {current_expiry_date} PE",
-            ]
-        )
-        if is_today_expiry:
-            keys.extend(
-                [
-                    f"{symbol} {next_expiry_date} CE",
-                    f"{symbol} {next_expiry_date} PE",
-                ]
-            )
-
-        (
-            current_month_expiry,
-            next_month_expiry,
-            is_today_months_expiry,
-        ) = await get_monthly_expiry_date_from_redis(
-            async_redis_client=_test_async_redis_client,
-            instrument_type=InstrumentTypeEnum.FUTIDX,
-            symbol=symbol,
-        )
-
-        keys.append(f"{symbol} {current_month_expiry} FUT")
-        if is_today_months_expiry:
-            keys.append(f"{symbol} {next_month_expiry} FUT")
-
-    start_time = datetime.now()
-    logging.info("start updating redis with option_chain")
-
-    prod_config = get_config()
-    prod_async_redis_client = await aioredis.StrictRedis.from_url(
-        prod_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["url"],
-        encoding="utf-8",
-        decode_responses=True,
-    )
-
-    all_option_chain = {}
-    # Queue up hgetall commands
-    async with prod_async_redis_client.pipeline() as pipe:
-        for key in keys:
-            pipe.hgetall(key)
-            option_chain = await pipe.execute()
-            # Process results
-            all_option_chain[key] = option_chain
-
-    logging.info(f"Pulled option chain from prod redis in [ {datetime.now() - start_time} ]")
-
-    start_time = datetime.now()
-    # Queue up hset commands
-    async with _test_async_redis_client.pipeline() as pipe:
-        for key, option_chain in all_option_chain.items():
-            if "FUT" in key:
-                # For future option chain first and second argument are same
-                pipe.delete(key)
-                pipe.hset(key, "FUT", option_chain[0].get("FUT", 0.0))
-            else:
-                for strike, premium in option_chain[0].items():
-                    pipe.hset(key, strike, premium)
-        await pipe.execute()
-
-    logging.info(
-        f"Time taken to update redis with option chain: [ {datetime.now() - start_time} ]"
-    )
-
-    # set up contract in redis
-    async with httpx.AsyncClient(verify=False) as client:
-        response = await client.get(AB_NFO_CONTRACTS_URL)
-
-    data_stream = io.StringIO(response.text)
-    try:
-        df = pd.read_csv(data_stream)
-        full_name_row_dict = {}
-        for key, value in df.set_index(INSTRUMENT_COLUMN).T.to_dict().items():
-            if "BANKNIFTY" in key or "NIFTY" in key:
-                full_name_row_dict[key] = json.dumps(value)
-    except Exception as e:
-        logging.error(f"Error while reading csv: {e}")
-
-    logging.info("Start setting master contract in Redis")
-    start_time = datetime.now()
-
-    # Split the dictionary into smaller chunks
-    chunk_size = 10000
-    dict_chunks = [
-        dict(list(full_name_row_dict.items())[i : i + chunk_size])
-        for i in range(0, len(full_name_row_dict), chunk_size)
-    ]
-
-    # Use a pipeline to set each chunk of key-value pairs in Redis
-    async with _test_async_redis_client.pipeline() as pipe:
-        for chunk in dict_chunks:
-            pipe.mset(chunk)
-        await pipe.execute()
-
-    await push_angel_one_instruments(_test_async_redis_client, symbols=symbols)
-    logging.info(f"Time taken to set master contract in redis: [ {datetime.now() - start_time} ]")
+# @pytest.fixture(scope="session", autouse=True)
+# async def setup_redis():
+#     import io
+#     import json
+#     from datetime import datetime
+#
+#     import httpx
+#     import pandas as pd
+#     from cron.download_master_contracts import push_angel_one_instruments
+#
+#     from app.api.trade.IndianFNO.utils import get_expiry_dict_from_alice_blue
+#     from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_redis
+#     from app.pydantic_models.enums import InstrumentTypeEnum
+#     from app.utils.constants import AB_NFO_CONTRACTS_URL
+#     from app.utils.constants import INSTRUMENT_COLUMN
+#     from app.utils.constants import REDIS_DATE_FORMAT
+#
+#     test_config = get_config(ConfigFile.TEST)
+#     _test_async_redis_client = aioredis.Redis(
+#         host=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["host"],
+#         port=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["port"],
+#         password=test_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["password"],
+#         encoding="utf-8",
+#         decode_responses=True,
+#         ssl=True,
+#         ssl_cert_reqs=None,
+#     )
+#     await _test_async_redis_client.dbsize()
+#     await _test_async_redis_client.flushdb()
+#
+#     # update redis with necessary data i.e expiry list, option chain etc
+#     expiry_dict = await get_expiry_dict_from_alice_blue()
+#     for instrument_type, expiry in expiry_dict.items():
+#         await _test_async_redis_client.set(instrument_type, json.dumps(expiry))
+#
+#     logging.info(f"Updated redis with expiry list: {datetime.now()}")
+#     todays_date = datetime.now().date()
+#
+#     symbols = ["BANKNIFTY", "NIFTY"]
+#     keys = []
+#     current_expiry_date, next_expiry_date, is_today_expiry = None, None, False
+#     for symbol in symbols:
+#         for index, expiry_date_str in enumerate(expiry_dict[InstrumentTypeEnum.OPTIDX][symbol]):
+#             expiry_date = datetime.strptime(expiry_date_str, REDIS_DATE_FORMAT).date()
+#             if todays_date > expiry_date:
+#                 continue
+#             elif expiry_date == todays_date:
+#                 next_expiry_date = expiry_dict[InstrumentTypeEnum.OPTIDX][symbol][index + 1]
+#                 current_expiry_date = expiry_date_str
+#                 is_today_expiry = True
+#                 break
+#             elif todays_date < expiry_date:
+#                 current_expiry_date = expiry_date_str
+#                 break
+#
+#         keys.extend(
+#             [
+#                 f"{symbol} {current_expiry_date} CE",
+#                 f"{symbol} {current_expiry_date} PE",
+#             ]
+#         )
+#         if is_today_expiry:
+#             keys.extend(
+#                 [
+#                     f"{symbol} {next_expiry_date} CE",
+#                     f"{symbol} {next_expiry_date} PE",
+#                 ]
+#             )
+#
+#         (
+#             current_month_expiry,
+#             next_month_expiry,
+#             is_today_months_expiry,
+#         ) = await get_monthly_expiry_date_from_redis(
+#             async_redis_client=_test_async_redis_client,
+#             instrument_type=InstrumentTypeEnum.FUTIDX,
+#             symbol=symbol,
+#         )
+#
+#         keys.append(f"{symbol} {current_month_expiry} FUT")
+#         if is_today_months_expiry:
+#             keys.append(f"{symbol} {next_month_expiry} FUT")
+#
+#     start_time = datetime.now()
+#     logging.info("start updating redis with option_chain")
+#
+#     prod_config = get_config()
+#     prod_async_redis_client = await aioredis.StrictRedis.from_url(
+#         prod_config.data[TRADES_AND_OPTION_CHAIN_REDIS]["url"],
+#         encoding="utf-8",
+#         decode_responses=True,
+#     )
+#
+#     all_option_chain = {}
+#     # Queue up hgetall commands
+#     async with prod_async_redis_client.pipeline() as pipe:
+#         for key in keys:
+#             pipe.hgetall(key)
+#             option_chain = await pipe.execute()
+#             # Process results
+#             all_option_chain[key] = option_chain
+#
+#     logging.info(f"Pulled option chain from prod redis in [ {datetime.now() - start_time} ]")
+#
+#     start_time = datetime.now()
+#     # Queue up hset commands
+#     async with _test_async_redis_client.pipeline() as pipe:
+#         for key, option_chain in all_option_chain.items():
+#             if "FUT" in key:
+#                 # For future option chain first and second argument are same
+#                 pipe.delete(key)
+#                 pipe.hset(key, "FUT", option_chain[0].get("FUT", 0.0))
+#             else:
+#                 for strike, premium in option_chain[0].items():
+#                     pipe.hset(key, strike, premium)
+#         await pipe.execute()
+#
+#     logging.info(
+#         f"Time taken to update redis with option chain: [ {datetime.now() - start_time} ]"
+#     )
+#
+#     # set up contract in redis
+#     async with httpx.AsyncClient(verify=False) as client:
+#         response = await client.get(AB_NFO_CONTRACTS_URL)
+#
+#     data_stream = io.StringIO(response.text)
+#     try:
+#         df = pd.read_csv(data_stream)
+#         full_name_row_dict = {}
+#         for key, value in df.set_index(INSTRUMENT_COLUMN).T.to_dict().items():
+#             if "BANKNIFTY" in key or "NIFTY" in key:
+#                 full_name_row_dict[key] = json.dumps(value)
+#     except Exception as e:
+#         logging.error(f"Error while reading csv: {e}")
+#
+#     logging.info("Start setting master contract in Redis")
+#     start_time = datetime.now()
+#
+#     # Split the dictionary into smaller chunks
+#     chunk_size = 10000
+#     dict_chunks = [
+#         dict(list(full_name_row_dict.items())[i : i + chunk_size])
+#         for i in range(0, len(full_name_row_dict), chunk_size)
+#     ]
+#
+#     # Use a pipeline to set each chunk of key-value pairs in Redis
+#     async with _test_async_redis_client.pipeline() as pipe:
+#         for chunk in dict_chunks:
+#             pipe.mset(chunk)
+#         await pipe.execute()
+#
+#     await push_angel_one_instruments(_test_async_redis_client, symbols=symbols)
+#     logging.info(f"Time taken to set master contract in redis: [ {datetime.now() - start_time} ]")
 
 
 @pytest.fixture(scope="session", autouse=True)
