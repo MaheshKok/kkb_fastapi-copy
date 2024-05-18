@@ -17,12 +17,12 @@ from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_strategy_pyd_model
 from app.api.trade import trading_router
-from app.api.trade.IndianFNO.tasks import task_entry_trade
-from app.api.trade.IndianFNO.tasks import task_exit_trade
-from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
-from app.api.trade.IndianFNO.utils import get_opposite_trade_option_type
-from app.api.trade.IndianFNO.utils import set_option_type
-from app.broker.AsyncAngelOne import AsyncAngelOneClient
+from app.api.trade.indian_fno.alice_blue.tasks import task_entry_trade
+from app.api.trade.indian_fno.alice_blue.tasks import task_exit_trade
+from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
+from app.api.trade.indian_fno.utils import get_opposite_trade_option_type
+from app.api.trade.indian_fno.utils import set_option_type
+from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
@@ -81,8 +81,8 @@ def get_expiry_date_to_trade(
     return current_expiry_date
 
 
-@fno_router.post("/nfo", status_code=200)
-async def post_nfo_indian_options(
+@fno_router.post("/angelone/nfo", status_code=200)
+async def post_nfo_angel_one_trading(
     signal_pyd_model: SignalPydanticModel,
     strategy_pyd_model: StrategyPydanticModel = Depends(get_strategy_pyd_model),
     async_redis_client: Redis = Depends(get_async_redis_client),
