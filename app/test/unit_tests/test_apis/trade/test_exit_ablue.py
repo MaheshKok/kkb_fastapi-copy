@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy import select
 
-from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
-from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
+from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
+from app.broker_clients.async_pya3_alice_blue import AsyncPya3Aliceblue
 from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.schemas import User
@@ -410,7 +410,7 @@ async def test_exit_alice_blue_trade_for_short_strategy(
 #
 #     # Use monkeypatch to patch the method
 #     monkeypatch.setattr(
-#         "app.services.broker.utils.update_session_token",
+#         "app.services.broker_clients.utils.update_session_token",
 #         AsyncMock(side_effect=mock_update_session_token),
 #     )
 #     response = await test_async_client.post("/api/trades/nfo/options", json=payload)

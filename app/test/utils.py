@@ -4,8 +4,8 @@ import httpx
 from cron.update_daily_profit import get_holidays_list
 from cron.update_daily_profit import get_last_working_date
 
-from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_alice_blue
-from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_alice_blue
+from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_alice_blue
+from app.api.trade.indian_fno.utils import get_monthly_expiry_date_from_alice_blue
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.enums import SignalTypeEnum

@@ -8,7 +8,7 @@ from _decimal import getcontext
 from fastapi import HTTPException
 from sqlalchemy import update
 
-from app.broker.AsyncCapital import AsyncCapitalClient
+from app.broker_clients.async_capital import AsyncCapitalClient
 from app.database.schemas import CFDStrategyDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.strategy import CFDStrategyPydanticModel
@@ -62,8 +62,8 @@ def get_lots_to_trade_and_profit_or_loss(
         # ) / (1 + drawdown_percentage)
         #
 
-        # i think below code  doesn't make any sense as i have seen if available funds are in negative still i can trade in broker,
-        # don't know how it works in indian broker like zerodha , keeping it for now
+        # i think below code  doesn't make any sense as i have seen if available funds are in negative still i can trade in broker_clients,
+        # don't know how it works in indian broker_clients like zerodha , keeping it for now
         # if funds_to_use < ongoing_profit_or_loss:
         #     funds_to_trade = Decimal(strategy_pyd_model.funds + (funds_to_use * 0.95))
         #     to_update_profit_or_loss_in_db = funds_to_use

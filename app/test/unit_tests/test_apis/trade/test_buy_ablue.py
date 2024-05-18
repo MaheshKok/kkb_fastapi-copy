@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy import select
 
-from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
+from app.broker_clients.async_pya3_alice_blue import AsyncPya3Aliceblue
 from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.schemas import User
@@ -195,7 +195,7 @@ async def test_buy_alice_blue_trade_raise_401(
 
     # Use monkeypatch to patch the method
     monkeypatch.setattr(
-        "app.broker.utils.update_ablue_session_token",
+        "app.broker_clients.utils.update_ablue_session_token",
         AsyncMock(side_effect=mock_update_session_token),
     )
 

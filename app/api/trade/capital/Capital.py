@@ -6,10 +6,10 @@ from fastapi import Depends
 
 from app.api.dependency import get_cfd_strategy_pyd_model
 from app.api.trade import trading_router
-from app.api.trade.Capital.utils import close_capital_lots
-from app.api.trade.Capital.utils import get_capital_cfd_existing_profit_or_loss
-from app.api.trade.Capital.utils import open_capital_lots
-from app.broker.AsyncCapital import AsyncCapitalClient
+from app.api.trade.capital.utils import close_capital_lots
+from app.api.trade.capital.utils import get_capital_cfd_existing_profit_or_loss
+from app.api.trade.capital.utils import open_capital_lots
+from app.broker_clients.async_capital import AsyncCapitalClient
 from app.pydantic_models.strategy import CFDStrategyPydanticModel
 from app.pydantic_models.trade import CFDPayloadPydanticModel
 

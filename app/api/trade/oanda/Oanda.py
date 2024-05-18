@@ -17,8 +17,8 @@ from sqlalchemy import select
 
 from app.api.dependency import get_cfd_strategy_pyd_model
 from app.api.trade import trading_router
-from app.api.trade.Capital.utils import update_cfd_strategy_funds
-from app.broker.AsyncPyOanda import AsyncAPI
+from app.api.trade.capital.utils import update_cfd_strategy_funds
+from app.broker_clients.async_oanda import AsyncAPI
 from app.database.schemas import BrokerDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import SignalTypeEnum
@@ -322,7 +322,7 @@ async def get_oanda_access_token(
         return oanda_access_token_cache[cfd_strategy_pyd_model.broker_id]
 
     async with Database() as async_session:
-        # fetch broker model from database
+        # fetch broker_clients model from database
         stmt = select(BrokerDBModel).filter_by(id=cfd_strategy_pyd_model.broker_id)
         _query = await async_session.execute(stmt)
         broker_db_model = _query.scalars().one_or_none()

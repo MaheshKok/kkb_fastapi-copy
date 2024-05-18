@@ -7,9 +7,9 @@ from aioredis import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.broker.AsyncAngelOne import AsyncAngelOneClient
-from app.broker.utils import get_pya3_obj
-from app.broker.utils import update_ablue_session_token
+from app.api.trade.indian_fno.alice_blue.utils import get_pya3_obj
+from app.api.trade.indian_fno.alice_blue.utils import update_ablue_session_token
+from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.DEBUG)
 # refactored update and logging into a separate coroutine
 async def task_update_ablue_session_token(async_session, async_redis_client):
     try:
-        # get broker model from db filtered by username
+        # get broker_clients model from db filtered by username
         fetch_broker_query = await async_session.execute(
             select(BrokerDBModel).filter_by(name=BrokerNameEnum.ALICEBLUE.value)
         )

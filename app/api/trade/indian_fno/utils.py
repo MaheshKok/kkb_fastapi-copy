@@ -22,9 +22,9 @@ from sqlalchemy import text
 from sqlalchemy import update
 from starlette import status
 
-from app.broker.AsyncAngelOne import AsyncAngelOneClient
-from app.broker.utils import buy_alice_blue_trades
-from app.broker.utils import close_alice_blue_trades
+from app.api.trade.indian_fno.alice_blue.utils import buy_alice_blue_trades
+from app.api.trade.indian_fno.alice_blue.utils import close_alice_blue_trades
+from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
@@ -678,7 +678,7 @@ async def calculate_profits(
         quantity = redis_trade_pyd_model.quantity
         exit_price = strike_exit_price_dict.get(redis_trade_pyd_model.strike) or 0.0
         if not exit_price:
-            # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker
+            # this is an alarm that exit price is not found for this strike nd this is more likely to happen for broker_clients
             continue
 
         profit = get_options_profit(

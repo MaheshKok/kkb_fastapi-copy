@@ -9,18 +9,18 @@ from aioredis import Redis
 from httpx import AsyncClient
 from line_profiler import profile  # noqa
 
-from app.api.trade.IndianFNO.utils import close_trades_in_db_and_remove_from_redis
-from app.api.trade.IndianFNO.utils import compute_trade_data_needed_for_closing_trade
-from app.api.trade.IndianFNO.utils import dump_trade_in_db_and_redis
-from app.api.trade.IndianFNO.utils import get_angel_one_futures_trading_symbol
-from app.api.trade.IndianFNO.utils import get_angel_one_options_trading_symbol
-from app.api.trade.IndianFNO.utils import get_future_price_from_redis
-from app.api.trade.IndianFNO.utils import get_lots_to_open
-from app.api.trade.IndianFNO.utils import get_margin_required
-from app.api.trade.IndianFNO.utils import get_strike_and_entry_price
-from app.api.trade.IndianFNO.utils import set_quantity
-from app.broker.AsyncAngelOne import AsyncAngelOneClient
-from app.broker.utils import buy_alice_blue_trades
+from app.api.trade.indian_fno.alice_blue.utils import buy_alice_blue_trades
+from app.api.trade.indian_fno.utils import close_trades_in_db_and_remove_from_redis
+from app.api.trade.indian_fno.utils import compute_trade_data_needed_for_closing_trade
+from app.api.trade.indian_fno.utils import dump_trade_in_db_and_redis
+from app.api.trade.indian_fno.utils import get_angel_one_futures_trading_symbol
+from app.api.trade.indian_fno.utils import get_angel_one_options_trading_symbol
+from app.api.trade.indian_fno.utils import get_future_price_from_redis
+from app.api.trade.indian_fno.utils import get_lots_to_open
+from app.api.trade.indian_fno.utils import get_margin_required
+from app.api.trade.indian_fno.utils import get_strike_and_entry_price
+from app.api.trade.indian_fno.utils import set_quantity
+from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.pydantic_models.strategy import StrategyPydanticModel
 from app.pydantic_models.trade import RedisTradePydanticModel
 from app.pydantic_models.trade import SignalPydanticModel

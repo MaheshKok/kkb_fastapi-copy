@@ -478,3 +478,7 @@ class AsyncAngelOneClient:
         except Exception as e:
             logging.error(f"Error occurred in ind_order_details: {e}")
             return None
+
+
+async def place_order():
+    pass

@@ -10,7 +10,7 @@ from app.pydantic_models.enums import InstrumentTypeEnum
 
 
 class BrokerPydanticModel(BaseModel):
-    # create pydantic model for broker based on a database model (BrokerModel)
+    # create pydantic model for broker_clients based on a database model (BrokerModel)
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID = Field(description="Broker ID", example="ff80cf6b-3c4a-4d28-82b0-631eafb4cdd1")
@@ -19,7 +19,7 @@ class BrokerPydanticModel(BaseModel):
         default=None,
         example="u5tIkfvy1OgSPx1tvQ3e1XSHeml82qMQRuLszzVSBEsFevFElu87ZNP2A20zB4nu8Wfo8JSlYR2hgOUNzQAtppkABzlt7Um1Tke8znrt413hveAz9b4BFNDU2ob6KoK4RcXz3rRSkhPMr3QnO2Trxv3dBgldQT54FSnNq0UlWN3vNX7tKsBQ7Vxs1CZmFHrnx5SmdnA37gc8dbgbuRXGbbiFGn5c4kOHrQrIWtU0PTcJhX0riMdyvPYtk1e5A5AF",
     )
-    name: str = Field(description="Name of broker", example="ALICEBLUE")
+    name: str = Field(description="Name of broker_clients", example="ALICEBLUE")
     username: str = Field(description="username", example="569619")
     password: str = Field(description="password", example="PASSword@123")
     api_key: str = Field(

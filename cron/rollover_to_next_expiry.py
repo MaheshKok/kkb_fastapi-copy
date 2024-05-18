@@ -11,11 +11,11 @@ from pydantic import TypeAdapter
 from sqlalchemy import select
 
 from app.api.dependency import get_angelone_client
-from app.api.trade.IndianFNO.tasks import task_entry_trade
-from app.api.trade.IndianFNO.tasks import task_exit_trade
-from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
-from app.api.trade.IndianFNO.utils import get_future_price_from_redis
-from app.api.trade.IndianFNO.utils import set_option_type
+from app.api.trade.indian_fno.alice_blue.tasks import task_entry_trade
+from app.api.trade.indian_fno.alice_blue.tasks import task_exit_trade
+from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
+from app.api.trade.indian_fno.utils import get_future_price_from_redis
+from app.api.trade.indian_fno.utils import set_option_type
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
