@@ -23,9 +23,9 @@ from app.api.healthcheck import healthcheck_router
 from app.api.strategy import strategy_router
 from app.api.trade import trading_router
 from app.api.trade.binance.crypto import binance_router
-from app.api.trade.capital.Capital import forex_router
+from app.api.trade.capital.router import forex_router
 from app.api.trade.indian_fno.alice_blue.router import fno_router
-from app.api.trade.oanda.Oanda import oanda_forex_router
+from app.api.trade.oanda.router import oanda_forex_router
 from app.core.config import get_config
 from app.database.base import engine_kw
 from app.database.base import get_db_url
