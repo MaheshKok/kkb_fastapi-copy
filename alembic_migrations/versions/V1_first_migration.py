@@ -33,7 +33,7 @@ def upgrade() -> None:
         sa.UniqueConstraint("email"),
     )
     op.create_table(
-        "broker_clients",
+        "broker",
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("access_token", sa.String(), nullable=False),
         sa.Column("name", sa.String(), nullable=False),
@@ -49,7 +49,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_broker_user_id"), "broker_clients", ["user_id"], unique=False)
+    op.create_index(op.f("ix_broker_user_id"), "broker", ["user_id"], unique=False)
     op.create_table(
         "strategy",
         sa.Column("id", sa.UUID(), nullable=False),
@@ -165,7 +165,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_strategy_exchange"), table_name="strategy")
     op.drop_index(op.f("ix_strategy_broker_id"), table_name="strategy")
     op.drop_table("strategy")
-    op.drop_index(op.f("ix_broker_user_id"), table_name="broker_clients")
-    op.drop_table("broker_clients")
+    op.drop_index(op.f("ix_broker_user_id"), table_name="broker")
+    op.drop_table("broker")
     op.drop_table("user")
     # ### end Alembic commands ###

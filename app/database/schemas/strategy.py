@@ -53,7 +53,7 @@ class StrategyDBModel(Base):
     only_on_expiry = Column(Boolean, nullable=False, server_default="False")
     broker_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("broker_clients.id", ondelete="CASCADE"),
+        ForeignKey("broker.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )

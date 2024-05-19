@@ -10,7 +10,6 @@ from fastapi import APIRouter
 from fastapi import Depends
 from httpx import AsyncClient
 from pydantic import TypeAdapter
-from sqlalchemy import select
 
 from app.api.dependency import get_angelone_client
 from app.api.dependency import get_async_httpx_client
@@ -23,13 +22,10 @@ from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redi
 from app.api.trade.indian_fno.utils import get_opposite_trade_option_type
 from app.api.trade.indian_fno.utils import set_option_type
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
-from app.database.schemas import TradeDBModel
-from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.enums import SignalTypeEnum
 from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import DBEntryTradePydanticModel
 from app.pydantic_models.trade import RedisTradePydanticModel
 from app.pydantic_models.trade import SignalPydanticModel
 from app.utils.constants import FUT
@@ -44,16 +40,6 @@ fno_router = APIRouter(
     prefix=f"{trading_router.prefix}",
     tags=["futures_and_options"],
 )
-
-
-@trading_router.get("/nfo", status_code=200, response_model=List[DBEntryTradePydanticModel])
-async def get_open_trades():
-    async with Database() as async_session:
-        fetch_open_trades_query_ = await async_session.execute(
-            select(TradeDBModel).filter(TradeDBModel.exit_at == None)  # noqa
-        )
-        trade_db_models = fetch_open_trades_query_.scalars().all()
-        return trade_db_models
 
 
 def get_expiry_date_to_trade(

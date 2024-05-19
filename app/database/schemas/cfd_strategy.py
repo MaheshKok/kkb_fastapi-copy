@@ -41,7 +41,7 @@ class CFDStrategyDBModel(Base):
 
     broker_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("broker_clients.id", ondelete="CASCADE"),
+        ForeignKey("broker.id", ondelete="CASCADE"),
         nullable=True,
         index=True,
     )
