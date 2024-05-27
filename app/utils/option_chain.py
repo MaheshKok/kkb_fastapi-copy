@@ -1,7 +1,7 @@
 import logging
 
 from app.pydantic_models.enums import InstrumentTypeEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
 from app.utils.constants import OptionType
 
 
@@ -9,7 +9,7 @@ async def get_option_chain(
     *,
     async_redis_client,
     expiry,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     option_type=None,
     is_future=False,
 ):

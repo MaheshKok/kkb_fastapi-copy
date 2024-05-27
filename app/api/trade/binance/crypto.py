@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 from app.api.trade import trading_router
 from app.pydantic_models.enums import SignalTypeEnum
-from app.pydantic_models.trade import BinanceFuturesPayloadPydanticModel
+from app.pydantic_models.trade import BinanceFuturesPayloadPydModel
 
 
 binance_router = APIRouter(
@@ -17,7 +17,7 @@ binance_router = APIRouter(
 
 @binance_router.post("/futures", status_code=200)
 async def post_binance_futures(
-    futures_payload_pyd_model: BinanceFuturesPayloadPydanticModel,
+    futures_payload_pyd_model: BinanceFuturesPayloadPydModel,
 ):
     if futures_payload_pyd_model.is_live:
         api_key = "8eV439YeuT1JM5mYF0mX34jKSOakRukolfGayaF9Sj6FMBC4FV1qTHKUqycrpQ4T"

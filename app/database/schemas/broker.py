@@ -26,4 +26,4 @@ class BrokerDBModel(Base):
     user_id = Column(
         UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    strategydbmodels = relationship("StrategyDBModel", backref="strategy", cascade="all, delete")
+    strategydbmodel = relationship("StrategyDBModel", backref="strategy", cascade="all, delete")

@@ -1,3 +1,4 @@
+import datetime
 import logging
 import traceback
 from datetime import date
@@ -11,26 +12,29 @@ from app.api.trade.indian_fno.utils import get_strike_and_entry_price_from_optio
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.pydantic_models.angel_one import DurationEnum
 from app.pydantic_models.angel_one import ExchangeEnum
+from app.pydantic_models.angel_one import OrderPayloadPydModel
 from app.pydantic_models.angel_one import OrderResponsePydModel
 from app.pydantic_models.angel_one import OrderTypeEnum
-from app.pydantic_models.angel_one import PlaceOrderPydanticModel
 from app.pydantic_models.angel_one import ProductTypeEnum
 from app.pydantic_models.angel_one import TransactionTypeEnum
 from app.pydantic_models.angel_one import VarietyEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import SignalPydanticModel
+from app.pydantic_models.enums import InstrumentTypeEnum
+from app.pydantic_models.enums import PositionEnum
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import SignalPydModel
 from app.utils.constants import OptionType
 
 
 async def get_angel_one_trade_params(
     *,
     async_redis_client: aioredis.Redis,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     expiry_date: date,
     is_fut: bool,
     strike: int = None,
     option_type: OptionType,
     transaction_type: TransactionTypeEnum,
+    crucial_details: str,
 ):
     """
     Place an order with various parameters and constants.
@@ -123,8 +127,7 @@ async def get_angel_one_trade_params(
         }
     """
 
-    strategy_pyd_model
-    place_order_params = PlaceOrderPydanticModel(
+    place_order_params = OrderPayloadPydModel(
         variety=VarietyEnum.NORMAL,
         transactiontype=transaction_type,
         ordertype=OrderTypeEnum.MARKET,
@@ -140,6 +143,7 @@ async def get_angel_one_trade_params(
         strike=strike,
         option_type=option_type,
         is_fut=is_fut,
+        crucial_details=crucial_details,
     )
 
     place_order_params.update(
@@ -166,9 +170,9 @@ async def create_angel_one_buy_order(
     *,
     async_angelone_client: AsyncAngelOneClient,
     async_redis_client: aioredis.Redis,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     is_fut: bool,
-    signal_pyd_model: SignalPydanticModel,
+    signal_pyd_model: SignalPydModel,
     crucial_details: str,
     option_chain: dict,
 ) -> OrderResponsePydModel:
@@ -201,6 +205,7 @@ async def create_angel_one_buy_order(
         option_type=signal_pyd_model.option_type,
         is_fut=is_fut,
         transaction_type=signal_pyd_model.action.upper(),
+        crucial_details=crucial_details,
     )
 
     try:
@@ -209,6 +214,9 @@ async def create_angel_one_buy_order(
             order_response_pyd_model = OrderResponsePydModel(**response)
             if order_response_pyd_model.status:
                 if order_response_pyd_model.data:
+                    logging.info(
+                        f"[  {crucial_details} ] - Successfully placed angel one buy order: {order_response_pyd_model.data}"
+                    )
                     return order_response_pyd_model
             else:
                 msg = f"[ {crucial_details} ] - Error while placing angel one buy order: {order_response_pyd_model.message}"
@@ -223,3 +231,28 @@ async def create_angel_one_buy_order(
         logging.error(f"[ {crucial_details} ] - error while creating angel one buy order {e}")
         traceback.print_exc()
         raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+
+def get_expiry_date_to_trade(
+    *,
+    current_expiry_date: datetime.date,
+    next_expiry_date: datetime.date,
+    strategy_pyd_model: StrategyPydModel,
+    is_today_expiry: bool,
+):
+    if not is_today_expiry:
+        return current_expiry_date
+
+    current_time = datetime.datetime.utcnow()
+    if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
+        if strategy_pyd_model.position == PositionEnum.SHORT:
+            if current_time.time() > datetime.time(hour=9, minute=45):
+                current_expiry_date = next_expiry_date
+        else:
+            if current_time.time() > datetime.time(hour=8, minute=30):
+                current_expiry_date = next_expiry_date
+    else:
+        if current_time.time() > datetime.time(hour=9, minute=45):
+            current_expiry_date = next_expiry_date
+
+    return current_expiry_date

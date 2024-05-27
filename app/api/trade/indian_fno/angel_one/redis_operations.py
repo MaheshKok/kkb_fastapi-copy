@@ -7,7 +7,7 @@ from fastapi import HTTPException
 
 from app.api.trade.indian_fno.utils import get_angel_one_futures_trading_symbol
 from app.api.trade.indian_fno.utils import get_angel_one_options_trading_symbol
-from app.pydantic_models.angel_one import InstrumentPydanticModel
+from app.pydantic_models.angel_one import InstrumentPydModel
 from app.utils.constants import OptionType
 
 
@@ -34,13 +34,14 @@ def generate_angel_one_complete_symbol(
 
 async def get_angel_one_instrument_details(
     *,
+    crucial_details: str,
     async_redis_client: aioredis.Redis,
     symbol: str,
     expiry_date: date,
     strike: int = None,
     option_type: OptionType = None,
     is_fut=False,
-) -> InstrumentPydanticModel:
+) -> InstrumentPydModel:
     """
     Complete Symbol is of the format:
     'BANKNIFTY31JUL2449400PE' or 'BANKNIFTY31JUL24FUT'
@@ -68,15 +69,17 @@ async def get_angel_one_instrument_details(
         option_type=option_type,
         is_fut=is_fut,
     )
-    logging.info(f"[ {angel_one_complete_symbol} ] - getting instrument token")
+    logging.info(f"[ {crucial_details} ] - getting instrument token")
 
     instrument_details = await async_redis_client.get(angel_one_complete_symbol)
-
     if not instrument_details:
         raise HTTPException(
             status_code=404,
-            detail=f"Instrument detail: {angel_one_complete_symbol} not found in redis",
+            detail=f"[ {crucial_details} ] - Instrument detail: [ {angel_one_complete_symbol} ] not found in redis",
         )
 
     instrument_details = json.loads(instrument_details)
-    return InstrumentPydanticModel(**instrument_details)
+    logging.info(
+        f"[ {crucial_details} ] - instrument details for: [ {angel_one_complete_symbol} ] found in redis"
+    )
+    return InstrumentPydModel(**instrument_details)

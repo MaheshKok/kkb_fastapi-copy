@@ -22,8 +22,8 @@ from app.broker_clients.async_oanda import AsyncAPI
 from app.database.schemas import BrokerDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import SignalTypeEnum
-from app.pydantic_models.strategy import CFDStrategyPydanticModel
-from app.pydantic_models.trade import CFDPayloadPydanticModel
+from app.pydantic_models.strategy import CFDStrategyPydModel
+from app.pydantic_models.trade import CFDPayloadPydModel
 from app.utils.in_memory_cache import oanda_access_token_cache
 from app.utils.in_memory_cache import usd_to_gbp_conversion_cache
 
@@ -112,7 +112,7 @@ async def get_gbp_to_usd_conversion_rate():
 
 
 async def get_available_funds(
-    strategy_pyd_model: CFDStrategyPydanticModel, profit_or_loss: float, crucial_details: str
+    strategy_pyd_model: CFDStrategyPydModel, profit_or_loss: float, crucial_details: str
 ):
     conversion_rate = await get_gbp_to_usd_conversion_rate()
     available_funds = round((strategy_pyd_model.funds + profit_or_loss) * conversion_rate, 2)
@@ -122,8 +122,8 @@ async def get_available_funds(
 
 async def get_current_instrument_price(
     client: AsyncAPI,
-    cfd_payload_pyd_model: CFDPayloadPydanticModel,
-    strategy_pyd_model: CFDStrategyPydanticModel,
+    cfd_payload_pyd_model: CFDPayloadPydModel,
+    strategy_pyd_model: CFDStrategyPydModel,
     crucial_details: str,
 ):
     """
@@ -174,8 +174,8 @@ async def get_current_instrument_price(
 
 async def get_instrument(
     client: AsyncAPI,
-    cfd_payload_pyd_model: CFDPayloadPydanticModel,
-    strategy_pyd_model: CFDStrategyPydanticModel,
+    cfd_payload_pyd_model: CFDPayloadPydModel,
+    strategy_pyd_model: CFDStrategyPydModel,
     crucial_details: str,
 ):
     """
@@ -241,9 +241,9 @@ async def get_instrument(
 
 async def get_lots_to_open(
     *,
-    strategy_pyd_model: CFDStrategyPydanticModel,
+    strategy_pyd_model: CFDStrategyPydModel,
     profit_or_loss: float,
-    cfd_payload_pyd_model: CFDPayloadPydanticModel,
+    cfd_payload_pyd_model: CFDPayloadPydModel,
     client: AsyncAPI,
     crucial_details: str,
 ):
@@ -316,7 +316,7 @@ async def get_lots_to_open(
 
 
 async def get_oanda_access_token(
-    cfd_strategy_pyd_model: CFDStrategyPydanticModel, crucial_details: str
+    cfd_strategy_pyd_model: CFDStrategyPydModel, crucial_details: str
 ):
     if cfd_strategy_pyd_model.broker_id in oanda_access_token_cache:
         return oanda_access_token_cache[cfd_strategy_pyd_model.broker_id]
@@ -339,8 +339,8 @@ async def get_oanda_access_token(
 
 @oanda_forex_router.post("/cfd", status_code=200)
 async def post_oanda_cfd(
-    cfd_payload_pyd_model: CFDPayloadPydanticModel,
-    cfd_strategy_pyd_model: CFDStrategyPydanticModel = Depends(get_cfd_strategy_pyd_model),
+    cfd_payload_pyd_model: CFDPayloadPydModel,
+    cfd_strategy_pyd_model: CFDStrategyPydModel = Depends(get_cfd_strategy_pyd_model),
 ):
     start_time = time.perf_counter()
     demo_or_live = "DEMO" if cfd_strategy_pyd_model.is_demo else "LIVE"

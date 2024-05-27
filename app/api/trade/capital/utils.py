@@ -11,14 +11,14 @@ from sqlalchemy import update
 from app.broker_clients.async_capital import AsyncCapitalClient
 from app.database.schemas import CFDStrategyDBModel
 from app.database.session_manager.db_session import Database
-from app.pydantic_models.strategy import CFDStrategyPydanticModel
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import CFDPayloadPydanticModel
+from app.pydantic_models.strategy import CFDStrategyPydModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import CFDPayloadPydModel
 
 
 def get_lots_to_trade_and_profit_or_loss(
     funds_to_use,
-    strategy_pyd_model: CFDStrategyPydanticModel | StrategyPydanticModel,
+    strategy_pyd_model: CFDStrategyPydModel | StrategyPydModel,
     ongoing_profit_or_loss,
     crucial_details: str = None,
 ):
@@ -125,7 +125,7 @@ def get_lots_to_trade_and_profit_or_loss(
 
 async def get_all_positions(
     client: AsyncCapitalClient,
-    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydModel,
     crucial_details: str,
 ) -> dict:
     get_all_positions_attempt = 1
@@ -201,7 +201,7 @@ async def get_all_open_orders(client: AsyncCapitalClient, crucial_details: str) 
 
 async def get_capital_cfd_existing_profit_or_loss(
     client: AsyncCapitalClient,
-    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydModel,
     crucial_details: str,
 ) -> tuple[int, int, str | None]:
     direction = None
@@ -222,7 +222,7 @@ async def get_capital_cfd_existing_profit_or_loss(
 
 
 async def get_funds_to_use(
-    client, cfd_strategy_pyd_model: CFDStrategyPydanticModel, crucial_details: str
+    client, cfd_strategy_pyd_model: CFDStrategyPydModel, crucial_details: str
 ) -> float:
     get_all_accounts_attempt = 1
     while get_all_accounts_attempt < 10:
@@ -251,7 +251,7 @@ async def get_funds_to_use(
 
 async def update_cfd_strategy_funds(
     *,
-    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydModel,
     profit_or_loss: float,
     crucial_details: str,
 ):
@@ -273,8 +273,8 @@ async def update_cfd_strategy_funds(
 async def open_order_found(
     *,
     client: AsyncCapitalClient,
-    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
-    cfd_payload_pyd_model: CFDPayloadPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydModel,
+    cfd_payload_pyd_model: CFDPayloadPydModel,
     lots_size: float,
     crucial_details: str,
 ):
@@ -301,7 +301,7 @@ async def find_position(
     *,
     client: AsyncCapitalClient,
     demo_or_live: str,
-    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydModel,
     current_open_lots: float,
     action: str,
     crucial_details: str,

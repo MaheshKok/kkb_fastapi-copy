@@ -12,9 +12,9 @@ from httpx import AsyncClient
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
-from app.api.dependency import get_angelone_client
 from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
+from app.api.dependency import get_default_angelone_client
 from app.api.dependency import get_strategy_pyd_model
 from app.api.trade import trading_router
 from app.api.trade.indian_fno.alice_blue.tasks import task_entry_trade
@@ -28,10 +28,10 @@ from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.enums import SignalTypeEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import DBEntryTradePydanticModel
-from app.pydantic_models.trade import RedisTradePydanticModel
-from app.pydantic_models.trade import SignalPydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import DBEntryTradePydModel
+from app.pydantic_models.trade import RedisTradePydModel
+from app.pydantic_models.trade import SignalPydModel
 from app.utils.constants import FUT
 
 
@@ -46,7 +46,7 @@ fno_router = APIRouter(
 )
 
 
-@trading_router.get("/nfo", status_code=200, response_model=List[DBEntryTradePydanticModel])
+@trading_router.get("/nfo", status_code=200, response_model=List[DBEntryTradePydModel])
 async def get_open_trades():
     async with Database() as async_session:
         fetch_open_trades_query_ = await async_session.execute(
@@ -60,7 +60,7 @@ def get_expiry_date_to_trade(
     *,
     current_expiry_date: datetime.date,
     next_expiry_date: datetime.date,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     is_today_expiry: bool,
 ):
     if not is_today_expiry:
@@ -83,11 +83,11 @@ def get_expiry_date_to_trade(
 
 @fno_router.post("/nfo", status_code=200)
 async def post_nfo_indian_options(
-    signal_pyd_model: SignalPydanticModel,
-    strategy_pyd_model: StrategyPydanticModel = Depends(get_strategy_pyd_model),
+    signal_pyd_model: SignalPydModel,
+    strategy_pyd_model: StrategyPydModel = Depends(get_strategy_pyd_model),
     async_redis_client: Redis = Depends(get_async_redis_client),
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
-    async_angelone_client: AsyncAngelOneClient = Depends(get_angelone_client),
+    async_angelone_client: AsyncAngelOneClient = Depends(get_default_angelone_client),
 ):
     crucial_details = f"{strategy_pyd_model.symbol} {strategy_pyd_model.id} {strategy_pyd_model.instrument_type} {signal_pyd_model.action}"
     todays_date = datetime.datetime.utcnow().date()
@@ -185,7 +185,7 @@ async def post_nfo_indian_options(
         logging.info(
             f"[ {crucial_details} ] - Existing total: {len(exiting_trades_json_list)} trades to be closed"
         )
-        redis_trade_pyd_model_list = TypeAdapter(List[RedisTradePydanticModel]).validate_python(
+        redis_trade_pyd_model_list = TypeAdapter(List[RedisTradePydModel]).validate_python(
             [json.loads(trade) for trade in exiting_trades_json_list]
         )
         ongoing_profit = await task_exit_trade(

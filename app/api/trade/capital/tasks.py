@@ -8,16 +8,16 @@ from app.api.trade.capital.utils import get_lots_to_trade_and_profit_or_loss
 from app.api.trade.capital.utils import open_order_found
 from app.api.trade.capital.utils import update_cfd_strategy_funds
 from app.broker_clients.async_capital import AsyncCapitalClient
-from app.pydantic_models.strategy import CFDStrategyPydanticModel
-from app.pydantic_models.trade import CFDPayloadPydanticModel
+from app.pydantic_models.strategy import CFDStrategyPydModel
+from app.pydantic_models.trade import CFDPayloadPydModel
 
 
 async def close_capital_lots(
     *,
     client: AsyncCapitalClient,
     lots_to_close: float,
-    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
-    cfd_payload_pyd_model: CFDPayloadPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydModel,
+    cfd_payload_pyd_model: CFDPayloadPydModel,
     demo_or_live: str,
     profit_or_loss: float,
     crucial_details: str,
@@ -117,8 +117,8 @@ async def close_capital_lots(
 async def open_capital_lots(
     *,
     client: AsyncCapitalClient,
-    cfd_strategy_pyd_model: CFDStrategyPydanticModel,
-    cfd_payload_pyd_model: CFDPayloadPydanticModel,
+    cfd_strategy_pyd_model: CFDStrategyPydModel,
+    cfd_payload_pyd_model: CFDPayloadPydModel,
     demo_or_live: str,
     profit_or_loss: float,
     funds_to_use=float,

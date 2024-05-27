@@ -1,4 +1,3 @@
-import uuid
 from datetime import datetime
 
 from sqlalchemy import Column
@@ -17,9 +16,8 @@ from app.database import Base
 class OrderDBModel(Base):
     __tablename__ = "order"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    unique_order_id = Column(UUID(as_uuid=True), primary_key=True)
     order_id = Column(String, nullable=False)
-    unique_order_id = Column(UUID(as_uuid=True), nullable=False)
     instrument = Column(String, nullable=False, index=True)
     quantity = Column(Integer, default=25, nullable=False)
 

@@ -16,18 +16,18 @@ from app.api.trade.indian_fno.utils import get_lots_to_open
 from app.api.trade.indian_fno.utils import get_margin_required
 from app.api.trade.indian_fno.utils import set_quantity
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import RedisTradePydanticModel
-from app.pydantic_models.trade import SignalPydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import RedisTradePydModel
+from app.pydantic_models.trade import SignalPydModel
 from app.utils.option_chain import get_option_chain
 
 
 # @profile
 async def task_create_angel_one_order(
     *,
-    signal_pyd_model: SignalPydanticModel,
+    signal_pyd_model: SignalPydModel,
     async_redis_client: aioredis.StrictRedis,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     async_httpx_client: AsyncClient,
     crucial_details: str,
     async_angelone_client: AsyncAngelOneClient,
@@ -45,6 +45,34 @@ async def task_create_angel_one_order(
             is_future=True,
         )
 
+        angel_one_trading_symbol = get_angel_one_futures_trading_symbol(
+            symbol=strategy_pyd_model.symbol,
+            expiry_date=signal_pyd_model.expiry,
+        )
+
+        entry_price = signal_pyd_model.future_entry_price_received
+
+        margin_for_min_quantity = await get_margin_required(
+            client=async_angelone_client,
+            price=entry_price,
+            signal_type=signal_pyd_model.action,
+            strategy_pyd_model=strategy_pyd_model,
+            async_redis_client=async_redis_client,
+            angel_one_trading_symbol=angel_one_trading_symbol,
+            crucial_details=crucial_details,
+        )
+        lots_to_open = get_lots_to_open(
+            strategy_pyd_model=strategy_pyd_model,
+            crucial_details=crucial_details,
+            ongoing_profit_or_loss=ongoing_profit,
+            margin_for_min_quantity=margin_for_min_quantity,
+        )
+        set_quantity(
+            strategy_pyd_model=strategy_pyd_model,
+            signal_pyd_model=signal_pyd_model,
+            lots_to_open=lots_to_open,
+        )
+
         order_response_pyd_model = await create_angel_one_buy_order(
             async_angelone_client=async_angelone_client,
             async_redis_client=async_redis_client,
@@ -55,11 +83,6 @@ async def task_create_angel_one_order(
             option_chain=option_chain,
         )
 
-        angel_one_trading_symbol = get_angel_one_futures_trading_symbol(
-            symbol=strategy_pyd_model.symbol,
-            expiry_date=signal_pyd_model.expiry,
-        )
-        entry_price = signal_pyd_model.future_entry_price_received
     # else:
     #     if strategy_pyd_model.broker_id:
     #         entry_price = await buy_alice_blue_trades(
@@ -90,27 +113,6 @@ async def task_create_angel_one_order(
     #         f"[ {crucial_details} ] - Slippage: [ {entry_price - signal_pyd_model.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_pyd_model.future_entry_price_received} ] "
     #     )
 
-    margin_for_min_quantity = await get_margin_required(
-        client=async_angelone_client,
-        price=entry_price,
-        signal_type=signal_pyd_model.action,
-        strategy_pyd_model=strategy_pyd_model,
-        async_redis_client=async_redis_client,
-        angel_one_trading_symbol=angel_one_trading_symbol,
-        crucial_details=crucial_details,
-    )
-    lots_to_open = get_lots_to_open(
-        strategy_pyd_model=strategy_pyd_model,
-        crucial_details=crucial_details,
-        ongoing_profit_or_loss=ongoing_profit,
-        margin_for_min_quantity=margin_for_min_quantity,
-    )
-    set_quantity(
-        strategy_pyd_model=strategy_pyd_model,
-        signal_pyd_model=signal_pyd_model,
-        lots_to_open=lots_to_open,
-    )
-
     await dump_angel_one_buy_order_in_db(
         order_data_pyd_model=order_response_pyd_model.data,
         strategy_pyd_model=strategy_pyd_model,
@@ -123,13 +125,13 @@ async def task_create_angel_one_order(
 
 async def task_angel_one_exit_trade(
     *,
-    signal_pyd_model: SignalPydanticModel,
-    strategy_pyd_model: StrategyPydanticModel,
+    signal_pyd_model: SignalPydModel,
+    strategy_pyd_model: StrategyPydModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
     only_futures: bool,
     redis_hash: str,
-    redis_trade_pyd_model_list: List[RedisTradePydanticModel],
+    redis_trade_pyd_model_list: List[RedisTradePydModel],
     crucial_details: str,
     futures_expiry_date: date,
     options_expiry_date: date = None,

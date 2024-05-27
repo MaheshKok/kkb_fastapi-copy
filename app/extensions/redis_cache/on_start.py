@@ -7,8 +7,8 @@ from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import PositionEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import RedisTradePydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import RedisTradePydModel
 from app.utils.constants import FUT
 
 
@@ -43,7 +43,7 @@ async def cache_ongoing_trades(async_redis_client):
                 pipe.hset(
                     str(strategy_db_model.id),
                     "strategy",
-                    StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
+                    StrategyPydModel.model_validate(strategy_db_model).model_dump_json(),
                 )
             await pipe.execute()
 
@@ -103,9 +103,9 @@ async def cache_ongoing_trades(async_redis_client):
                         and len(trades_in_redis) != len(trade_db_models_list)
                     ):
                         redis_trades_pyd_model_json_list = [
-                            RedisTradePydanticModel.model_validate(
-                                trade_db_model
-                            ).model_dump_json(exclude_none=True)
+                            RedisTradePydModel.model_validate(trade_db_model).model_dump_json(
+                                exclude_none=True
+                            )
                             for trade_db_model in trade_db_models_list
                         ]
                         result = await async_redis_client.hset(

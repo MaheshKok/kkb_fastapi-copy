@@ -1,3 +1,6 @@
+import logging
+
+import pyotp
 from aioredis import Redis
 from fastapi import Depends
 from fastapi import FastAPI
@@ -14,12 +17,12 @@ from app.database.schemas import BrokerDBModel
 from app.database.schemas import CFDStrategyDBModel
 from app.database.schemas import StrategyDBModel
 from app.database.session_manager.db_session import Database
-from app.pydantic_models.broker import BrokerPydanticModel
+from app.pydantic_models.broker import BrokerPydModel
 from app.pydantic_models.enums import BrokerNameEnum
-from app.pydantic_models.strategy import CFDStrategyPydanticModel
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import CFDPayloadPydanticModel
-from app.pydantic_models.trade import SignalPydanticModel
+from app.pydantic_models.strategy import CFDStrategyPydModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import CFDPayloadPydModel
+from app.pydantic_models.trade import SignalPydModel
 from app.utils.constants import ANGELONE_BROKER
 from app.utils.constants import STRATEGY
 
@@ -42,16 +45,16 @@ async def get_async_redis_client(app: FastAPI = Depends(get_app)) -> Redis:
 
 
 async def get_strategy_pyd_model(
-    signal_pyd_model: SignalPydanticModel,
+    signal_pyd_model: SignalPydModel,
     async_redis_client: Redis = Depends(get_async_redis_client),
-) -> StrategyPydanticModel:
+) -> StrategyPydModel:
     redis_strategy_json = await async_redis_client.hget(
         str(signal_pyd_model.strategy_id), "strategy"
     )
     if not redis_strategy_json:
         async with Database() as async_session:
             fetch_strategy_query = await async_session.execute(
-                select(StrategyDBModel).where(StrategyDBModel.id == signal_pyd_model.strategy_id)
+                select(StrategyDBModel).filter_by(id=signal_pyd_model.strategy_id)
             )
             strategy_db_model = fetch_strategy_query.scalar()
             if not strategy_db_model:
@@ -62,24 +65,22 @@ async def get_strategy_pyd_model(
             redis_set_result = await async_redis_client.hset(
                 str(strategy_db_model.id),
                 STRATEGY,
-                StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
+                StrategyPydModel.model_validate(strategy_db_model).model_dump_json(),
             )
             if not redis_set_result:
                 raise Exception(f"Redis set strategy: {strategy_db_model.id} failed")
 
-            return StrategyPydanticModel.model_validate(strategy_db_model)
-    return StrategyPydanticModel.model_validate_json(redis_strategy_json)
+            return StrategyPydModel.model_validate(strategy_db_model)
+    return StrategyPydModel.model_validate_json(redis_strategy_json)
 
 
-async def get_cfd_strategy_pyd_model(cfd_payload_pyd_model: CFDPayloadPydanticModel):
+async def get_cfd_strategy_pyd_model(cfd_payload_pyd_model: CFDPayloadPydModel):
     async with Database() as async_session:
         fetch_strategy_query = await async_session.execute(
-            select(CFDStrategyDBModel).where(
-                CFDStrategyDBModel.id == cfd_payload_pyd_model.strategy_id
-            )
+            select(CFDStrategyDBModel).filter_by(id=cfd_payload_pyd_model.strategy_id)
         )
         if strategy_db_model := fetch_strategy_query.scalar():
-            return CFDStrategyPydanticModel.model_validate(strategy_db_model)
+            return CFDStrategyPydModel.model_validate(strategy_db_model)
         else:
             raise HTTPException(
                 status_code=404,
@@ -99,11 +100,11 @@ async def get_async_httpx_client() -> AsyncClient:
 async def get_broker_pyd_model(
     config: Config,
     async_redis_client: Redis = Depends(get_async_redis_client),
-) -> BrokerPydanticModel:
+) -> BrokerPydModel:
     broker_id = config.data[ANGELONE_BROKER]["id"]
     broker_json = await async_redis_client.get(broker_id)
     if broker_json:
-        broker_pyd_model: BrokerPydanticModel = BrokerPydanticModel.parse_raw(broker_json)
+        broker_pyd_model: BrokerPydModel = BrokerPydModel.parse_raw(broker_json)
     else:
         async with Database() as async_session:
             fetch_broker_query = await async_session.execute(
@@ -112,7 +113,7 @@ async def get_broker_pyd_model(
             broker_db_model = fetch_broker_query.scalars().one_or_none()
 
             if not broker_db_model:
-                broker_pyd_model = BrokerPydanticModel(
+                broker_pyd_model = BrokerPydModel(
                     id=str(broker_id),
                     username=config.data[ANGELONE_BROKER]["username"],
                     password=config.data[ANGELONE_BROKER]["password"],
@@ -130,16 +131,14 @@ async def get_broker_pyd_model(
                 await async_session.add(broker_db_model)
                 await async_session.commit()
             else:
-                broker_pyd_model: BrokerPydanticModel = BrokerPydanticModel.model_validate(
-                    broker_db_model
-                )
+                broker_pyd_model: BrokerPydModel = BrokerPydModel.model_validate(broker_db_model)
 
             await async_redis_client.set(broker_id, broker_pyd_model.model_dump_json())
 
     return broker_pyd_model
 
 
-async def get_angelone_client(
+async def get_default_angelone_client(
     config: Config = Depends(get_config),
     async_redis_client: Redis = Depends(get_async_redis_client),
 ) -> AsyncAngelOneClient:
@@ -174,4 +173,53 @@ async def get_angelone_client(
     #         str(broker_pyd_model.id), BrokerSchema.model_validate(broker_pyd_model).model_dump_json()
     #     )
 
+    return async_angelone_client
+
+
+async def get_strategy_angelone_client(
+    async_redis_client: Redis = Depends(get_async_redis_client),
+    strategy_pyd_model: StrategyPydModel = Depends(get_strategy_pyd_model),
+) -> AsyncAngelOneClient:
+    broker_id = str(strategy_pyd_model.broker_id)
+    broker_json = await async_redis_client.get(broker_id)
+    if broker_json:
+        broker_pyd_model: BrokerPydModel = BrokerPydModel.parse_raw(broker_json)
+    else:
+        async with Database() as async_session:
+            fetch_broker_query = await async_session.execute(
+                select(BrokerDBModel).filter_by(id=str(broker_id))
+            )
+            broker_db_model = fetch_broker_query.scalars().one()
+            broker_pyd_model: BrokerPydModel = BrokerPydModel.model_validate(broker_db_model)
+            if not (
+                broker_pyd_model.access_token
+                and broker_pyd_model.refresh_token
+                and broker_pyd_model.feed_token
+            ):
+                client = AsyncAngelOneClient(broker_pyd_model.api_key)
+                await client.generate_session(
+                    client_code=broker_pyd_model.username,
+                    password=broker_pyd_model.password,
+                    totp=pyotp.TOTP(broker_pyd_model.totp).now(),
+                )
+                broker_db_model.access_token = client.access_token
+
+            await async_session.commit()
+            broker_pyd_model.access_token = client.access_token
+            broker_pyd_model.refresh_token = client.refresh_token
+            broker_pyd_model.feed_token = client.feed_token
+            # update redis cache with new session_id
+            await async_redis_client.set(
+                str(broker_pyd_model.id), broker_pyd_model.model_dump_json()
+            )
+            logging.info(
+                f"successfully updated session token for: [ {broker_db_model.name} ] user: [ {broker_db_model.username} ] in db and redis"
+            )
+
+    async_angelone_client = AsyncAngelOneClient(
+        broker_pyd_model.api_key,
+        access_token=broker_pyd_model.access_token,
+        refresh_token=broker_pyd_model.refresh_token,
+        feed_token=broker_pyd_model.feed_token,
+    )
     return async_angelone_client

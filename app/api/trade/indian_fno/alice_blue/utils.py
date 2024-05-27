@@ -23,11 +23,11 @@ from sqlalchemy import select
 from app.broker_clients.async_pya3_alice_blue import AsyncPya3Aliceblue
 from app.database.schemas import BrokerDBModel
 from app.database.session_manager.db_session import Database
-from app.pydantic_models.broker import BrokerPydanticModel
+from app.pydantic_models.broker import BrokerPydModel
 from app.pydantic_models.enums import InstrumentTypeEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import RedisTradePydanticModel
-from app.pydantic_models.trade import SignalPydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import RedisTradePydModel
+from app.pydantic_models.trade import SignalPydModel
 from app.utils.constants import OptionType
 from app.utils.constants import Status
 
@@ -86,7 +86,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
     broker_json = await async_redis_client.get(broker_id)
 
     if broker_json:
-        broker_pyd_model = BrokerPydanticModel.parse_raw(broker_json)
+        broker_pyd_model = BrokerPydModel.parse_raw(broker_json)
     else:
         async with Database() as async_session:
             # We have a cron that update session token every 1 hour,
@@ -102,7 +102,7 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
 
             if not broker_db_model:
                 raise HTTPException(status_code=404, detail=f"Broker: {broker_id} not found")
-            broker_pyd_model = BrokerPydanticModel.model_validate(broker_db_model)
+            broker_pyd_model = BrokerPydModel.model_validate(broker_db_model)
             await async_redis_client.set(broker_id, broker_pyd_model.model_dump_json())
 
     # TODO: update cron updating alice blue access token to update redis as well with the latest access token
@@ -122,8 +122,8 @@ async def get_pya3_obj(async_redis_client, broker_id, async_httpx_client) -> Asy
 async def buy_alice_blue_trades(
     *,
     strike: Optional[float],
-    signal_pyd_model: SignalPydanticModel,
-    strategy_pyd_model: StrategyPydanticModel,
+    signal_pyd_model: SignalPydModel,
+    strategy_pyd_model: StrategyPydModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
 ):
@@ -211,7 +211,7 @@ async def buy_alice_blue_trades(
         return None
 
 
-def get_exiting_trades_insights(redis_trade_pyd_model_list: list[RedisTradePydanticModel]):
+def get_exiting_trades_insights(redis_trade_pyd_model_list: list[RedisTradePydModel]):
     strike_quantity_dict = defaultdict(int)
 
     for redis_trade_pyd_model in redis_trade_pyd_model_list:
@@ -229,7 +229,7 @@ def get_exiting_trades_insights(redis_trade_pyd_model_list: list[RedisTradePydan
 async def place_ablue_order(
     *,
     pya3_obj: AsyncPya3Aliceblue,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     async_redis_client: Redis,
     strike: float,
     quantity: int,
@@ -340,8 +340,8 @@ async def place_ablue_order(
 
 
 async def close_alice_blue_trades(
-    redis_trade_pyd_model_list: list[RedisTradePydanticModel],
-    strategy_pyd_model: StrategyPydanticModel,
+    redis_trade_pyd_model_list: list[RedisTradePydModel],
+    strategy_pyd_model: StrategyPydModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
 ):
@@ -424,7 +424,7 @@ async def update_ablue_session_token(pya3_obj: AsyncPya3Aliceblue, async_redis_c
 
         # update redis cache with new session_id
         await async_redis_client.set(
-            str(broker_db_model.id), BrokerPydanticModel.model_validate(broker_db_model).json()
+            str(broker_db_model.id), BrokerPydModel.model_validate(broker_db_model).json()
         )
         logging.info(f"access_token updated for user: {pya3_obj.user_id} in db and redis")
         return session_id

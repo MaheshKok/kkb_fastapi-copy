@@ -16,7 +16,7 @@ from app.utils.constants import ALICE_BLUE_EXPIRY_DATE_FORMAT
 from app.utils.constants import OptionType
 
 
-class SignalPydanticModel(BaseModel):
+class SignalPydModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     future_entry_price_received: float = Field(description="Future Entry Price", example=40600.5)
@@ -42,7 +42,7 @@ class SignalPydanticModel(BaseModel):
     quantity: Optional[int] = Field(description="Quantity", example=15, default=0)
 
 
-class RedisTradePydanticModel(SignalPydanticModel):
+class RedisTradePydModel(SignalPydModel):
     # the main purpose is for testing
 
     id: uuid.UUID = Field(description="Trade ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3")
@@ -73,7 +73,7 @@ class RedisTradePydanticModel(SignalPydanticModel):
         }
 
 
-class ExitTradePydanticModel(BaseModel):
+class ExitTradePydModel(BaseModel):
     id: uuid.UUID = Field(description="Trade ID", example="ff9acef9-e6c4-4792-9d43-d266b4d685c3")
     exit_price: float = Field(description="Exit Price", example=450.5)
     profit: float = Field(description="Profit", example=2500.0)
@@ -87,7 +87,7 @@ class ExitTradePydanticModel(BaseModel):
     )
 
 
-class EntryTradePydanticModel(SignalPydanticModel):
+class EntryTradePydModel(SignalPydModel):
     model_config = ConfigDict(from_attributes=True)
 
     entry_price: Optional[float] = Field(description="Entry Price", example=350.5, default=None)
@@ -115,6 +115,10 @@ class EntryTradePydanticModel(SignalPydanticModel):
             values["future_entry_price_received"] = round(
                 values["future_entry_price_received"], 2
             )
+            if values.get("instrument"):
+                return values
+
+            # generate instrument name based on symbol, expiry and option_type and strike
             if values.get("option_type"):
                 instrument = generate_trading_symbol(
                     symbol=values["symbol"],
@@ -131,7 +135,7 @@ class EntryTradePydanticModel(SignalPydanticModel):
 
 
 # below schema is used only for as Response Model in endpoints where trades are retrieved from DB
-class DBEntryTradePydanticModel(BaseModel):
+class DBEntryTradePydModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     quantity: int = Field(description="Quantity", example=25)
@@ -159,18 +163,18 @@ class DBEntryTradePydanticModel(BaseModel):
     expiry: date = Field(description="Expiry", example="2023-05-22")
 
 
-class CFDPayloadPydanticModel(BaseModel):
+class CFDPayloadPydModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     strategy_id: uuid.UUID = Field(description="strategy id")
     direction: SignalTypeEnum = Field(description="buy or sell signal", example="buy")
     account_id: Optional[str] = Field(description="account id", default=None)
 
 
-class FuturesPayloadSchema(CFDPayloadPydanticModel):
+class FuturesPayloadSchema(CFDPayloadPydModel):
     pass
 
 
-class BinanceFuturesPayloadPydanticModel(BaseModel):
+class BinanceFuturesPayloadPydModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     symbol: str = Field(description="Symbol", example="BTCUSDT")
     quantity: float = Field(description="Quantity", example=1)

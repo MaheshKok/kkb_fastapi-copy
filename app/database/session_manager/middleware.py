@@ -1,6 +1,7 @@
 """
 middleware
 """
+
 from typing import Dict
 from typing import Optional
 from typing import Union

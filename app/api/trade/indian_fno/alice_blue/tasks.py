@@ -21,18 +21,18 @@ from app.api.trade.indian_fno.utils import get_margin_required
 from app.api.trade.indian_fno.utils import get_strike_and_entry_price
 from app.api.trade.indian_fno.utils import set_quantity
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import RedisTradePydanticModel
-from app.pydantic_models.trade import SignalPydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import RedisTradePydModel
+from app.pydantic_models.trade import SignalPydModel
 from app.utils.option_chain import get_option_chain
 
 
 # @profile
 async def task_entry_trade(
     *,
-    signal_pyd_model: SignalPydanticModel,
+    signal_pyd_model: SignalPydModel,
     async_redis_client: aioredis.StrictRedis,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     async_httpx_client: AsyncClient,
     crucial_details: str,
     async_angelone_client: AsyncAngelOneClient,
@@ -146,13 +146,13 @@ async def task_entry_trade(
 
 async def task_exit_trade(
     *,
-    signal_pyd_model: SignalPydanticModel,
-    strategy_pyd_model: StrategyPydanticModel,
+    signal_pyd_model: SignalPydModel,
+    strategy_pyd_model: StrategyPydModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
     only_futures: bool,
     redis_hash: str,
-    redis_trade_pyd_model_list: List[RedisTradePydanticModel],
+    redis_trade_pyd_model_list: List[RedisTradePydModel],
     crucial_details: str,
     futures_expiry_date: date,
     options_expiry_date: date = None,

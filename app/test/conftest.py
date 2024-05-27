@@ -19,9 +19,9 @@ from app.database.base import engine_kw
 from app.database.base import get_db_url
 from app.database.schemas import StrategyDBModel
 from app.database.session_manager.db_session import Database
-from app.pydantic_models.broker import BrokerPydanticModel
+from app.pydantic_models.broker import BrokerPydModel
 from app.pydantic_models.enums import BrokerNameEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
 from app.test.unit_tests.test_data import get_test_post_trade_payload
 from app.test.utils import create_close_trades
 from app.utils.constants import ANGELONE_BROKER
@@ -225,7 +225,7 @@ async def test_async_redis_client():
     else:
         logging.error("test redis client connection failed")
 
-    broker_pyd_model = BrokerPydanticModel(
+    broker_pyd_model = BrokerPydModel(
         id=test_config.data[ANGELONE_BROKER]["id"],
         name=BrokerNameEnum.ANGELONE,
         username=test_config.data[ANGELONE_BROKER]["username"],
@@ -339,7 +339,7 @@ async def buy_task_payload_dict(test_async_redis_client: aioredis.Redis):
     async with Database() as async_session:
         fetch_strategy_query_ = await async_session.execute(select(StrategyDBModel))
         strategy_db_model = fetch_strategy_query_.scalars().one_or_none()
-        strategy_pyd_model = StrategyPydanticModel.model_validate(strategy_db_model)
+        strategy_pyd_model = StrategyPydModel.model_validate(strategy_db_model)
         (
             current_expiry_date,
             next_expiry_date,

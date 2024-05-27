@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
+from typing import Union
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -12,7 +13,7 @@ from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
 
 
-class StrategyCreatePydanticModel(BaseModel):
+class StrategyCreatePydModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     instrument_type: InstrumentTypeEnum = Field(
@@ -20,8 +21,9 @@ class StrategyCreatePydanticModel(BaseModel):
     )
     symbol: str = Field(description="Symbol", example="BANKNIFTY")
     name: str = Field(description="Name", example="BANKNIFTY1! TF:2 Brick_Size:35 Pyramiding:100")
-    position: Optional[PositionEnum] = Field(description="Position", example="LONG", default=None)
-
+    position: Optional[Union[PositionEnum, str]] = Field(
+        description="Position", example="LONG", default=None
+    )
     premium: Optional[float] = Field(description="Premium", example=350.0, default=None)
 
     funds: float = Field(description="Funds", example=1000000.0)
@@ -64,7 +66,7 @@ class StrategyCreatePydanticModel(BaseModel):
         return _input
 
 
-class StrategyPydanticModel(StrategyCreatePydanticModel):
+class StrategyPydModel(StrategyCreatePydModel):
     id: uuid.UUID = Field(
         description="Strategy ID", example="ff80cf6b-3c4a-4d28-82b0-631eafb4cdd1"
     )
@@ -72,7 +74,7 @@ class StrategyPydanticModel(StrategyCreatePydanticModel):
     model_config = ConfigDict(from_attributes=True, json_encoders={uuid.UUID: str})
 
 
-class CFDStrategyPydanticModel(BaseModel):
+class CFDStrategyPydModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID = Field(

@@ -15,11 +15,15 @@ from app.database.base import get_db_url
 from app.database.base import get_redis_client
 from app.database.schemas import BrokerDBModel
 from app.database.session_manager.db_session import Database
-from app.pydantic_models.broker import BrokerPydanticModel
+from app.pydantic_models.broker import BrokerPydModel
 from app.pydantic_models.enums import BrokerNameEnum
 
 
 logging.basicConfig(level=logging.DEBUG)
+
+
+async def get_angel_one_access_token():
+    pass
 
 
 # refactored update and logging into a separate coroutine
@@ -70,7 +74,7 @@ async def task_update_angelone_session_token(
     )
     broker_db_models = fetch_broker_query.scalars().all()
     for broker_db_model in broker_db_models:
-        broker_pyd_model = BrokerPydanticModel.model_validate(broker_db_model)
+        broker_pyd_model = BrokerPydModel.model_validate(broker_db_model)
         client = AsyncAngelOneClient(broker_pyd_model.api_key)
         await client.generate_session(
             client_code=broker_pyd_model.username,
@@ -79,6 +83,7 @@ async def task_update_angelone_session_token(
         )
         broker_db_model.access_token = client.access_token
         await async_session.commit()
+
         broker_pyd_model.access_token = client.access_token
         broker_pyd_model.refresh_token = client.refresh_token
         broker_pyd_model.feed_token = client.feed_token

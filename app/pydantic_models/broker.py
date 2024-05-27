@@ -9,7 +9,7 @@ from app.pydantic_models.enums import ExchangeEnum
 from app.pydantic_models.enums import InstrumentTypeEnum
 
 
-class BrokerPydanticModel(BaseModel):
+class BrokerPydModel(BaseModel):
     # create pydantic model for broker_clients based on a database model (BrokerModel)
     model_config = ConfigDict(from_attributes=True)
 
@@ -35,7 +35,7 @@ class BrokerPydanticModel(BaseModel):
     feed_token: Optional[str] = Field(description="feed token", example="<KEY>", default="")
 
 
-class AngelOneInstrumentPydanticModel(BaseModel):
+class AngelOneInstrumentPydModel(BaseModel):
     exch_seg: ExchangeEnum = Field(..., example="NFO", description="Exchange Segment")
     expiry: str = Field(..., example="27MAR2024", description="Expiry Date")
     instrumenttype: InstrumentTypeEnum = Field(

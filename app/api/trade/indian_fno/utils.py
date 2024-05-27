@@ -28,17 +28,17 @@ from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
-from app.pydantic_models.broker import AngelOneInstrumentPydanticModel
+from app.pydantic_models.broker import AngelOneInstrumentPydModel
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import OptionTypeEnum
 from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.enums import ProductTypeEnum
 from app.pydantic_models.enums import SignalTypeEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import EntryTradePydanticModel
-from app.pydantic_models.trade import ExitTradePydanticModel
-from app.pydantic_models.trade import RedisTradePydanticModel
-from app.pydantic_models.trade import SignalPydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import EntryTradePydModel
+from app.pydantic_models.trade import ExitTradePydModel
+from app.pydantic_models.trade import RedisTradePydModel
+from app.pydantic_models.trade import SignalPydModel
 from app.utils.constants import ANGELONE_EXPIRY_DATE_FORMAT
 from app.utils.constants import FUT
 from app.utils.constants import REDIS_DATE_FORMAT
@@ -56,7 +56,7 @@ async def get_exit_price_from_option_chain(
     async_redis_client,
     redis_trade_pyd_model_list,
     expiry_date,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
 ):
     option_type = redis_trade_pyd_model_list[0].option_type
     # reason for using set comprehension, we want the exit_price for all distinct strikes
@@ -126,7 +126,7 @@ async def get_monthly_expiry_date_from_alice_blue(*, instrument_type, symbol):
 async def get_future_price_from_redis(
     *,
     async_redis_client: Redis,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     expiry_date: date,
 ):
     future_option_chain = await get_option_chain(
@@ -145,11 +145,11 @@ async def get_future_price_from_redis(
 async def get_future_price(
     *,
     async_redis_client: Redis,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     expiry_date: date,
-    signal_pyd_model: SignalPydanticModel,
+    signal_pyd_model: SignalPydModel,
     async_httpx_client: AsyncClient,
-    redis_trade_pyd_model_list: Optional[List[RedisTradePydanticModel]] = None,
+    redis_trade_pyd_model_list: Optional[List[RedisTradePydModel]] = None,
 ) -> float:
     # fetch future price from alice blue only when
     # strategy_pyd_model.instrument_type == InstrumentTypeEnum.FUTIDX and
@@ -187,8 +187,8 @@ async def get_future_price(
 async def get_strike_and_exit_price_dict(
     *,
     async_redis_client: Redis,
-    redis_trade_pyd_model_list: list[RedisTradePydanticModel],
-    strategy_pyd_model: StrategyPydanticModel,
+    redis_trade_pyd_model_list: list[RedisTradePydModel],
+    strategy_pyd_model: StrategyPydModel,
     async_httpx_client: AsyncClient,
     expiry_date: date,
 ) -> dict:
@@ -212,7 +212,7 @@ async def get_strike_and_exit_price_dict(
 
 
 async def get_strike_and_entry_price_from_option_chain(
-    *, option_chain, signal_pyd_model: SignalPydanticModel, premium: float
+    *, option_chain, signal_pyd_model: SignalPydModel, premium: float
 ):
     strike = signal_pyd_model.strike
     future_price = signal_pyd_model.future_entry_price_received
@@ -243,8 +243,8 @@ async def get_strike_and_entry_price_from_option_chain(
 async def get_strike_and_entry_price(
     *,
     option_chain,
-    strategy_pyd_model: StrategyPydanticModel,
-    signal_pyd_model: SignalPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
+    signal_pyd_model: SignalPydModel,
     async_redis_client: Redis,
     async_httpx_client: AsyncClient,
     crucial_details: str,
@@ -354,9 +354,7 @@ async def get_current_and_next_expiry_from_alice_blue(symbol: str):
     return current_expiry_date, next_expiry_date, is_today_expiry
 
 
-def set_option_type(
-    strategy_pyd_model: StrategyPydanticModel, payload: SignalPydanticModel
-) -> None:
+def set_option_type(strategy_pyd_model: StrategyPydModel, payload: SignalPydModel) -> None:
     # this is to prevent setting option type on future strategy, it acts as double protection
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.FUTIDX:
         return
@@ -397,8 +395,8 @@ def get_opposite_trade_option_type(strategy_position, signal_action) -> OptionTy
 
 
 def set_quantity(
-    strategy_pyd_model: StrategyPydanticModel,
-    signal_pyd_model: SignalPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
+    signal_pyd_model: SignalPydModel,
     lots_to_open: int,
 ) -> None:
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
@@ -414,7 +412,7 @@ def set_quantity(
 
 
 def get_lots_to_open(
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     ongoing_profit_or_loss,
     margin_for_min_quantity: float,
     crucial_details: str = None,
@@ -511,12 +509,12 @@ async def get_margin_required(
     async_redis_client: Redis,
     angel_one_trading_symbol: str,
     signal_type: SignalTypeEnum,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     crucial_details: str,
 ):
     instrument_json = await async_redis_client.get(angel_one_trading_symbol)
     instrument = json.loads(instrument_json)
-    instrument_pyd_model = AngelOneInstrumentPydanticModel(**instrument)
+    instrument_pyd_model = AngelOneInstrumentPydModel(**instrument)
 
     # exchange = NSE, BSE, NFO, CDS, MCX, NCDEX and BFO
     # product_type = CARRYFORWARD, INTRADAY, DELIVERY, MARGIN, BO, and CO.
@@ -662,9 +660,9 @@ async def calculate_profits(
     *,
     strike_exit_price_dict: dict,
     future_exit_price: float,
-    signal_pyd_model: SignalPydanticModel,
-    redis_trade_pyd_model_list: List[RedisTradePydanticModel],
-    strategy_pyd_model: StrategyPydanticModel,
+    signal_pyd_model: SignalPydModel,
+    redis_trade_pyd_model_list: List[RedisTradePydModel],
+    strategy_pyd_model: StrategyPydModel,
 ):
     updated_data = {}
     total_ongoing_profit = 0
@@ -707,7 +705,7 @@ async def calculate_profits(
         total_future_profit += future_profit
 
     # validate all mappings via ExitTradeSchema
-    ExitTradeListValidator = TypeAdapter(List[ExitTradePydanticModel])
+    ExitTradeListValidator = TypeAdapter(List[ExitTradePydModel])
     ExitTradeListValidator.validate_python(list(updated_data.values()))
 
     return updated_data, round(total_ongoing_profit, 2), round(total_future_profit, 2)
@@ -729,7 +727,7 @@ async def push_trade_to_redis(
     else:
         redis_hash = f"{trade_db_model.expiry} {PositionEnum.LONG if signal_type == SignalTypeEnum.BUY else PositionEnum.SHORT} {FUT}"
     redis_trades_json = await async_redis_client.hget(redis_key, redis_hash)
-    new_trade_json = RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json(
+    new_trade_json = RedisTradePydModel.model_validate(trade_db_model).model_dump_json(
         exclude={"received_at"}, exclude_none=True
     )
     redis_trades_list = []
@@ -742,16 +740,16 @@ async def push_trade_to_redis(
 
 async def dump_trade_in_db_and_redis(
     *,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     entry_price: float,
-    signal_pyd_model: SignalPydanticModel,
+    signal_pyd_model: SignalPydModel,
     async_redis_client: aioredis.StrictRedis,
     crucial_details: str,
 ):
     async with Database() as async_session:
         # Use the AsyncSession to perform database operations
         # Example: Create a new entry in the database
-        trade_pydatic_model = EntryTradePydanticModel(
+        trade_pyd_model = EntryTradePydModel(
             symbol=strategy_pyd_model.symbol,
             entry_price=entry_price,
             entry_received_at=signal_pyd_model.received_at,
@@ -759,7 +757,7 @@ async def dump_trade_in_db_and_redis(
         )
 
         trade_db_model = TradeDBModel(
-            **trade_pydatic_model.model_dump(
+            **trade_pyd_model.model_dump(
                 exclude={"premium", "broker_id", "symbol", "received_at"},
                 exclude_none=True,
             )
@@ -778,7 +776,7 @@ async def dump_trade_in_db_and_redis(
 async def close_trades_in_db_and_remove_from_redis(
     *,
     updated_data: dict,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     total_profit: float,
     total_future_profit: float,
     total_redis_trades: int,
@@ -812,7 +810,7 @@ async def close_trades_in_db_and_remove_from_redis(
         await async_redis_client.hset(
             redis_strategy_key,
             STRATEGY,
-            StrategyPydanticModel.model_dump_json(strategy_pyd_model),
+            StrategyPydModel.model_dump_json(strategy_pyd_model),
         )
         logging.info(
             f"[ {crucial_details} ] - Strategy updated funds: [ {updated_funds} ] and futures funds: [ {updated_futures_funds} ] in redis successfully"
@@ -831,10 +829,10 @@ async def close_trades_in_db_and_remove_from_redis(
 
 async def compute_trade_data_needed_for_closing_trade(
     *,
-    signal_pyd_model: SignalPydanticModel,
-    redis_trade_pyd_model_list: list[RedisTradePydanticModel],
+    signal_pyd_model: SignalPydModel,
+    redis_trade_pyd_model_list: list[RedisTradePydModel],
     async_redis_client: Redis,
-    strategy_pyd_model: StrategyPydanticModel,
+    strategy_pyd_model: StrategyPydModel,
     async_httpx_client: AsyncClient,
     crucial_details: str,
     futures_expiry_date: date,
