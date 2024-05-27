@@ -65,3 +65,4 @@ class StrategyDBModel(Base):
         "DailyProfitDBModel", backref="strategy", cascade="all, delete"
     )
     trades = relationship("TradeDBModel", back_populates="strategy", cascade="all, delete")
+    orders = relationship("OrderDBModel", back_populates="strategy", cascade="all, delete")

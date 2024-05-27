@@ -5,6 +5,7 @@ Revises: 784a46a80825
 Create Date: 2024-05-19 02:05:37.937861
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -22,7 +23,7 @@ def upgrade() -> None:
     op.create_table(
         "order",
         sa.Column("id", sa.UUID(), nullable=False),
-        sa.Column("order_id", sa.UUID(), nullable=False),
+        sa.Column("order_id", sa.String(), nullable=False),
         sa.Column("unique_order_id", sa.UUID(), nullable=False),
         sa.Column("instrument", sa.String(), nullable=False),
         sa.Column("quantity", sa.Integer(), nullable=False),

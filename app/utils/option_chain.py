@@ -16,6 +16,9 @@ async def get_option_chain(
     if is_future and option_type:
         raise ValueError("Futures don't have option_type")
 
+    if not is_future and not option_type:
+        raise ValueError("Either is_future or option_type is required for option chain")
+
     future_or_option_type = "FUT" if is_future else option_type
     key = f"{strategy_pyd_model.symbol} {expiry} {future_or_option_type}"
     option_chain = await async_redis_client.hgetall(key)

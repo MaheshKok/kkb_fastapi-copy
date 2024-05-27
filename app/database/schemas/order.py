@@ -18,7 +18,7 @@ class OrderDBModel(Base):
     __tablename__ = "order"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    order_id = Column(UUID(as_uuid=True), nullable=False)
+    order_id = Column(String, nullable=False)
     unique_order_id = Column(UUID(as_uuid=True), nullable=False)
     instrument = Column(String, nullable=False, index=True)
     quantity = Column(Integer, default=25, nullable=False)
@@ -39,4 +39,4 @@ class OrderDBModel(Base):
         nullable=False,
         index=True,
     )
-    strategy = relationship("StrategyDBModel", back_populates="trades")
+    strategy = relationship("StrategyDBModel", back_populates="orders")

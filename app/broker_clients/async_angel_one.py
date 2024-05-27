@@ -281,19 +281,7 @@ class AsyncAngelOneClient:
             if params[k] is None:
                 del params[k]
         response = await self._post_request("api.order.place", params)
-        if response is not None and response.get("status", False):
-            if (
-                "data" in response
-                and response["data"] is not None
-                and "orderid" in response["data"]
-            ):
-                order_response = response["data"]["orderid"]
-                return order_response
-            else:
-                logging.error(f"Invalid response format: {response}")
-        else:
-            logging.error(f"API request failed: {response}")
-        return None
+        return response
 
     async def place_order_full_response(self, orderparams):
         params = orderparams
@@ -478,7 +466,3 @@ class AsyncAngelOneClient:
         except Exception as e:
             logging.error(f"Error occurred in ind_order_details: {e}")
             return None
-
-
-async def place_order():
-    pass

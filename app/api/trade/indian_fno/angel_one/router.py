@@ -16,8 +16,8 @@ from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_strategy_pyd_model
 from app.api.trade import trading_router
-from app.api.trade.indian_fno.alice_blue.tasks import task_entry_trade
 from app.api.trade.indian_fno.alice_blue.tasks import task_exit_trade
+from app.api.trade.indian_fno.angel_one.tasks import task_create_angel_one_order
 from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.indian_fno.utils import get_opposite_trade_option_type
 from app.api.trade.indian_fno.utils import set_option_type
@@ -36,7 +36,7 @@ logging.basicConfig(
 )
 
 
-fno_router = APIRouter(
+angel_one_router = APIRouter(
     prefix=f"{trading_router.prefix}",
     tags=["futures_and_options"],
 )
@@ -67,7 +67,16 @@ def get_expiry_date_to_trade(
     return current_expiry_date
 
 
-@fno_router.post("/angelone/nfo", status_code=200)
+@angel_one_router.post("/angelone/webhook/orders/updates", status_code=200)
+async def angel_one_webhook_order_updates(
+    async_redis_client: Redis = Depends(get_async_redis_client),
+    async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
+    async_angelone_client: AsyncAngelOneClient = Depends(get_angelone_client),
+):
+    pass
+
+
+@angel_one_router.post("/angelone/nfo", status_code=200)
 async def post_nfo_angel_one_trading(
     signal_pyd_model: SignalPydanticModel,
     strategy_pyd_model: StrategyPydanticModel = Depends(get_strategy_pyd_model),
@@ -183,7 +192,7 @@ async def post_nfo_angel_one_trading(
         msg += " closed existing trades and"
 
     # initiate buy_trade
-    await task_entry_trade(
+    await task_create_angel_one_order(
         **kwargs,
         async_angelone_client=async_angelone_client,
     )

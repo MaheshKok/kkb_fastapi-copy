@@ -25,6 +25,7 @@ from app.api.trade import trading_router
 from app.api.trade.binance.crypto import binance_router
 from app.api.trade.capital.router import forex_router
 from app.api.trade.indian_fno.alice_blue.router import fno_router
+from app.api.trade.indian_fno.angel_one.router import angel_one_router
 from app.api.trade.oanda.router import oanda_forex_router
 from app.core.config import get_config
 from app.database.base import engine_kw
@@ -45,6 +46,7 @@ def register_routers(app: FastAPI):
     app.include_router(healthcheck_router)
     app.include_router(trading_router)
     app.include_router(fno_router)
+    app.include_router(angel_one_router)
     app.include_router(strategy_router)
     app.include_router(forex_router)
     app.include_router(binance_router)

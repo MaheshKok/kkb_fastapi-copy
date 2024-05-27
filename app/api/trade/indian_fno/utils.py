@@ -215,7 +215,6 @@ async def get_strike_and_entry_price_from_option_chain(
     *, option_chain, signal_pyd_model: SignalPydanticModel, premium: float
 ):
     strike = signal_pyd_model.strike
-    premium = premium
     future_price = signal_pyd_model.future_entry_price_received
 
     # use bisect to find the strike and its price from option chain
@@ -553,7 +552,7 @@ async def get_margin_required(
 
 
 def get_angel_one_options_trading_symbol(
-    symbol: str, expiry_date: date, strike: int, option_type: OptionTypeEnum
+    *, symbol: str, expiry_date: date, strike: int, option_type: OptionTypeEnum
 ) -> str:
     return f"{symbol}{(expiry_date.strftime(ANGELONE_EXPIRY_DATE_FORMAT)).upper()}{strike}{option_type}"
 

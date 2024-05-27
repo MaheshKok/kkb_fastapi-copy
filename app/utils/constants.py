@@ -29,10 +29,11 @@ ONGOING_TRADES_REDIS_KEY = "strategy_id expiry option_type"
 
 
 # EXPIRY DATE FORMAT
-EDELWEISS_DATE_FORMAT = "%d %b %Y"
-REDIS_DATE_FORMAT = "%Y-%m-%d"
-SQLALCHEMY_DATE_FORMAT = "%Y-%m-%d"
-ALICE_BLUE_EXPIRY_DATE_FORMAT = ANGELONE_EXPIRY_DATE_FORMAT = "%d%b%y"
+EDELWEISS_DATE_FORMAT = "%d %b %Y"  # 22 Jun 2024
+REDIS_DATE_FORMAT = "%Y-%m-%d"  # 2024-06-22
+SQLALCHEMY_DATE_FORMAT = "%Y-%m-%d"  # 2024-06-22
+ALICE_BLUE_EXPIRY_DATE_FORMAT = "%d%b%y"  # 22JUN24
+ANGELONE_EXPIRY_DATE_FORMAT = "%d%B%y"
 FUT = "FUT"
 TRADES_AND_OPTION_CHAIN_REDIS = "trades_and_option_chain_redis"
 AB_NFO_CONTRACTS_URL = "https://v2api.aliceblueonline.com/restpy/static/contract_master/NFO.csv"
@@ -44,6 +45,8 @@ INSTRUMENT_COLUMN = "Trading Symbol"
 SYMBOL_STR = "symbol"
 NAME_STR = "name"
 ANGELONE_BROKER = "angelone_broker"
+STRATEGY = "strategy"
+
 update_trade_columns = {
     "exit_price",
     "profit",
@@ -52,8 +55,6 @@ update_trade_columns = {
     "exit_received_at",
     "exit_at",
 }
-
-STRATEGY = "strategy"
 
 
 class SYMBOL:
