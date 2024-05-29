@@ -21,6 +21,7 @@ from app.api.trade.indian_fno.alice_blue.tasks import task_entry_trade
 from app.api.trade.indian_fno.alice_blue.tasks import task_exit_trade
 from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.indian_fno.utils import get_opposite_trade_option_type
+from app.api.trade.indian_fno.utils import is_short_sell_strategy
 from app.api.trade.indian_fno.utils import set_option_type
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.database.schemas import TradeDBModel
@@ -68,7 +69,7 @@ def get_expiry_date_to_trade(
 
     current_time = datetime.datetime.utcnow()
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if strategy_pyd_model.position == PositionEnum.SHORT:
+        if is_short_sell_strategy(strategy_pyd_model):
             if current_time.time() > datetime.time(hour=9, minute=45):
                 current_expiry_date = next_expiry_date
         else:

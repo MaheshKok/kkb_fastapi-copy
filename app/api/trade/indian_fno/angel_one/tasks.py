@@ -27,7 +27,7 @@ from app.utils.option_chain import get_option_chain
 
 
 # @profile
-async def task_create_angel_one_order(
+async def task_open_angel_one_trade_position(
     *,
     signal_pyd_model: SignalPydModel,
     async_redis_client: aioredis.StrictRedis,

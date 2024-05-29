@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from starlette import status
 
 from app.api.trade.indian_fno.angel_one.redis_operations import get_angel_one_instrument_details
+from app.api.trade.indian_fno.utils import is_short_sell_strategy
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.pydantic_models.angel_one import DurationEnum
 from app.pydantic_models.angel_one import ExchangeEnum
@@ -19,7 +20,6 @@ from app.pydantic_models.angel_one import TransactionTypeEnum
 from app.pydantic_models.angel_one import VarietyEnum
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import OptionTypeEnum
-from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.strategy import StrategyPydModel
 from app.pydantic_models.trade import SignalPydModel
 
@@ -189,7 +189,11 @@ async def create_angel_one_buy_order(
             }
     """
 
-    # TODO: for short sell what should be the place_order_params
+    if is_short_sell_strategy(strategy_pyd_model):
+        transaction_type = TransactionTypeEnum.SELL
+    else:
+        transaction_type = TransactionTypeEnum.BUY
+
     place_order_params = await get_angel_one_trade_params(
         async_redis_client=async_redis_client,
         strategy_pyd_model=strategy_pyd_model,
@@ -197,7 +201,7 @@ async def create_angel_one_buy_order(
         strike=strike,
         option_type=signal_pyd_model.option_type,
         is_fut=is_fut,
-        transaction_type=signal_pyd_model.action.upper(),
+        transaction_type=transaction_type,
         crucial_details=crucial_details,
     )
 
@@ -238,7 +242,7 @@ def get_expiry_date_to_trade(
 
     current_time = datetime.datetime.utcnow()
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if strategy_pyd_model.position == PositionEnum.SHORT:
+        if is_short_sell_strategy(strategy_pyd_model):
             if current_time.time() > datetime.time(hour=9, minute=45):
                 current_expiry_date = next_expiry_date
         else:

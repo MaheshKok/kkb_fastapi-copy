@@ -400,10 +400,10 @@ def set_quantity(
     lots_to_open: int,
 ) -> None:
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if strategy_pyd_model.position == PositionEnum.LONG:
-            signal_pyd_model.quantity = lots_to_open
-        else:
+        if is_short_sell_strategy(strategy_pyd_model):
             signal_pyd_model.quantity = -lots_to_open
+        else:
+            signal_pyd_model.quantity = lots_to_open
     else:
         if signal_pyd_model.action == SignalTypeEnum.BUY:
             signal_pyd_model.quantity = lots_to_open
@@ -518,12 +518,12 @@ async def get_margin_required(
 
     # exchange = NSE, BSE, NFO, CDS, MCX, NCDEX and BFO
     # product_type = CARRYFORWARD, INTRADAY, DELIVERY, MARGIN, BO, and CO.
-    #  tradeType = BUY or SELL
+    # tradeType = BUY or SELL
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
         trade_type = (
-            SignalTypeEnum.BUY
-            if strategy_pyd_model.position == PositionEnum.LONG
-            else SignalTypeEnum.SELL
+            SignalTypeEnum.SELL
+            if is_short_sell_strategy(strategy_pyd_model)
+            else SignalTypeEnum.BUY
         )
     else:
         trade_type = signal_type
@@ -920,3 +920,7 @@ async def compute_trade_data_needed_for_closing_trade(
 
 def is_futures_strategy(strategy_pyd_model: StrategyPydModel):
     return strategy_pyd_model.instrument_type == InstrumentTypeEnum.FUTIDX
+
+
+def is_short_sell_strategy(strategy_pyd_model: StrategyPydModel):
+    return strategy_pyd_model.position == PositionEnum.SHORT
