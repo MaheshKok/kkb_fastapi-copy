@@ -19,7 +19,7 @@ from app.api.trade.indian_fno.alice_blue.tasks import task_exit_trade
 from app.api.trade.indian_fno.angel_one.db_operations import get_order_pyd_model
 from app.api.trade.indian_fno.angel_one.dependency import get_strategy_angelone_client
 from app.api.trade.indian_fno.angel_one.dependency import get_strategy_pyd_model_from_order
-from app.api.trade.indian_fno.angel_one.tasks import task_open_angel_one_trade_position
+from app.api.trade.indian_fno.angel_one.tasks import task_open_angelone_trade_position
 from app.api.trade.indian_fno.angel_one.trading_operations import get_expiry_date_to_trade
 from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.indian_fno.utils import get_opposite_trade_option_type
@@ -231,7 +231,7 @@ async def post_nfo_angel_one_trading(
         msg += " closed existing trades and"
 
     # initiate buy_trade
-    await task_open_angel_one_trade_position(
+    await task_open_angelone_trade_position(
         **kwargs,
         async_angelone_client=async_angelone_client,
     )
