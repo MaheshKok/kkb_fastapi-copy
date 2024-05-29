@@ -916,3 +916,7 @@ async def compute_trade_data_needed_for_closing_trade(
             f" [ {crucial_details} ] - adding profit: [ {total_ongoing_profit} ] and future profit: [ {total_actual_profit} ]"
         )
         return updated_data, total_ongoing_profit, total_actual_profit
+
+
+def is_futures_strategy(strategy_pyd_model: StrategyPydModel):
+    return strategy_pyd_model.instrument_type == InstrumentTypeEnum.FUTIDX

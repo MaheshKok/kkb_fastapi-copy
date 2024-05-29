@@ -23,6 +23,7 @@ from app.api.trade.indian_fno.angel_one.tasks import task_create_angel_one_order
 from app.api.trade.indian_fno.angel_one.trading_operations import get_expiry_date_to_trade
 from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.indian_fno.utils import get_opposite_trade_option_type
+from app.api.trade.indian_fno.utils import is_futures_strategy
 from app.api.trade.indian_fno.utils import set_option_type
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.database.schemas import TradeDBModel
@@ -66,6 +67,12 @@ async def angel_one_webhook_order_updates(
     logging.info(
         f"[ {crucial_details} ] - Received order update for: {updated_order_pyd_model.orderid} at updatetime: {updated_order_pyd_model.updatetime}  with text: {updated_order_pyd_model.text}, status: {updated_order_pyd_model.status}, orderstatus: {updated_order_pyd_model.orderstatus}"
     )
+
+    if is_futures_strategy(strategy_pyd_model):
+        logging.info(
+            f"[ {crucial_details} ] - Introduced slippage of {updated_order_pyd_model.price - initial_order_pyd_model.future_entry_price_received} for order: {updated_order_pyd_model.orderid}"
+        )
+
     async with Database() as async_session:
         # Use the AsyncSession to perform database operations
         # Example: Create a new entry in the database

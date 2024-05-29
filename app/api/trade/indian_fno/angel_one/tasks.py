@@ -41,14 +41,6 @@ async def task_create_angel_one_order(
     ongoing_profit: int = 0,
 ):
     if only_futures:
-        option_chain = await get_option_chain(
-            async_redis_client=async_redis_client,
-            expiry=futures_expiry_date,
-            option_type=signal_pyd_model.option_type,
-            strategy_pyd_model=strategy_pyd_model,
-            is_future=True,
-        )
-
         angel_one_trading_symbol = get_angel_one_futures_trading_symbol(
             symbol=strategy_pyd_model.symbol,
             expiry_date=signal_pyd_model.expiry,
