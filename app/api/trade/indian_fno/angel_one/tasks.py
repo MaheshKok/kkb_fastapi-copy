@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import traceback
 from datetime import date
@@ -12,8 +13,11 @@ from app.api.trade.indian_fno.angel_one.trading_operations import create_angel_o
 from app.api.trade.indian_fno.utils import close_trades_in_db_and_remove_from_redis
 from app.api.trade.indian_fno.utils import compute_trade_data_needed_for_closing_trade
 from app.api.trade.indian_fno.utils import get_angel_one_futures_trading_symbol
+from app.api.trade.indian_fno.utils import get_angel_one_options_trading_symbol
+from app.api.trade.indian_fno.utils import get_future_price_from_redis
 from app.api.trade.indian_fno.utils import get_lots_to_open
 from app.api.trade.indian_fno.utils import get_margin_required
+from app.api.trade.indian_fno.utils import get_strike_and_entry_price_from_option_chain
 from app.api.trade.indian_fno.utils import set_quantity
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.pydantic_models.strategy import StrategyPydModel
@@ -80,38 +84,68 @@ async def task_create_angel_one_order(
             is_fut=only_futures,
             signal_pyd_model=signal_pyd_model,
             crucial_details=crucial_details,
-            option_chain=option_chain,
+        )
+    else:
+        option_chain = await get_option_chain(
+            async_redis_client=async_redis_client,
+            expiry=options_expiry_date,
+            option_type=signal_pyd_model.option_type,
+            strategy_pyd_model=strategy_pyd_model,
+            is_future=False,
         )
 
-    # else:
-    #     if strategy_pyd_model.broker_id:
-    #         entry_price = await buy_alice_blue_trades(
-    #             strike=None,
-    #             signal_pyd_model=signal_pyd_model,
-    #             async_redis_client=async_redis_client,
-    #             strategy_pyd_model=strategy_pyd_model,
-    #             async_httpx_client=async_httpx_client,
-    #         )
-    #         logging.info(
-    #             f"[ {crucial_details} ] - entry price: [ {entry_price} ] from alice blue"
-    #         )
-    #     else:
-    #         entry_price = await get_future_price_from_redis(
-    #             async_redis_client=async_redis_client,
-    #             strategy_pyd_model=strategy_pyd_model,
-    #             expiry_date=futures_expiry_date,
-    #         )
-    #         logging.info(
-    #             f"[ {crucial_details} ] - entry price: [ {entry_price} ] from redis option chain"
-    #         )
-    #
-    #     angel_one_trading_symbol = get_angel_one_futures_trading_symbol(
-    #         symbol=strategy_pyd_model.symbol,
-    #         expiry_date=signal_pyd_model.expiry,
-    #     )
-    #     logging.info(
-    #         f"[ {crucial_details} ] - Slippage: [ {entry_price - signal_pyd_model.future_entry_price_received} points ] introduced for future_entry_price: [ {signal_pyd_model.future_entry_price_received} ] "
-    #     )
+        future_entry_price, strike_and_entry_price = await asyncio.gather(
+            get_future_price_from_redis(
+                async_redis_client=async_redis_client,
+                strategy_pyd_model=strategy_pyd_model,
+                expiry_date=futures_expiry_date,
+            ),
+            get_strike_and_entry_price_from_option_chain(
+                option_chain=option_chain,
+                signal_pyd_model=signal_pyd_model,
+                premium=strategy_pyd_model.premium,
+            ),
+        )
+
+        strike, entry_price = strike_and_entry_price
+
+        angel_one_trading_symbol = get_angel_one_options_trading_symbol(
+            symbol=strategy_pyd_model.symbol,
+            expiry_date=signal_pyd_model.expiry,
+            option_type=signal_pyd_model.option_type,
+            strike=strike,
+        )
+
+        margin_for_min_quantity = await get_margin_required(
+            client=async_angelone_client,
+            price=entry_price,
+            signal_type=signal_pyd_model.action,
+            strategy_pyd_model=strategy_pyd_model,
+            async_redis_client=async_redis_client,
+            angel_one_trading_symbol=angel_one_trading_symbol,
+            crucial_details=crucial_details,
+        )
+        lots_to_open = get_lots_to_open(
+            strategy_pyd_model=strategy_pyd_model,
+            crucial_details=crucial_details,
+            ongoing_profit_or_loss=ongoing_profit,
+            margin_for_min_quantity=margin_for_min_quantity,
+        )
+        set_quantity(
+            strategy_pyd_model=strategy_pyd_model,
+            signal_pyd_model=signal_pyd_model,
+            lots_to_open=lots_to_open,
+        )
+
+        order_response_pyd_model = await create_angel_one_buy_order(
+            async_angelone_client=async_angelone_client,
+            async_redis_client=async_redis_client,
+            strategy_pyd_model=strategy_pyd_model,
+            is_fut=False,
+            signal_pyd_model=signal_pyd_model,
+            crucial_details=crucial_details,
+            strike=strike,
+        )
 
     await dump_angel_one_buy_order_in_db(
         order_data_pyd_model=order_response_pyd_model.data,

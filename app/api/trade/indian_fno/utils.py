@@ -550,9 +550,9 @@ async def get_margin_required(
 
 
 def get_angel_one_options_trading_symbol(
-    *, symbol: str, expiry_date: date, strike: int, option_type: OptionTypeEnum
+    *, symbol: str, expiry_date: date, strike: int | float, option_type: OptionTypeEnum
 ) -> str:
-    return f"{symbol}{(expiry_date.strftime(ANGELONE_EXPIRY_DATE_FORMAT)).upper()}{strike}{option_type}"
+    return f"{symbol}{(expiry_date.strftime(ANGELONE_EXPIRY_DATE_FORMAT)).upper()}{int(strike)}{option_type}"
 
 
 def get_angel_one_futures_trading_symbol(symbol: str, expiry_date: date) -> str:

@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from app.api.trade.indian_fno.utils import get_angel_one_futures_trading_symbol
 from app.api.trade.indian_fno.utils import get_angel_one_options_trading_symbol
 from app.pydantic_models.angel_one import InstrumentPydModel
-from app.utils.constants import OptionType
+from app.pydantic_models.enums import OptionTypeEnum
 
 
 def generate_angel_one_complete_symbol(
@@ -16,20 +16,25 @@ def generate_angel_one_complete_symbol(
     symbol: str,
     expiry_date: date,
     strike: int = None,
-    option_type: OptionType = None,
+    option_type: OptionTypeEnum = None,
     is_fut: bool = False,
 ):
-    if is_fut:
+    if is_fut and not option_type:
         return get_angel_one_futures_trading_symbol(
             symbol=symbol,
             expiry_date=expiry_date,
         )
-    return get_angel_one_options_trading_symbol(
-        symbol=symbol,
-        expiry_date=expiry_date,
-        strike=strike,
-        option_type=option_type.value,
-    )
+
+    if option_type and not is_fut:
+        return get_angel_one_options_trading_symbol(
+            symbol=symbol,
+            expiry_date=expiry_date,
+            strike=strike,
+            option_type=option_type.value,
+        )
+
+    if option_type and is_fut:
+        raise Exception("Cannot have both is_fut and option_type")
 
 
 async def get_angel_one_instrument_details(
@@ -39,7 +44,7 @@ async def get_angel_one_instrument_details(
     symbol: str,
     expiry_date: date,
     strike: int = None,
-    option_type: OptionType = None,
+    option_type: OptionTypeEnum = None,
     is_fut=False,
 ) -> InstrumentPydModel:
     """

@@ -8,7 +8,6 @@ from fastapi import HTTPException
 from starlette import status
 
 from app.api.trade.indian_fno.angel_one.redis_operations import get_angel_one_instrument_details
-from app.api.trade.indian_fno.utils import get_strike_and_entry_price_from_option_chain
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.pydantic_models.angel_one import DurationEnum
 from app.pydantic_models.angel_one import ExchangeEnum
@@ -19,10 +18,10 @@ from app.pydantic_models.angel_one import ProductTypeEnum
 from app.pydantic_models.angel_one import TransactionTypeEnum
 from app.pydantic_models.angel_one import VarietyEnum
 from app.pydantic_models.enums import InstrumentTypeEnum
+from app.pydantic_models.enums import OptionTypeEnum
 from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.strategy import StrategyPydModel
 from app.pydantic_models.trade import SignalPydModel
-from app.utils.constants import OptionType
 
 
 async def get_angel_one_trade_params(
@@ -32,7 +31,7 @@ async def get_angel_one_trade_params(
     expiry_date: date,
     is_fut: bool,
     strike: int = None,
-    option_type: OptionType,
+    option_type: OptionTypeEnum,
     transaction_type: TransactionTypeEnum,
     crucial_details: str,
 ):
@@ -174,7 +173,7 @@ async def create_angel_one_buy_order(
     is_fut: bool,
     signal_pyd_model: SignalPydModel,
     crucial_details: str,
-    option_chain: dict,
+    strike=None,
 ) -> OrderResponsePydModel:
     """
     Place Order Response:
@@ -189,14 +188,8 @@ async def create_angel_one_buy_order(
                         }
             }
     """
-    strike = None
-    if not is_fut:
-        strike, premium = await get_strike_and_entry_price_from_option_chain(
-            option_chain=option_chain,
-            signal_pyd_model=signal_pyd_model,
-            premium=strategy_pyd_model.premium,
-        )
 
+    # TODO: for short sell what should be the place_order_params
     place_order_params = await get_angel_one_trade_params(
         async_redis_client=async_redis_client,
         strategy_pyd_model=strategy_pyd_model,

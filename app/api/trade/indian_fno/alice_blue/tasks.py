@@ -79,7 +79,7 @@ async def task_entry_trade(
         angel_one_trading_symbol = get_angel_one_options_trading_symbol(
             symbol=strategy_pyd_model.symbol,
             expiry_date=signal_pyd_model.expiry,
-            strike=int(strike),
+            strike=strike,
             option_type=signal_pyd_model.option_type,
         )
     else:

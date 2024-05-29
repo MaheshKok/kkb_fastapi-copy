@@ -1,6 +1,3 @@
-import logging
-
-import pyotp
 from aioredis import Redis
 from fastapi import Depends
 from fastapi import FastAPI
@@ -173,53 +170,4 @@ async def get_default_angelone_client(
     #         str(broker_pyd_model.id), BrokerSchema.model_validate(broker_pyd_model).model_dump_json()
     #     )
 
-    return async_angelone_client
-
-
-async def get_strategy_angelone_client(
-    async_redis_client: Redis = Depends(get_async_redis_client),
-    strategy_pyd_model: StrategyPydModel = Depends(get_strategy_pyd_model),
-) -> AsyncAngelOneClient:
-    broker_id = str(strategy_pyd_model.broker_id)
-    broker_json = await async_redis_client.get(broker_id)
-    if broker_json:
-        broker_pyd_model: BrokerPydModel = BrokerPydModel.parse_raw(broker_json)
-    else:
-        async with Database() as async_session:
-            fetch_broker_query = await async_session.execute(
-                select(BrokerDBModel).filter_by(id=str(broker_id))
-            )
-            broker_db_model = fetch_broker_query.scalars().one()
-            broker_pyd_model: BrokerPydModel = BrokerPydModel.model_validate(broker_db_model)
-            if not (
-                broker_pyd_model.access_token
-                and broker_pyd_model.refresh_token
-                and broker_pyd_model.feed_token
-            ):
-                client = AsyncAngelOneClient(broker_pyd_model.api_key)
-                await client.generate_session(
-                    client_code=broker_pyd_model.username,
-                    password=broker_pyd_model.password,
-                    totp=pyotp.TOTP(broker_pyd_model.totp).now(),
-                )
-                broker_db_model.access_token = client.access_token
-
-            await async_session.commit()
-            broker_pyd_model.access_token = client.access_token
-            broker_pyd_model.refresh_token = client.refresh_token
-            broker_pyd_model.feed_token = client.feed_token
-            # update redis cache with new session_id
-            await async_redis_client.set(
-                str(broker_pyd_model.id), broker_pyd_model.model_dump_json()
-            )
-            logging.info(
-                f"successfully updated session token for: [ {broker_db_model.name} ] user: [ {broker_db_model.username} ] in db and redis"
-            )
-
-    async_angelone_client = AsyncAngelOneClient(
-        broker_pyd_model.api_key,
-        access_token=broker_pyd_model.access_token,
-        refresh_token=broker_pyd_model.refresh_token,
-        feed_token=broker_pyd_model.feed_token,
-    )
     return async_angelone_client

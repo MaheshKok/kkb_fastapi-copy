@@ -58,13 +58,13 @@ async def push_angel_one_instruments(redis_client, symbols=None):
     df = pd.DataFrame(data_stream)
 
     # Construct the dictionary
-    full_name_row_dict = {}
+    full_symbol_to_row_mapping = {}
     if not symbols:
         for _, row in df.iterrows():
             row_dict = row.to_dict()
             trading_symbol = row_dict[SYMBOL_STR]
             value = json.dumps(row_dict)
-            full_name_row_dict[trading_symbol] = value
+            full_symbol_to_row_mapping[trading_symbol] = value
     else:
         for _, row in df.iterrows():
             row_dict = row.to_dict()
@@ -72,7 +72,7 @@ async def push_angel_one_instruments(redis_client, symbols=None):
             trading_symbol = row_dict[SYMBOL_STR]
             if symbol in symbols:
                 value = json.dumps(row_dict)
-                full_name_row_dict[trading_symbol] = value
+                full_symbol_to_row_mapping[trading_symbol] = value
 
     print("Setting keys in Redis")
     start_time = datetime.now()
@@ -85,13 +85,13 @@ async def push_angel_one_instruments(redis_client, symbols=None):
 
     # # Use a pipeline to set each chunk of key-value pairs in Redis
     async with redis_client.pipeline() as pipe:
-        for chunk in chunked_dict(full_name_row_dict, chunk_size=1000):
+        for chunk in chunked_dict(full_symbol_to_row_mapping, chunk_size=1000):
             pipe.mset(chunk)
             # execute the pipeline after each chunk, otherwise it will throw broken pipe error due to large data
             await pipe.execute()
 
     print(
-        f"Time taken to set Angel One {len(full_name_row_dict)} keys: {datetime.now() - start_time}"
+        f"Time taken to set Angel One {len(full_symbol_to_row_mapping)} keys: {datetime.now() - start_time}"
     )
 
 

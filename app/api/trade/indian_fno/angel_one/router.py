@@ -13,11 +13,11 @@ from pydantic import TypeAdapter
 
 from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
-from app.api.dependency import get_strategy_angelone_client
 from app.api.dependency import get_strategy_pyd_model
 from app.api.trade import trading_router
 from app.api.trade.indian_fno.alice_blue.tasks import task_exit_trade
 from app.api.trade.indian_fno.angel_one.db_operations import get_order_pyd_model
+from app.api.trade.indian_fno.angel_one.dependency import get_strategy_angelone_client
 from app.api.trade.indian_fno.angel_one.dependency import get_strategy_pyd_model_from_order
 from app.api.trade.indian_fno.angel_one.tasks import task_create_angel_one_order
 from app.api.trade.indian_fno.angel_one.trading_operations import get_expiry_date_to_trade
