@@ -7,17 +7,19 @@ import aioredis
 from aioredis import Redis
 from httpx import AsyncClient
 
-from app.api.trade.indian_fno.angel_one.db_operations import dump_angel_one_buy_order_in_db
-from app.api.trade.indian_fno.angel_one.trading_operations import create_angel_one_buy_order
-from app.api.trade.indian_fno.utils import close_trades_in_db_and_remove_from_redis
-from app.api.trade.indian_fno.utils import compute_trade_data_needed_for_closing_trade
+from app.api.trade.indian_fno.angel_one.db_operations import dump_angel_one_order_in_db
+from app.api.trade.indian_fno.angel_one.trading_operations import create_angel_one_order
 from app.api.trade.indian_fno.utils import get_angel_one_futures_trading_symbol
 from app.api.trade.indian_fno.utils import get_angel_one_options_trading_symbol
 from app.api.trade.indian_fno.utils import get_lots_to_open
 from app.api.trade.indian_fno.utils import get_margin_required
 from app.api.trade.indian_fno.utils import get_strike_and_entry_price_from_option_chain
+from app.api.trade.indian_fno.utils import is_buy_signal
+from app.api.trade.indian_fno.utils import is_futures_strategy
+from app.api.trade.indian_fno.utils import is_short_sell_strategy
 from app.api.trade.indian_fno.utils import set_quantity
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
+from app.pydantic_models.angel_one import TransactionTypeEnum
 from app.pydantic_models.strategy import StrategyPydModel
 from app.pydantic_models.trade import RedisTradePydModel
 from app.pydantic_models.trade import SignalPydModel
@@ -64,19 +66,28 @@ async def handle_futures_trade(
         lots_to_open=lots_to_open,
     )
 
-    order_response_pyd_model = await create_angel_one_buy_order(
+    if is_short_sell_strategy(strategy_pyd_model):
+        transaction_type = TransactionTypeEnum.SELL
+    else:
+        transaction_type = TransactionTypeEnum.BUY
+
+    order_response_pyd_model = await create_angel_one_order(
         async_angelone_client=async_angelone_client,
         async_redis_client=async_redis_client,
         strategy_pyd_model=strategy_pyd_model,
         is_fut=True,
-        signal_pyd_model=signal_pyd_model,
+        expiry_date=signal_pyd_model.expiry,
         crucial_details=crucial_details,
+        transaction_type=transaction_type,
+        quantity=lots_to_open,
     )
-    await dump_angel_one_buy_order_in_db(
+
+    await dump_angel_one_order_in_db(
         order_data_pyd_model=order_response_pyd_model.data,
         strategy_pyd_model=strategy_pyd_model,
         signal_pyd_model=signal_pyd_model,
         crucial_details=crucial_details,
+        entry_exit="ENTRY",
     )
     return "successfully added trade to db"
 
@@ -140,20 +151,29 @@ async def handle_options_trade(
         lots_to_open=lots_to_open,
     )
 
-    order_response_pyd_model = await create_angel_one_buy_order(
+    if is_short_sell_strategy(strategy_pyd_model):
+        transaction_type = TransactionTypeEnum.SELL
+    else:
+        transaction_type = TransactionTypeEnum.BUY
+
+    order_response_pyd_model = await create_angel_one_order(
         async_angelone_client=async_angelone_client,
         async_redis_client=async_redis_client,
         strategy_pyd_model=strategy_pyd_model,
         is_fut=False,
-        signal_pyd_model=signal_pyd_model,
+        expiry_date=signal_pyd_model.expiry,
+        option_type=signal_pyd_model.option_type,
         crucial_details=crucial_details,
         strike=strike,
+        transaction_type=transaction_type,
+        quantity=lots_to_open,
     )
-    await dump_angel_one_buy_order_in_db(
+    await dump_angel_one_order_in_db(
         order_data_pyd_model=order_response_pyd_model.data,
         strategy_pyd_model=strategy_pyd_model,
         signal_pyd_model=signal_pyd_model,
         crucial_details=crucial_details,
+        entry_exit="ENTRY",
     )
     return "successfully added trade to db"
 
@@ -193,57 +213,108 @@ async def task_open_angelone_trade_position(
         )
 
 
-async def task_angel_one_exit_trade(
+async def task_exit_angelone_trade_position(
     *,
     signal_pyd_model: SignalPydModel,
     strategy_pyd_model: StrategyPydModel,
     async_redis_client: Redis,
-    async_httpx_client: AsyncClient,
-    only_futures: bool,
-    redis_hash: str,
     redis_trade_pyd_model_list: List[RedisTradePydModel],
+    async_angelone_client: AsyncAngelOneClient,
     crucial_details: str,
-    futures_expiry_date: date,
-    options_expiry_date: date = None,
 ):
-    trades_key = f"{signal_pyd_model.strategy_id}"
-
     # TODO: in future decide based on strategy new column, strategy_type:
     # if strategy_position is "every" then close all ongoing trades and buy new trade
     # 2. strategy_position is "signal", then on action: EXIT, close same option type trades
     # and buy new trade on BUY action,
     # To be decided in future, the name of actions
 
+    expiry_date = redis_trade_pyd_model_list[0].expiry
+
     try:
-        (
-            updated_data,
-            total_ongoing_profit,
-            total_future_profit,
-        ) = await compute_trade_data_needed_for_closing_trade(
-            signal_pyd_model=signal_pyd_model,
-            redis_trade_pyd_model_list=redis_trade_pyd_model_list,
-            async_redis_client=async_redis_client,
-            strategy_pyd_model=strategy_pyd_model,
-            async_httpx_client=async_httpx_client,
-            only_futures=only_futures,
-            futures_expiry_date=futures_expiry_date,
-            options_expiry_date=options_expiry_date,
-            crucial_details=crucial_details,
-        )
+        if is_futures_strategy(strategy_pyd_model):
+            transaction_type = signal_pyd_model.action.upper()
+            lots_to_open = sum(
+                redis_trade_pyd_model.quantity
+                for redis_trade_pyd_model in redis_trade_pyd_model_list
+            )
+            order_response_pyd_model = await create_angel_one_order(
+                async_angelone_client=async_angelone_client,
+                async_redis_client=async_redis_client,
+                strategy_pyd_model=strategy_pyd_model,
+                is_fut=True,
+                expiry_date=expiry_date,
+                crucial_details=crucial_details,
+                transaction_type=transaction_type,
+                quantity=lots_to_open,
+            )
 
-        # update database with the updated data
-        await close_trades_in_db_and_remove_from_redis(
-            updated_data=updated_data,
-            strategy_pyd_model=strategy_pyd_model,
-            total_profit=total_ongoing_profit,
-            total_future_profit=total_future_profit,
-            total_redis_trades=len(redis_trade_pyd_model_list),
-            async_redis_client=async_redis_client,
-            redis_strategy_key_hash=f"{trades_key} {redis_hash}",
-            crucial_details=crucial_details,
-        )
-        return total_ongoing_profit
+            await dump_angel_one_order_in_db(
+                order_data_pyd_model=order_response_pyd_model.data,
+                strategy_pyd_model=strategy_pyd_model,
+                signal_pyd_model=signal_pyd_model,
+                crucial_details=crucial_details,
+                entry_exit="EXIT",
+            )
+        else:
+            """
+            current signal is of type BUY
+                for short sell strategy,
+                    earlier signal was of type SELL
+                    so we would have sold CE
+                    so now to exit the existing position
+                    we would have to buy CE
+                for long strategy,
+                    earlier signal was of type SELL
+                    so we would have bought PE
+                    so now to exit the existing position
+                    we would have to sell PE
+            """
+            if is_short_sell_strategy(strategy_pyd_model):
+                transaction_type = signal_pyd_model.action.upper()
+            else:
+                if is_buy_signal(signal_pyd_model):
+                    transaction_type = TransactionTypeEnum.SELL
+                else:
+                    transaction_type = TransactionTypeEnum.BUY
 
+            strike_option_type_mappings = {}
+            for trade in redis_trade_pyd_model_list:
+                key = f"{trade.strike}_{trade.option_type}"
+                if key in strike_option_type_mappings:
+                    strike_option_type_mappings[key] = (
+                        strike_option_type_mappings[key] + trade.quantity
+                    )
+                else:
+                    strike_option_type_mappings[
+                        f"{trade.strike}_{trade.option_type}"
+                    ] = trade.quantity
+
+            # TODO: how to figure out how many trades are closed and at what price,
+            # we get tradingsymbol in webhook updated order which is enough
+            for strike_option_type, quantity in strike_option_type_mappings.items():
+                strike, option_type = strike_option_type.split("_")
+                order_response_pyd_model = await create_angel_one_order(
+                    async_angelone_client=async_angelone_client,
+                    async_redis_client=async_redis_client,
+                    strategy_pyd_model=strategy_pyd_model,
+                    is_fut=False,
+                    expiry_date=expiry_date,
+                    crucial_details=crucial_details,
+                    transaction_type=transaction_type,
+                    quantity=quantity,
+                    strike=strike,
+                    option_type=option_type,
+                )
+
+                await dump_angel_one_order_in_db(
+                    order_data_pyd_model=order_response_pyd_model.data,
+                    strategy_pyd_model=strategy_pyd_model,
+                    signal_pyd_model=signal_pyd_model,
+                    crucial_details=crucial_details,
+                    entry_exit="EXIT",
+                )
     except Exception as e:
-        logging.error(f"[ {crucial_details} ] - Exception while exiting trade: {e}")
+        logging.error(
+            f"[ {crucial_details} ] - Exception while placing angel one exit trade: {e}"
+        )
         traceback.print_exc()

@@ -21,7 +21,6 @@ from app.pydantic_models.angel_one import VarietyEnum
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import OptionTypeEnum
 from app.pydantic_models.strategy import StrategyPydModel
-from app.pydantic_models.trade import SignalPydModel
 
 
 async def get_angel_one_trade_params(
@@ -33,6 +32,7 @@ async def get_angel_one_trade_params(
     strike: int = None,
     option_type: OptionTypeEnum,
     transaction_type: TransactionTypeEnum,
+    quantity: int,
     crucial_details: str,
 ):
     """
@@ -149,7 +149,7 @@ async def get_angel_one_trade_params(
         {
             "tradingsymbol": angel_one_instrument_pyd_model.symbol,
             "symboltoken": angel_one_instrument_pyd_model.token,
-            "quantity": strategy_pyd_model.min_quantity,
+            "quantity": quantity,
         }
     )
     return place_order_params
@@ -165,15 +165,18 @@ async def place_angel_one_buy_order(
         return response.json()
 
 
-async def create_angel_one_buy_order(
+async def create_angel_one_order(
     *,
     async_angelone_client: AsyncAngelOneClient,
     async_redis_client: aioredis.Redis,
     strategy_pyd_model: StrategyPydModel,
     is_fut: bool,
-    signal_pyd_model: SignalPydModel,
     crucial_details: str,
+    transaction_type: TransactionTypeEnum,
+    expiry_date: date,
+    quantity: int,
     strike=None,
+    option_type: OptionTypeEnum = None,
 ) -> OrderResponsePydModel:
     """
     Place Order Response:
@@ -189,20 +192,16 @@ async def create_angel_one_buy_order(
             }
     """
 
-    if is_short_sell_strategy(strategy_pyd_model):
-        transaction_type = TransactionTypeEnum.SELL
-    else:
-        transaction_type = TransactionTypeEnum.BUY
-
     place_order_params = await get_angel_one_trade_params(
         async_redis_client=async_redis_client,
         strategy_pyd_model=strategy_pyd_model,
-        expiry_date=signal_pyd_model.expiry,
+        expiry_date=expiry_date,
         strike=strike,
-        option_type=signal_pyd_model.option_type,
+        option_type=option_type,
         is_fut=is_fut,
         transaction_type=transaction_type,
         crucial_details=crucial_details,
+        quantity=quantity,
     )
 
     try:

@@ -79,6 +79,7 @@ class InitialOrderPydModel(BaseModel):
     expiry: datetime.date
     action: SignalTypeEnum
     strategy_id: uuid.UUID
+    entry_exit: str
 
 
 class InstrumentPydModel(BaseModel):

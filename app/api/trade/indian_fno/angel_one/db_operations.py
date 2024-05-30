@@ -11,12 +11,13 @@ from app.pydantic_models.strategy import StrategyPydModel
 from app.pydantic_models.trade import SignalPydModel
 
 
-async def dump_angel_one_buy_order_in_db(
+async def dump_angel_one_order_in_db(
     *,
     order_data_pyd_model: OrderDataPydModel,
     strategy_pyd_model: StrategyPydModel,
     signal_pyd_model: SignalPydModel,
     crucial_details: str,
+    entry_exit: str,
 ):
     async with Database() as async_session:
         create_order_pyd_model = InitialOrderPydModel(
@@ -24,6 +25,7 @@ async def dump_angel_one_buy_order_in_db(
             unique_order_id=order_data_pyd_model.uniqueorderid,
             instrument=order_data_pyd_model.script,
             entry_received_at=signal_pyd_model.received_at,
+            entry_exit=entry_exit,
             **strategy_pyd_model.model_dump(),
             **signal_pyd_model.model_dump(),
         )

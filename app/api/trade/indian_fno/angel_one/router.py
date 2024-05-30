@@ -15,10 +15,10 @@ from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_strategy_pyd_model
 from app.api.trade import trading_router
-from app.api.trade.indian_fno.alice_blue.tasks import task_exit_trade
 from app.api.trade.indian_fno.angel_one.db_operations import get_order_pyd_model
 from app.api.trade.indian_fno.angel_one.dependency import get_strategy_angelone_client
 from app.api.trade.indian_fno.angel_one.dependency import get_strategy_pyd_model_from_order
+from app.api.trade.indian_fno.angel_one.tasks import task_exit_angelone_trade_position
 from app.api.trade.indian_fno.angel_one.tasks import task_open_angelone_trade_position
 from app.api.trade.indian_fno.angel_one.trading_operations import get_expiry_date_to_trade
 from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
@@ -222,9 +222,8 @@ async def post_nfo_angel_one_trading(
         redis_trade_pyd_model_list = TypeAdapter(List[RedisTradePydModel]).validate_python(
             [json.loads(trade) for trade in exiting_trades_json_list]
         )
-        ongoing_profit = await task_exit_trade(
+        ongoing_profit = await task_exit_angelone_trade_position(
             **kwargs,
-            redis_hash=redis_hash,
             redis_trade_pyd_model_list=redis_trade_pyd_model_list,
         )
         kwargs["ongoing_profit"] = ongoing_profit

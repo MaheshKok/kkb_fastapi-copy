@@ -30,7 +30,8 @@ class OrderDBModel(Base):
     option_type = Column(String, nullable=True, index=True)
     expiry = Column(Date, index=True, nullable=False)
     action = Column(String, nullable=False, index=True)
-
+    entry_exit = Column(String, nullable=False, index=True)
+    # TODO: add a column to identify the order was to create a position or close a position i.e entry or exit
     strategy_id = Column(
         UUID(as_uuid=True),
         ForeignKey("strategy.id", ondelete="CASCADE"),

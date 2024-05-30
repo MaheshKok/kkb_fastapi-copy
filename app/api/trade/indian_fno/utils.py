@@ -924,3 +924,7 @@ def is_futures_strategy(strategy_pyd_model: StrategyPydModel):
 
 def is_short_sell_strategy(strategy_pyd_model: StrategyPydModel):
     return strategy_pyd_model.position == PositionEnum.SHORT
+
+
+def is_buy_signal(signal_pyd_model: SignalPydModel):
+    return signal_pyd_model.action == SignalTypeEnum.BUY

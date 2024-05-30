@@ -26,6 +26,7 @@ def upgrade() -> None:
         sa.Column("unique_order_id", sa.UUID(), nullable=False),
         sa.Column("instrument", sa.String(), nullable=False),
         sa.Column("quantity", sa.Integer(), nullable=False),
+        sa.Column("entry_exit", sa.String(), nullable=False),
         sa.Column("future_entry_price_received", sa.Float(), nullable=False),
         sa.Column("entry_received_at", postgresql.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("entry_at", postgresql.TIMESTAMP(timezone=True), nullable=False),
@@ -42,6 +43,7 @@ def upgrade() -> None:
     op.create_index(op.f("ix_order_instrument"), "order", ["instrument"], unique=False)
     op.create_index(op.f("ix_order_option_type"), "order", ["option_type"], unique=False)
     op.create_index(op.f("ix_order_strategy_id"), "order", ["strategy_id"], unique=False)
+    op.create_index(op.f("ix_order_entry_exit"), "order", ["entry_exit"], unique=False)
     # ### end Alembic commands ###
 
 
