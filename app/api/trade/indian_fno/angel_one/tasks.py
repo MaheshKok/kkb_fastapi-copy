@@ -257,17 +257,17 @@ async def task_exit_angelone_trade_position(
             )
         else:
             """
-            current signal is of type BUY
-                for short sell strategy,
-                    earlier signal was of type SELL
-                    so we would have sold CE
-                    so now to exit the existing position
-                    we would have to buy CE
-                for long strategy,
-                    earlier signal was of type SELL
-                    so we would have bought PE
-                    so now to exit the existing position
-                    we would have to sell PE
+            if current_signal is BUY:
+                if strategy is SHORT_SELL:
+                    if earlier_signal was SELL:
+                        # We had previously sold a Call Option (CE)
+                        # To exit this position, we need to buy back the Call Option (CE)
+                        exit_position = buy CE
+                elif strategy is LONG:
+                    if earlier_signal was SELL:
+                        # We had previously bought a Put Option (PE)
+                        # To exit this position, we need to sell the Put Option (PE)
+                        exit_position = sell PE
             """
             if is_short_sell_strategy(strategy_pyd_model):
                 transaction_type = signal_pyd_model.action.upper()
