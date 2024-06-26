@@ -3,7 +3,7 @@ from decimal import getcontext
 
 import pytest
 
-from app.api.trade.Capital.utils import get_lots_to_trade_and_profit_or_loss
+from app.api.trade.capital.utils import get_lots_to_trade_and_profit_or_loss
 from app.pydantic_models.strategy import CFDStrategyPydanticModel
 
 
