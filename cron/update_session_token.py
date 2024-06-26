@@ -76,23 +76,30 @@ async def task_update_angelone_session_token(
     for broker_db_model in broker_db_models:
         broker_pyd_model = BrokerPydModel.model_validate(broker_db_model)
         client = AsyncAngelOneClient(broker_pyd_model.api_key)
-        await client.generate_session(
-            client_code=broker_pyd_model.username,
-            password=broker_pyd_model.password,
-            totp=pyotp.TOTP(broker_pyd_model.totp).now(),
-        )
-        broker_db_model.access_token = client.access_token
-        await async_session.commit()
+        try:
+            await client.generate_session(
+                client_code=broker_pyd_model.username,
+                password=broker_pyd_model.password,
+                totp=pyotp.TOTP(broker_pyd_model.totp).now(),
+            )
+            broker_db_model.access_token = client.access_token
+            await async_session.commit()
 
-        broker_pyd_model.access_token = client.access_token
-        broker_pyd_model.refresh_token = client.refresh_token
-        broker_pyd_model.feed_token = client.feed_token
+            broker_pyd_model.access_token = client.access_token
+            broker_pyd_model.refresh_token = client.refresh_token
+            broker_pyd_model.feed_token = client.feed_token
 
-        # update redis cache with new session_id
-        await async_redis_client.set(str(broker_db_model.id), broker_pyd_model.model_dump_json())
-        logging.info(
-            f"successfully updated session token for: [ {broker_db_model.name} ] user: [ {broker_db_model.username} ] in db and redis"
-        )
+            # update redis cache with new session_id
+            await async_redis_client.set(
+                str(broker_db_model.id), broker_pyd_model.model_dump_json()
+            )
+            logging.info(
+                f"successfully updated session token for: [ {broker_db_model.name} ] user: [ {broker_db_model.username} ] in db and redis"
+            )
+        except Exception as e:
+            logging.error(
+                f"Error while updating session token for: [ {broker_db_model.name} ] user: [ {broker_db_model.username} ] api_key: [ {broker_db_model.api_key} ], {e}"
+            )
 
 
 async def cron_update_session_token():
