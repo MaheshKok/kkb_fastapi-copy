@@ -4,6 +4,7 @@ from datetime import datetime
 
 import aiocron
 import httpx
+from cron.clean_redis import clean_redis
 from cron.download_master_contracts import download_master_contract
 from cron.rollover_to_next_expiry import rollover_to_next_expiry
 from cron.update_daily_profit import update_daily_profit
@@ -163,6 +164,7 @@ aiocron.crontab("0 2 * * *", func=task_backup_db)  # Every day at 02:00
 aiocron.crontab("0 1 * * 1", func=task_clean_redis)  # Every Friday at 03:00
 aiocron.crontab("45 2 * * *", func=download_master_contract)  # Every day at 02:45
 aiocron.crontab("0 3 * * *", func=task_update_expiry_list)  # Every day at 03:00
+aiocron.crontab("15 3 * * *", func=clean_redis)  # Every day at 03:15
 aiocron.crontab("10 3 * * *", func=task_update_session_token)  # Every day at 03:10
 aiocron.crontab("30 3 * * *", func=task_update_session_token)  # Every day at 03:30
 # aiocron.crontab("30 3 * * *", func=task_scale_up_dynos)  # Every day at 03:30

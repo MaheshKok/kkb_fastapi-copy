@@ -31,7 +31,7 @@ async def push_alice_blue_instruments(redis_client):
         value = json.dumps(row_dict)
         full_name_row_dict[key] = value
 
-    print("Setting keys in Redis")
+    print(f"Setting alice blue [ {full_name_row_dict} ] keys in Redis")
     start_time = datetime.now()
 
     # Split the dictionary into smaller chunks
@@ -74,7 +74,7 @@ async def push_angel_one_instruments(redis_client, symbols=None):
                 value = json.dumps(row_dict)
                 full_symbol_to_row_mapping[trading_symbol] = value
 
-    print("Setting keys in Redis")
+    print(f"Setting angel one  [ {full_symbol_to_row_mapping} ]  keys in redis")
     start_time = datetime.now()
 
     # # Split the dictionary into smaller chunks

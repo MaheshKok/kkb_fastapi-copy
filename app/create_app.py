@@ -6,6 +6,7 @@ import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
+from cron.clean_redis import clean_redis
 from cron.download_master_contracts import download_master_contract
 from cron.scheduler import task_backup_db
 from cron.scheduler import task_clean_redis
@@ -78,6 +79,7 @@ def register_cron_jobs(scheduler: AsyncIOScheduler):
     scheduler.add_job(
         download_master_contract, CronTrigger.from_crontab("45 2 * * *")
     )  # Every day at 02:45
+    scheduler.add_job(clean_redis, CronTrigger.from_crontab("15 3 * * *"))  # Every day at 03:15
     scheduler.add_job(
         task_update_expiry_list, CronTrigger.from_crontab("0 3 * * *")
     )  # Every day at 03:00
