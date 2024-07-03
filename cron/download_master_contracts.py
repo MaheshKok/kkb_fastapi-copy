@@ -6,7 +6,7 @@ from itertools import islice
 
 import httpx
 import pandas as pd
-from cron.clean_redis import date_in_key
+from cron.clean_redis import contains_date
 from cron.clean_redis import is_stale_expiry
 
 from app.core.config import get_config
@@ -32,7 +32,7 @@ async def push_alice_blue_instruments(redis_client):
         row_dict = row.to_dict()
         key = row_dict[INSTRUMENT_COLUMN]
         value = json.dumps(row_dict)
-        if date_in_key(key):
+        if contains_date(key):
             expiry_date_str = row_dict.get("expiry", row_dict.get("Expiry Date"))
             if not is_stale_expiry(expiry_date_str, current_date):
                 full_name_row_dict[key] = value
@@ -73,7 +73,7 @@ async def push_angel_one_instruments(redis_client, symbols=None):
             row_dict = row.to_dict()
             trading_symbol = row_dict[SYMBOL_STR]
             value = json.dumps(row_dict)
-            if date_in_key(trading_symbol):
+            if contains_date(trading_symbol):
                 expiry_date_str = row_dict.get("expiry", row_dict.get("Expiry Date"))
                 if not is_stale_expiry(expiry_date_str, current_date):
                     full_symbol_to_row_mapping[trading_symbol] = value
@@ -86,7 +86,7 @@ async def push_angel_one_instruments(redis_client, symbols=None):
             trading_symbol = row_dict[SYMBOL_STR]
             if symbol in symbols:
                 value = json.dumps(row_dict)
-                if date_in_key(trading_symbol):
+                if contains_date(trading_symbol):
                     expiry_date_str = row_dict.get("expiry", row_dict.get("Expiry Date"))
                     if not is_stale_expiry(expiry_date_str, current_date):
                         full_symbol_to_row_mapping[trading_symbol] = value
