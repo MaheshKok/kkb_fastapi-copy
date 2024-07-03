@@ -1,4 +1,3 @@
-import asyncio
 from datetime import datetime
 from datetime import timedelta
 from unittest.mock import AsyncMock
@@ -72,8 +71,9 @@ async def test_get_stale_keys():
 async def test_delete_keys():
     redis_client = AsyncMock(Redis)
     keys_to_delete = ["key1", "key2"]
-    redis_client.delete.return_value = asyncio.Future()
-    redis_client.delete.return_value.set_result(None)
+    # mock delete
+    redis_client.delete = AsyncMock(return_value=None)
+
     await delete_keys(redis_client, keys_to_delete)
     redis_client.delete.assert_called_with("key1", "key2")
 
@@ -90,9 +90,12 @@ async def test_clean_redis():
     redis_client = AsyncMock(Redis)
 
     # mock keys
-    redis_client.keys.return_value = asyncio.Future()
-    redis_client.keys.return_value.set_result(
-        [f"key_{yesterdays_date}", "key_without_date", f"another_key_{tomorrows_date}"]
+    redis_client.keys = AsyncMock(
+        return_value=[
+            f"key_{yesterdays_date}",
+            "key_without_date",
+            f"another_key_{tomorrows_date}",
+        ]
     )
 
     # mock types and values
@@ -107,8 +110,7 @@ async def test_clean_redis():
     ]
 
     # mock delete
-    redis_client.delete.return_value = asyncio.Future()
-    redis_client.delete.return_value.set_result(None)
+    redis_client.delete = AsyncMock(return_value=None)
 
     await clean_redis(redis_client)
     redis_client.keys.assert_called_once()
