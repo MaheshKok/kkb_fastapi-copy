@@ -192,6 +192,10 @@ async def create_angel_one_order(
             }
     """
 
+    # angel one do not accept -ive quantity hence we convert it to positive
+    if quantity < 0:
+        quantity = abs(quantity)
+
     place_order_params = await get_angel_one_trade_params(
         async_redis_client=async_redis_client,
         strategy_pyd_model=strategy_pyd_model,

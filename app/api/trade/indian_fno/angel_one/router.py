@@ -91,158 +91,173 @@ async def angel_one_webhook_order_updates(
             f"[ {crucial_details} ] - Introduced slippage of {updated_order_pyd_model.price - initial_order_pyd_model.future_entry_price_received} for order: {updated_order_pyd_model.orderid}"
         )
 
+    trade_id = None
     async with Database() as async_session:
         # Use the AsyncSession to perform database operations
         # Example: Create a new entry in the database
         if is_order_complete(updated_order_pyd_model):
-            if is_entry_order(initial_order_pyd_model):
-                trade_pyd_model = EntryTradePydModel(
-                    entry_price=updated_order_pyd_model.averageprice,
-                    future_entry_price=initial_order_pyd_model.future_entry_price_received,
-                    # TODO: check quantity when multiple lots are bought
-                    quantity=updated_order_pyd_model.quantity,
-                    entry_at=initial_order_pyd_model.entry_at,
-                    instrument=updated_order_pyd_model.tradingsymbol,
-                    entry_received_at=initial_order_pyd_model.entry_received_at,
-                    # reason to include received_at is because it is inherited from signalpydmodel
-                    received_at=initial_order_pyd_model.entry_received_at,
-                    expiry=initial_order_pyd_model.expiry,
-                    action=initial_order_pyd_model.action,
-                    strategy_id=strategy_pyd_model.id,
-                    future_entry_price_received=initial_order_pyd_model.future_entry_price_received,
-                    strike=initial_order_pyd_model.strike,
-                    option_type=initial_order_pyd_model.option_type,
-                )
-
-                trade_db_model = TradeDBModel(
-                    **trade_pyd_model.model_dump(
-                        exclude={
-                            "premium",
-                            "broker_id",
-                            "symbol",
-                            "received_at",
-                            "future_entry_price",
-                        },
-                        exclude_none=True,
+            if not is_futures_strategy(strategy_pyd_model):
+                if is_entry_order(initial_order_pyd_model):
+                    trade_pyd_model = EntryTradePydModel(
+                        entry_price=updated_order_pyd_model.averageprice,
+                        future_entry_price=initial_order_pyd_model.future_entry_price_received,
+                        # TODO: check quantity when multiple lots are bought
+                        quantity=(
+                            updated_order_pyd_model.quantity
+                            if strategy_pyd_model.position == PositionEnum.LONG
+                            else -updated_order_pyd_model.quantity
+                        ),
+                        entry_at=initial_order_pyd_model.entry_at,
+                        instrument=updated_order_pyd_model.tradingsymbol,
+                        entry_received_at=initial_order_pyd_model.entry_received_at,
+                        # reason to include received_at is because it is inherited from signalpydmodel
+                        received_at=initial_order_pyd_model.entry_received_at,
+                        expiry=initial_order_pyd_model.expiry,
+                        action=initial_order_pyd_model.action,
+                        strategy_id=strategy_pyd_model.id,
+                        future_entry_price_received=initial_order_pyd_model.future_entry_price_received,
+                        strike=initial_order_pyd_model.strike,
+                        option_type=initial_order_pyd_model.option_type,
                     )
-                )
-                async_session.add(trade_db_model)
-                await async_session.flush([trade_db_model])
-                msg = f"[ {crucial_details} ] - new trade: [ {trade_db_model.id} ] added to DB"
-                logging.info(msg)
 
-                # TODO: enable once testing is done
-                await push_trade_to_redis(
-                    async_redis_client=async_redis_client,
-                    trade_db_model=trade_db_model,
-                    signal_type=initial_order_pyd_model.action,
-                    crucial_details=crucial_details,
-                )
-            else:
-                exit_price = updated_order_pyd_model.averageprice
-                # construct signal pyd model the way we receive it from tradingview
-                # action will be the opposite of the initial_order_pyd_model.action, replace action with position and when constructing signal action then with strategy position and
-                action = (
-                    SignalTypeEnum.BUY
-                    if initial_order_pyd_model.action == SignalTypeEnum.SELL
-                    else SignalTypeEnum.SELL
-                )
-                if is_futures_strategy(strategy_pyd_model=strategy_pyd_model):
-                    pass
-                else:
-                    if is_short_strategy(strategy_pyd_model=strategy_pyd_model):
-                        if initial_order_pyd_model.option_type == OptionTypeEnum.CE:
-                            action = SignalTypeEnum.BUY
-                        else:
-                            action = SignalTypeEnum.SELL
-                    else:
-                        if initial_order_pyd_model.option_type == OptionTypeEnum.CE:
-                            action = SignalTypeEnum.SELL
-                        else:
-                            action = SignalTypeEnum.BUY
-
-                # now received_at will the time when angelone pushes the order updates
-                signal_pyd_model = SignalPydModel(
-                    strategy_id=strategy_pyd_model.id,
-                    future_entry_price_received=initial_order_pyd_model.future_entry_price_received,
-                    received_at=datetime.datetime.utcnow(),
-                    action=action,
-                )
-
-                crucial_details = get_crucial_details(
-                    signal_pyd_model=signal_pyd_model, strategy_pyd_model=strategy_pyd_model
-                )
-                kwargs, redis_hash = await get_angel_one_pre_trade_kwargs(
-                    signal_pyd_model=signal_pyd_model,
-                    strategy_pyd_model=strategy_pyd_model,
-                    async_redis_client=async_redis_client,
-                )
-                kwargs["crucial_details"] = crucial_details
-
-                if not is_futures_strategy(strategy_pyd_model=strategy_pyd_model):
-                    strike_exit_price_dict = {initial_order_pyd_model.strike: exit_price}
-                    future_exit_price = await get_future_price(
+                    trade_db_model = TradeDBModel(
+                        **trade_pyd_model.model_dump(
+                            exclude={
+                                "premium",
+                                "broker_id",
+                                "symbol",
+                                "received_at",
+                                "future_entry_price",
+                            },
+                            exclude_none=True,
+                        )
+                    )
+                    async_session.add(trade_db_model)
+                    await async_session.flush([trade_db_model])
+                    msg = (
+                        f"[ {crucial_details} ] - new trade: [ {trade_db_model.id} ] added to DB"
+                    )
+                    logging.info(msg)
+                    trade_id = trade_db_model.id
+                    # TODO: enable once testing is done
+                    await push_trade_to_redis(
                         async_redis_client=async_redis_client,
-                        strategy_pyd_model=strategy_pyd_model,
-                        expiry_date=kwargs["futures_expiry_date"],
-                        signal_pyd_model=signal_pyd_model,
-                        async_httpx_client=async_httpx_client,
-                    )
-
-                    logging.info(
-                        f"[ {crucial_details} ] - Slippage: [ {future_exit_price - signal_pyd_model.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_pyd_model.future_entry_price_received} ] "
-                    )
-                    trades_key = f"{signal_pyd_model.strategy_id}"
-                    exiting_trades_json = await async_redis_client.hget(trades_key, redis_hash)
-                    # initiate exit_trade
-                    exiting_trades_json_list = json.loads(exiting_trades_json)
-                    logging.info(
-                        f"[ {kwargs['crucial_details']} ] - Existing total: {len(exiting_trades_json_list)} trades to be closed"
-                    )
-                    redis_trade_pyd_model_list = TypeAdapter(
-                        List[RedisTradePydModel]
-                    ).validate_python([json.loads(trade) for trade in exiting_trades_json_list])
-
-                    (
-                        updated_data,
-                        total_ongoing_profit,
-                        total_future_profit,
-                    ) = await calculate_profits(
-                        strike_exit_price_dict=strike_exit_price_dict,
-                        future_exit_price=future_exit_price,
-                        signal_pyd_model=signal_pyd_model,
-                        redis_trade_pyd_model_list=redis_trade_pyd_model_list,
-                        strategy_pyd_model=strategy_pyd_model,
-                    )
-                    logging.info(
-                        f" [ {crucial_details} ] - adding profit: [ {total_ongoing_profit} ] and future profit: [ {total_future_profit} ]"
-                    )
-
-                    # update database with the updated data
-                    await close_trades_in_db_and_remove_from_redis(
-                        updated_data=updated_data,
-                        strategy_pyd_model=strategy_pyd_model,
-                        total_profit=total_ongoing_profit,
-                        total_future_profit=total_future_profit,
-                        total_redis_trades=len(redis_trade_pyd_model_list),
-                        async_redis_client=async_redis_client,
-                        redis_strategy_key_hash=f"{trades_key} {redis_hash}",
+                        trade_db_model=trade_db_model,
+                        signal_type=initial_order_pyd_model.action,
                         crucial_details=crucial_details,
                     )
+                else:
+                    exit_price = updated_order_pyd_model.averageprice
+                    # construct signal pyd model the way we receive it from tradingview
+                    # action will be the opposite of the initial_order_pyd_model.action, replace action with position and when constructing signal action then with strategy position and
+                    action = (
+                        SignalTypeEnum.BUY
+                        if initial_order_pyd_model.action == SignalTypeEnum.SELL
+                        else SignalTypeEnum.SELL
+                    )
+                    if is_futures_strategy(strategy_pyd_model=strategy_pyd_model):
+                        pass
+                    else:
+                        if is_short_strategy(strategy_pyd_model=strategy_pyd_model):
+                            if initial_order_pyd_model.option_type == OptionTypeEnum.CE:
+                                action = SignalTypeEnum.BUY
+                            else:
+                                action = SignalTypeEnum.SELL
+                        else:
+                            if initial_order_pyd_model.option_type == OptionTypeEnum.CE:
+                                action = SignalTypeEnum.SELL
+                            else:
+                                action = SignalTypeEnum.BUY
 
-                    # TODO: dont move get_async_angelone_client as dependency
-                    #  because strategy_pyd_model is dependant on signal_pyd_model
-                    #  which is not available in this request
-                    async_angelone_client = await get_async_angelone_client(
-                        async_redis_client=async_redis_client,
+                    # now received_at will the time when angelone pushes the order updates
+                    signal_pyd_model = SignalPydModel(
+                        strategy_id=strategy_pyd_model.id,
+                        future_entry_price_received=initial_order_pyd_model.future_entry_price_received,
+                        received_at=datetime.datetime.utcnow(),
+                        action=action,
+                    )
+
+                    crucial_details = get_crucial_details(
+                        signal_pyd_model=signal_pyd_model, strategy_pyd_model=strategy_pyd_model
+                    )
+                    kwargs, redis_hash = await get_angel_one_pre_trade_kwargs(
+                        signal_pyd_model=signal_pyd_model,
                         strategy_pyd_model=strategy_pyd_model,
+                        async_redis_client=async_redis_client,
                     )
-                    # update kwargs with
-                    kwargs["ongoing_profit"] = total_ongoing_profit
-                    await task_open_angelone_trade_position(
-                        **kwargs,
-                        async_angelone_client=async_angelone_client,
-                    )
+                    kwargs["crucial_details"] = crucial_details
+
+                    if not is_futures_strategy(strategy_pyd_model=strategy_pyd_model):
+                        strike_exit_price_dict = {initial_order_pyd_model.strike: exit_price}
+                        future_exit_price = await get_future_price(
+                            async_redis_client=async_redis_client,
+                            strategy_pyd_model=strategy_pyd_model,
+                            expiry_date=kwargs["futures_expiry_date"],
+                            signal_pyd_model=signal_pyd_model,
+                            async_httpx_client=async_httpx_client,
+                        )
+
+                        logging.info(
+                            f"[ {crucial_details} ] - Slippage: [ {future_exit_price - signal_pyd_model.future_entry_price_received} points ] introduced for future_exit_price: [ {signal_pyd_model.future_entry_price_received} ] "
+                        )
+                        trades_key = f"{signal_pyd_model.strategy_id}"
+                        exiting_trades_json = await async_redis_client.hget(
+                            trades_key, redis_hash
+                        )
+                        # initiate exit_trade
+                        exiting_trades_json_list = json.loads(exiting_trades_json)
+                        logging.info(
+                            f"[ {kwargs['crucial_details']} ] - Existing total: {len(exiting_trades_json_list)} trades to be closed"
+                        )
+                        redis_trade_pyd_model_list = TypeAdapter(
+                            List[RedisTradePydModel]
+                        ).validate_python(
+                            [json.loads(trade) for trade in exiting_trades_json_list]
+                        )
+
+                        # TODO: handle closing multiple trades at once i.e need to assign which trades are closed with which orders
+                        trade_id = redis_trade_pyd_model_list[0].id
+
+                        (
+                            updated_data,
+                            total_ongoing_profit,
+                            total_future_profit,
+                        ) = await calculate_profits(
+                            strike_exit_price_dict=strike_exit_price_dict,
+                            future_exit_price=future_exit_price,
+                            signal_pyd_model=signal_pyd_model,
+                            redis_trade_pyd_model_list=redis_trade_pyd_model_list,
+                            strategy_pyd_model=strategy_pyd_model,
+                        )
+                        logging.info(
+                            f" [ {crucial_details} ] - adding profit: [ {total_ongoing_profit} ] and future profit: [ {total_future_profit} ]"
+                        )
+
+                        # update database with the updated data
+                        await close_trades_in_db_and_remove_from_redis(
+                            updated_data=updated_data,
+                            strategy_pyd_model=strategy_pyd_model,
+                            total_profit=total_ongoing_profit,
+                            total_future_profit=total_future_profit,
+                            total_redis_trades=len(redis_trade_pyd_model_list),
+                            async_redis_client=async_redis_client,
+                            redis_strategy_key_hash=f"{trades_key} {redis_hash}",
+                            crucial_details=crucial_details,
+                        )
+
+                        # TODO: dont move get_async_angelone_client as dependency
+                        #  because strategy_pyd_model is dependant on signal_pyd_model
+                        #  which is not available in this request
+                        async_angelone_client = await get_async_angelone_client(
+                            async_redis_client=async_redis_client,
+                            strategy_pyd_model=strategy_pyd_model,
+                        )
+                        # update kwargs with
+                        kwargs["ongoing_profit"] = total_ongoing_profit
+                        await task_open_angelone_trade_position(
+                            **kwargs,
+                            async_angelone_client=async_angelone_client,
+                        )
 
         # Update the order with new status and text
         update_query = (
@@ -253,6 +268,7 @@ async def angel_one_webhook_order_updates(
                 orderstatus=updated_order_pyd_model.orderstatus,
                 text=updated_order_pyd_model.text,
                 executed_price=updated_order_pyd_model.averageprice,
+                trade_id=trade_id,
             )
         )
         await async_session.execute(update_query)
