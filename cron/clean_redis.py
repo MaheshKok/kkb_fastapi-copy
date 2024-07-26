@@ -90,9 +90,13 @@ async def delete_keys(redis_client: Redis, keys_to_delete: List[str]) -> None:
     logging.info(f"Deleted {len(keys_to_delete)} keys.")
 
 
-async def clean_redis(redis_client: Redis) -> None:
+async def clean_redis(redis_client: Redis = None) -> None:
     """Main function to clean Redis."""
     logging.info("Starting clean_redis...")
+    if not redis_client:
+        config = get_config()
+        redis_client = get_redis_client(config)
+
     keys = await redis_client.keys()
 
     keys_with_date = get_keys_with_date(keys)

@@ -30,7 +30,7 @@ def generate_angel_one_complete_symbol(
             symbol=symbol,
             expiry_date=expiry_date,
             strike=strike,
-            option_type=option_type.value,
+            option_type=option_type,
         )
 
     if option_type and is_fut:

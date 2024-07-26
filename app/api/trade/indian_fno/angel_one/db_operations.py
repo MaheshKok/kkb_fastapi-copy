@@ -1,9 +1,10 @@
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import text
 
 from app.database.schemas.order import OrderDBModel
 from app.database.session_manager.db_session import Database
+from app.pydantic_models.angel_one import EntryExitEnum
 from app.pydantic_models.angel_one import InitialOrderPydModel
 from app.pydantic_models.angel_one import OrderDataPydModel
 from app.pydantic_models.angel_one import UpdatedOrderPydModel
@@ -17,7 +18,7 @@ async def dump_angel_one_order_in_db(
     strategy_pyd_model: StrategyPydModel,
     signal_pyd_model: SignalPydModel,
     crucial_details: str,
-    entry_exit: str,
+    entry_exit: EntryExitEnum,
 ):
     async with Database() as async_session:
         create_order_pyd_model = InitialOrderPydModel(
@@ -34,7 +35,7 @@ async def dump_angel_one_order_in_db(
         async_session.add(order_db_model)
         await async_session.commit()
         logging.info(
-            f"[ {crucial_details} ] - new angel one buy order: [{order_db_model.unique_order_id}] added to DB"
+            f"[ {crucial_details} ] - new angel_one order: [{order_db_model.unique_order_id}] added to DB"
         )
 
 
@@ -44,10 +45,16 @@ async def get_order_pyd_model(
     # # wait for two second for the order to be created in the DB
     # await asyncio.sleep(1)
     async with Database() as async_session:
+        # TODO: for some reason, it is throwing an error i.e. 'Unknown PG numeric type: 1043' because of orderid,
+        #  hence swithed to raw sql
+        # fetch_order_query = await async_session.execute(
+        #     select(OrderDBModel).filter_by(order_id=updated_order_pyd_model.orderid)
+        # )
         fetch_order_query = await async_session.execute(
-            select(OrderDBModel).filter_by(order_id=updated_order_pyd_model.orderid)
+            text('SELECT * FROM "order" WHERE order_id = :order_id'),
+            {"order_id": updated_order_pyd_model.orderid},
         )
-        order_db_model = fetch_order_query.scalars().one_or_none()
+        order_db_model = fetch_order_query.fetchone()
         if not order_db_model:
             raise Exception(
                 f"Angel One Order: [ {updated_order_pyd_model.orderid} ] not found in DB"

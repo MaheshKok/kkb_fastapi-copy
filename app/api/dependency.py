@@ -86,7 +86,7 @@ async def get_cfd_strategy_pyd_model(cfd_payload_pyd_model: CFDPayloadPydModel):
 
 
 async def get_async_httpx_client() -> AsyncClient:
-    limits = Limits(max_connections=10, max_keepalive_connections=5)
+    limits = Limits(max_connections=20, max_keepalive_connections=10)
     client = AsyncClient(http2=True, limits=limits)
     try:
         yield client

@@ -47,3 +47,4 @@ class TradeDBModel(Base):
         index=True,
     )
     strategy = relationship("StrategyDBModel", back_populates="trades")
+    orders = relationship("OrderDBModel", back_populates="trade", cascade="all, delete")

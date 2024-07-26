@@ -30,7 +30,7 @@ async def get_strategy_pyd_model_from_order(
         return StrategyPydModel.model_validate(strategy_db_model)
 
 
-async def get_strategy_angelone_client(
+async def get_async_angelone_client(
     async_redis_client: Redis = Depends(get_async_redis_client),
     strategy_pyd_model: StrategyPydModel = Depends(get_strategy_pyd_model),
 ) -> AsyncAngelOneClient:

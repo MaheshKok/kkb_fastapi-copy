@@ -52,7 +52,10 @@ async def cache_ongoing_trades(async_redis_client):
             select(TradeDBModel).filter_by(exit_at=None)
         )
         ongoing_trades_model = live_trades_query.scalars().all()
-        redis_key_trade_db_models_dict = {}
+        redis_key_trade_db_models_dict = {
+            str(strategy_db_model.id): {} for strategy_db_model in strategy_db_models
+        }
+
         for ongoing_trade_db_model in ongoing_trades_model:
             if ongoing_trade_db_model.option_type:
                 redis_hash = (
@@ -78,6 +81,13 @@ async def cache_ongoing_trades(async_redis_client):
                 strategy_id,
                 redis_strategy_hash_trade_db_models_dict,
             ) in redis_key_trade_db_models_dict.items():
+                if not redis_strategy_hash_trade_db_models_dict:
+                    keys = await async_redis_client.hkeys(strategy_id)
+                    for key in keys:
+                        if key != "strategy":
+                            # this will make sure that if theres any discrepancy in db and redis, then redis will be updated
+                            await async_redis_client.hdel(strategy_id, key)
+
                 for (
                     redis_strategy_hash,
                     trade_db_models_list,

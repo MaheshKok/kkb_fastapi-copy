@@ -51,6 +51,11 @@ class ExchangeEnum(str, Enum):
     CDS = "CDS"
 
 
+class EntryExitEnum(str, Enum):
+    ENTRY = "ENTRY"
+    EXIT = "EXIT"
+
+
 class OrderPayloadPydModel(BaseModel):
     class Config:
         use_enum_values = True
@@ -79,7 +84,8 @@ class InitialOrderPydModel(BaseModel):
     expiry: datetime.date
     action: SignalTypeEnum
     strategy_id: uuid.UUID
-    entry_exit: str
+    entry_exit: EntryExitEnum
+    trade_id: Optional[uuid.UUID] = None
 
 
 class InstrumentPydModel(BaseModel):

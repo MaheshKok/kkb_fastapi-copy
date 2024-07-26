@@ -28,6 +28,9 @@ from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
+from app.pydantic_models.angel_one import EntryExitEnum
+from app.pydantic_models.angel_one import InitialOrderPydModel
+from app.pydantic_models.angel_one import UpdatedOrderPydModel
 from app.pydantic_models.broker import AngelOneInstrumentPydModel
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import OptionTypeEnum
@@ -400,7 +403,7 @@ def set_quantity(
     lots_to_open: int,
 ) -> None:
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if is_short_sell_strategy(strategy_pyd_model):
+        if is_short_strategy(strategy_pyd_model):
             signal_pyd_model.quantity = -lots_to_open
         else:
             signal_pyd_model.quantity = lots_to_open
@@ -521,9 +524,7 @@ async def get_margin_required(
     # tradeType = BUY or SELL
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
         trade_type = (
-            SignalTypeEnum.SELL
-            if is_short_sell_strategy(strategy_pyd_model)
-            else SignalTypeEnum.BUY
+            SignalTypeEnum.SELL if is_short_strategy(strategy_pyd_model) else SignalTypeEnum.BUY
         )
     else:
         trade_type = signal_type
@@ -552,7 +553,7 @@ async def get_margin_required(
 def get_angel_one_options_trading_symbol(
     *, symbol: str, expiry_date: date, strike: int | float, option_type: OptionTypeEnum
 ) -> str:
-    return f"{symbol}{(expiry_date.strftime(ANGELONE_EXPIRY_DATE_FORMAT)).upper()}{int(strike)}{option_type}"
+    return f"{symbol}{(expiry_date.strftime(ANGELONE_EXPIRY_DATE_FORMAT)).upper()}{int(float(strike))}{option_type}"
 
 
 def get_angel_one_futures_trading_symbol(symbol: str, expiry_date: date) -> str:
@@ -922,9 +923,21 @@ def is_futures_strategy(strategy_pyd_model: StrategyPydModel):
     return strategy_pyd_model.instrument_type == InstrumentTypeEnum.FUTIDX
 
 
-def is_short_sell_strategy(strategy_pyd_model: StrategyPydModel):
+def is_short_strategy(strategy_pyd_model: StrategyPydModel):
     return strategy_pyd_model.position == PositionEnum.SHORT
 
 
 def is_buy_signal(signal_pyd_model: SignalPydModel):
     return signal_pyd_model.action == SignalTypeEnum.BUY
+
+
+def is_entry_order(order_pyd_model: InitialOrderPydModel):
+    return order_pyd_model.entry_exit == EntryExitEnum.ENTRY
+
+
+def is_order_complete(order_pyd_model: UpdatedOrderPydModel):
+    return order_pyd_model.status == "complete"
+
+
+def get_crucial_details(strategy_pyd_model: StrategyPydModel, signal_pyd_model: SignalPydModel):
+    return f"{strategy_pyd_model.symbol} {strategy_pyd_model.id} {strategy_pyd_model.instrument_type} {signal_pyd_model.action}"

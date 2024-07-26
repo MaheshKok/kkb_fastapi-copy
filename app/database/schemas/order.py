@@ -18,6 +18,8 @@ class OrderDBModel(Base):
 
     unique_order_id = Column(UUID(as_uuid=True), primary_key=True)
     order_id = Column(String, nullable=False)
+    status = Column(String, nullable=True)
+    orderstatus = Column(String, nullable=True)
     instrument = Column(String, nullable=False, index=True)
     quantity = Column(Integer, default=25, nullable=False)
 
@@ -28,10 +30,19 @@ class OrderDBModel(Base):
 
     strike = Column(Float, nullable=True)
     option_type = Column(String, nullable=True, index=True)
+    executed_price = Column(Float, nullable=True)
     expiry = Column(Date, index=True, nullable=False)
-    action = Column(String, nullable=False, index=True)
+    action = Column(String, nullable=False)
     entry_exit = Column(String, nullable=False, index=True)
-    # TODO: add a column to identify the order was to create a position or close a position i.e entry or exit
+    text = Column(String, nullable=True)
+    trade_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("trade.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    trade = relationship("TradeDBModel", back_populates="orders")
+
     strategy_id = Column(
         UUID(as_uuid=True),
         ForeignKey("strategy.id", ondelete="CASCADE"),

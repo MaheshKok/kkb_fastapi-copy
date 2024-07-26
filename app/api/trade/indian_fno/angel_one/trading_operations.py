@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from starlette import status
 
 from app.api.trade.indian_fno.angel_one.redis_operations import get_angel_one_instrument_details
-from app.api.trade.indian_fno.utils import is_short_sell_strategy
+from app.api.trade.indian_fno.utils import is_short_strategy
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
 from app.pydantic_models.angel_one import DurationEnum
 from app.pydantic_models.angel_one import ExchangeEnum
@@ -211,20 +211,20 @@ async def create_angel_one_order(
             if order_response_pyd_model.status:
                 if order_response_pyd_model.data:
                     logging.info(
-                        f"[  {crucial_details} ] - Successfully placed angel one buy order: {order_response_pyd_model.data}"
+                        f"[  {crucial_details} ] - Successfully placed angel_one order: {order_response_pyd_model.data}"
                     )
                     return order_response_pyd_model
             else:
-                msg = f"[ {crucial_details} ] - Error while placing angel one buy order: {order_response_pyd_model.message}"
+                msg = f"[ {crucial_details} ] - Error while placing angel_one order: {order_response_pyd_model.message}"
                 logging.error(msg)
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg)
         except Exception:
-            msg = f"[ {crucial_details} ] - Invalid response format from angel one buy order: {response}"
+            msg = f"[ {crucial_details} ] - Invalid response format from angel_one order: {response}"
             logging.error(msg)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg)
 
     except HTTPException as e:
-        logging.error(f"[ {crucial_details} ] - error while creating angel one buy order {e}")
+        logging.error(f"[ {crucial_details} ] - error while creating angel_one order {e}")
         traceback.print_exc()
         raise HTTPException(status_code=e.status_code, detail=e.detail)
 
@@ -241,7 +241,7 @@ def get_expiry_date_to_trade(
 
     current_time = datetime.datetime.utcnow()
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if is_short_sell_strategy(strategy_pyd_model):
+        if is_short_strategy(strategy_pyd_model):
             if current_time.time() > datetime.time(hour=9, minute=45):
                 current_expiry_date = next_expiry_date
         else:

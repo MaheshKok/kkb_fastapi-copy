@@ -15,7 +15,7 @@ from app.api.trade.indian_fno.alice_blue.tasks import task_entry_trade
 from app.api.trade.indian_fno.alice_blue.tasks import task_exit_trade
 from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
 from app.api.trade.indian_fno.utils import get_future_price_from_redis
-from app.api.trade.indian_fno.utils import is_short_sell_strategy
+from app.api.trade.indian_fno.utils import is_short_strategy
 from app.api.trade.indian_fno.utils import set_option_type
 from app.core.config import get_config
 from app.database.base import get_db_url
@@ -33,7 +33,7 @@ from app.utils.constants import OptionType
 
 def get_action(strategy_pyd_model: StrategyPydModel, trade_db_model: RedisTradePydModel):
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if is_short_sell_strategy(strategy_pyd_model):
+        if is_short_strategy(strategy_pyd_model):
             if trade_db_model.option_type == OptionType.CE:
                 return SignalTypeEnum.SELL
             else:

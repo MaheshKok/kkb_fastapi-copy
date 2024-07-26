@@ -24,6 +24,9 @@ def upgrade() -> None:
         "order",
         sa.Column("order_id", sa.String(), nullable=False),
         sa.Column("unique_order_id", sa.UUID(), nullable=False),
+        sa.Column("status", sa.String(), nullable=True),
+        sa.Column("orderstatus", sa.String(), nullable=True),
+        sa.Column("text", sa.String(), nullable=True),
         sa.Column("instrument", sa.String(), nullable=False),
         sa.Column("quantity", sa.Integer(), nullable=False),
         sa.Column("entry_exit", sa.String(), nullable=False),
@@ -32,13 +35,15 @@ def upgrade() -> None:
         sa.Column("entry_at", postgresql.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("strike", sa.Float(), nullable=True),
         sa.Column("option_type", sa.String(), nullable=True),
+        sa.Column("executed_price", sa.String(), nullable=True),
         sa.Column("expiry", sa.Date(), nullable=False),
         sa.Column("action", sa.String(), nullable=False),
         sa.Column("strategy_id", sa.UUID(), nullable=False),
         sa.ForeignKeyConstraint(["strategy_id"], ["strategy.id"], ondelete="CASCADE"),
+        sa.Column("trade_id", sa.UUID(), nullable=True),
+        sa.ForeignKeyConstraint(["trade_id"], ["trade.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("unique_order_id"),
     )
-    op.create_index(op.f("ix_order_action"), "order", ["action"], unique=False)
     op.create_index(op.f("ix_order_expiry"), "order", ["expiry"], unique=False)
     op.create_index(op.f("ix_order_instrument"), "order", ["instrument"], unique=False)
     op.create_index(op.f("ix_order_option_type"), "order", ["option_type"], unique=False)
@@ -53,6 +58,5 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_order_option_type"), table_name="order")
     op.drop_index(op.f("ix_order_instrument"), table_name="order")
     op.drop_index(op.f("ix_order_expiry"), table_name="order")
-    op.drop_index(op.f("ix_order_action"), table_name="order")
     op.drop_table("order")
     # ### end Alembic commands ###

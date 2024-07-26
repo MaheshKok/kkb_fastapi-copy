@@ -5,7 +5,6 @@ from typing import List
 
 import aioredis
 from aioredis import Redis
-from httpx import AsyncClient
 
 from app.api.trade.indian_fno.angel_one.db_operations import dump_angel_one_order_in_db
 from app.api.trade.indian_fno.angel_one.trading_operations import create_angel_one_order
@@ -14,11 +13,11 @@ from app.api.trade.indian_fno.utils import get_angel_one_options_trading_symbol
 from app.api.trade.indian_fno.utils import get_lots_to_open
 from app.api.trade.indian_fno.utils import get_margin_required
 from app.api.trade.indian_fno.utils import get_strike_and_entry_price_from_option_chain
-from app.api.trade.indian_fno.utils import is_buy_signal
 from app.api.trade.indian_fno.utils import is_futures_strategy
-from app.api.trade.indian_fno.utils import is_short_sell_strategy
+from app.api.trade.indian_fno.utils import is_short_strategy
 from app.api.trade.indian_fno.utils import set_quantity
 from app.broker_clients.async_angel_one import AsyncAngelOneClient
+from app.pydantic_models.angel_one import EntryExitEnum
 from app.pydantic_models.angel_one import TransactionTypeEnum
 from app.pydantic_models.strategy import StrategyPydModel
 from app.pydantic_models.trade import RedisTradePydModel
@@ -66,7 +65,7 @@ async def handle_futures_trade(
         lots_to_open=lots_to_open,
     )
 
-    if is_short_sell_strategy(strategy_pyd_model):
+    if is_short_strategy(strategy_pyd_model):
         transaction_type = TransactionTypeEnum.SELL
     else:
         transaction_type = TransactionTypeEnum.BUY
@@ -87,7 +86,7 @@ async def handle_futures_trade(
         strategy_pyd_model=strategy_pyd_model,
         signal_pyd_model=signal_pyd_model,
         crucial_details=crucial_details,
-        entry_exit="ENTRY",
+        entry_exit=EntryExitEnum.ENTRY,
     )
     return "successfully added trade to db"
 
@@ -113,15 +112,15 @@ async def handle_options_trade(
         is_future=False,
     )
 
-    strike_and_entry_price = await (
-        get_strike_and_entry_price_from_option_chain(
-            option_chain=option_chain,
-            signal_pyd_model=signal_pyd_model,
-            premium=strategy_pyd_model.premium,
-        ),
+    strike_and_entry_price = await get_strike_and_entry_price_from_option_chain(
+        option_chain=option_chain,
+        signal_pyd_model=signal_pyd_model,
+        premium=strategy_pyd_model.premium,
     )
 
     strike, entry_price = strike_and_entry_price
+    # TODO: remove strike from signal_pyd_model and rather pass it as an argument everywhere
+    signal_pyd_model.strike = strike
 
     angel_one_trading_symbol = get_angel_one_options_trading_symbol(
         symbol=strategy_pyd_model.symbol,
@@ -151,7 +150,7 @@ async def handle_options_trade(
         lots_to_open=lots_to_open,
     )
 
-    if is_short_sell_strategy(strategy_pyd_model):
+    if is_short_strategy(strategy_pyd_model):
         transaction_type = TransactionTypeEnum.SELL
     else:
         transaction_type = TransactionTypeEnum.BUY
@@ -173,7 +172,7 @@ async def handle_options_trade(
         strategy_pyd_model=strategy_pyd_model,
         signal_pyd_model=signal_pyd_model,
         crucial_details=crucial_details,
-        entry_exit="ENTRY",
+        entry_exit=EntryExitEnum.ENTRY,
     )
     return "successfully added trade to db"
 
@@ -184,15 +183,13 @@ async def task_open_angelone_trade_position(
     signal_pyd_model: SignalPydModel,
     async_redis_client: aioredis.StrictRedis,
     strategy_pyd_model: StrategyPydModel,
-    async_httpx_client: AsyncClient,
     crucial_details: str,
     async_angelone_client: AsyncAngelOneClient,
     futures_expiry_date: date,
     options_expiry_date: date = None,
-    only_futures: bool = False,
     ongoing_profit: int = 0,
 ):
-    if only_futures:
+    if is_futures_strategy(strategy_pyd_model):
         return await handle_futures_trade(
             signal_pyd_model=signal_pyd_model,
             async_redis_client=async_redis_client,
@@ -221,6 +218,8 @@ async def task_exit_angelone_trade_position(
     redis_trade_pyd_model_list: List[RedisTradePydModel],
     async_angelone_client: AsyncAngelOneClient,
     crucial_details: str,
+    futures_expiry_date: date,
+    options_expiry_date: date,
 ):
     # TODO: in future decide based on strategy new column, strategy_type:
     # if strategy_position is "every" then close all ongoing trades and buy new trade
@@ -253,7 +252,7 @@ async def task_exit_angelone_trade_position(
                 strategy_pyd_model=strategy_pyd_model,
                 signal_pyd_model=signal_pyd_model,
                 crucial_details=crucial_details,
-                entry_exit="EXIT",
+                entry_exit=EntryExitEnum.EXIT,
             )
         else:
             """
@@ -269,13 +268,10 @@ async def task_exit_angelone_trade_position(
                         # To exit this position, we need to sell the Put Option (PE)
                         exit_position = sell PE
             """
-            if is_short_sell_strategy(strategy_pyd_model):
-                transaction_type = signal_pyd_model.action.upper()
+            if is_short_strategy(strategy_pyd_model):
+                transaction_type = TransactionTypeEnum.BUY
             else:
-                if is_buy_signal(signal_pyd_model):
-                    transaction_type = TransactionTypeEnum.SELL
-                else:
-                    transaction_type = TransactionTypeEnum.BUY
+                transaction_type = TransactionTypeEnum.SELL
 
             strike_option_type_mappings = {}
             for trade in redis_trade_pyd_model_list:
@@ -306,12 +302,16 @@ async def task_exit_angelone_trade_position(
                     option_type=option_type,
                 )
 
+                signal_pyd_model.strike = strike
+                # get remove of strike, option_type, quantity from signal_pyd_model and rather have a OptionParams
+                signal_pyd_model.option_type = option_type
+                signal_pyd_model.quantity = quantity
                 await dump_angel_one_order_in_db(
                     order_data_pyd_model=order_response_pyd_model.data,
                     strategy_pyd_model=strategy_pyd_model,
                     signal_pyd_model=signal_pyd_model,
                     crucial_details=crucial_details,
-                    entry_exit="EXIT",
+                    entry_exit=EntryExitEnum.EXIT,
                 )
     except Exception as e:
         logging.error(
