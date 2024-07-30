@@ -278,9 +278,8 @@ async def task_exit_angelone_trade_position(
                         strike_option_type_mappings[key] + trade.quantity
                     )
                 else:
-                    strike_option_type_mappings[
-                        f"{trade.strike}_{trade.option_type}"
-                    ] = trade.quantity
+                    key = f"{trade.strike}_{trade.option_type}"
+                    strike_option_type_mappings[key] = trade.quantity
 
             # TODO: how to figure out how many trades are closed and at what price,
             # we get tradingsymbol in webhook updated order which is enough
