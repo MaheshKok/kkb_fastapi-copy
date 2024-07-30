@@ -50,6 +50,7 @@ if __name__ == "__main__":
     try:
         # import uvloop
         # import asyncio
+        #
         # asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
         uvicorn.run(
             app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), log_level="debug"

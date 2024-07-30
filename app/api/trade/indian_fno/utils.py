@@ -402,7 +402,7 @@ def set_quantity(
     signal_pyd_model: SignalPydModel,
     lots_to_open: int,
 ) -> None:
-    if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
+    if is_options_strategy(strategy_pyd_model):
         if is_short_strategy(strategy_pyd_model):
             signal_pyd_model.quantity = -lots_to_open
         else:
@@ -921,6 +921,10 @@ async def compute_trade_data_needed_for_closing_trade(
 
 def is_futures_strategy(strategy_pyd_model: StrategyPydModel):
     return strategy_pyd_model.instrument_type == InstrumentTypeEnum.FUTIDX
+
+
+def is_options_strategy(strategy_pyd_model: StrategyPydModel):
+    return strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX
 
 
 def is_short_strategy(strategy_pyd_model: StrategyPydModel):

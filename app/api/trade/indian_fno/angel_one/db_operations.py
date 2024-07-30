@@ -1,6 +1,9 @@
 import logging
+from uuid import UUID
 
 from sqlalchemy import text
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.schemas.order import OrderDBModel
 from app.database.session_manager.db_session import Database
@@ -60,3 +63,29 @@ async def get_order_pyd_model(
                 f"Angel One Order: [ {updated_order_pyd_model.orderid} ] not found in DB"
             )
         return InitialOrderPydModel.model_validate(order_db_model)
+
+
+async def update_order_in_db(
+    *,
+    async_session: AsyncSession,
+    initial_order_pyd_model: InitialOrderPydModel,
+    updated_order_pyd_model: UpdatedOrderPydModel,
+    trade_id: UUID,
+    crucial_details: str,
+):
+    update_query = (
+        update(OrderDBModel)
+        .where(OrderDBModel.unique_order_id == initial_order_pyd_model.unique_order_id)
+        .values(
+            status=updated_order_pyd_model.status,
+            orderstatus=updated_order_pyd_model.orderstatus,
+            text=updated_order_pyd_model.text,
+            executed_price=updated_order_pyd_model.averageprice,
+            trade_id=trade_id,
+        )
+    )
+    await async_session.execute(update_query)
+    await async_session.commit()
+    logging.info(
+        f"[ {crucial_details} ] - order: {initial_order_pyd_model.unique_order_id} updated in DB"
+    )

@@ -6,8 +6,8 @@ from typing import List
 import aioredis
 from aioredis import Redis
 
+from app.api.trade.indian_fno.angel_one.broker_trading_operations import create_angel_one_order
 from app.api.trade.indian_fno.angel_one.db_operations import dump_angel_one_order_in_db
-from app.api.trade.indian_fno.angel_one.trading_operations import create_angel_one_order
 from app.api.trade.indian_fno.utils import get_angel_one_futures_trading_symbol
 from app.api.trade.indian_fno.utils import get_angel_one_options_trading_symbol
 from app.api.trade.indian_fno.utils import get_lots_to_open
@@ -65,10 +65,7 @@ async def handle_futures_trade(
         lots_to_open=lots_to_open,
     )
 
-    if is_short_strategy(strategy_pyd_model):
-        transaction_type = TransactionTypeEnum.SELL
-    else:
-        transaction_type = TransactionTypeEnum.BUY
+    transaction_type = signal_pyd_model.action.upper()
 
     order_response_pyd_model = await create_angel_one_order(
         async_angelone_client=async_angelone_client,
@@ -218,8 +215,8 @@ async def task_exit_angelone_trade_position(
     redis_trade_pyd_model_list: List[RedisTradePydModel],
     async_angelone_client: AsyncAngelOneClient,
     crucial_details: str,
-    futures_expiry_date: date,
-    options_expiry_date: date,
+    futures_expiry_date: date = None,
+    options_expiry_date: date = None,
 ):
     # TODO: in future decide based on strategy new column, strategy_type:
     # if strategy_position is "every" then close all ongoing trades and buy new trade

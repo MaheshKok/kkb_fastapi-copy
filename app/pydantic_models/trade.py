@@ -134,6 +134,66 @@ class EntryTradePydModel(SignalPydModel):
                 return {**values, "instrument": instrument}
 
 
+class FuturesEntryTradePydModel(SignalPydModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    entry_price: Optional[float] = Field(description="Entry Price", example=350.5, default=None)
+    future_entry_price: Optional[float] = Field(
+        description="Future Entry Price", example=40600.5, default=None
+    )
+    quantity: int = Field(description="Quantity", example=15)
+    entry_at: datetime = Field(
+        description="Placed At",
+        default_factory=datetime.utcnow,
+        example="2023-05-22 05:11:04.117358+00",
+    )
+    entry_received_at: datetime = Field(
+        description="Received At", example="2023-05-22 05:11:01.117358"
+    )
+
+    expiry: date = Field(description="Expiry", example="2023-05-22")
+    instrument: str = Field(description="Instrument name", example="BANKNIFTY27APR23FUT")
+    action: SignalTypeEnum = Field(description="buy or sell signal", example="buy")
+
+    @model_validator(mode="before")
+    def populate_instrument(cls, values):
+        # it must send symbol
+        if isinstance(values, dict):
+            values["future_entry_price_received"] = round(
+                values["future_entry_price_received"], 2
+            )
+            if values.get("instrument"):
+                return values
+
+            # generate instrument name based on symbol, expiry and option_type and strike
+            if values.get("option_type"):
+                instrument = generate_trading_symbol(
+                    symbol=values["symbol"],
+                    expiry=values["expiry"],
+                    option_type=values["option_type"],
+                    strike=values["strike"],
+                )
+                return {**values, "instrument": instrument}
+            else:
+                instrument = generate_trading_symbol(
+                    symbol=values["symbol"], expiry=values["expiry"], is_fut=True
+                )
+                return {**values, "instrument": instrument}
+
+
+class OptionsEntryTradePydModel(FuturesEntryTradePydModel):
+    model_config = ConfigDict(from_attributes=True)
+    strike: float = Field(description="Strike", example=42500.0, default=None)
+
+    # option type is decided based on strategy's position column
+    # if strategy position is long and signal action is buy, then option type is CE else PE
+    # if strategy position is short and signal action is buy, then option type is PE else CE
+    option_type: OptionTypeEnum = Field(
+        description="Option Type",
+        example="CE",
+    )
+
+
 # below schema is used only for as Response Model in endpoints where trades are retrieved from DB
 class DBEntryTradePydModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
