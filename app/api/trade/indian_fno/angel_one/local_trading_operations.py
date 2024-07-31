@@ -17,7 +17,6 @@ from app.api.trade.indian_fno.utils import calculate_profits
 from app.api.trade.indian_fno.utils import close_trades_in_db_and_remove_from_redis
 from app.api.trade.indian_fno.utils import get_crucial_details
 from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
-from app.api.trade.indian_fno.utils import get_future_price
 from app.api.trade.indian_fno.utils import get_future_price_from_redis
 from app.api.trade.indian_fno.utils import get_futures_profit
 from app.api.trade.indian_fno.utils import get_opposite_trade_option_type
@@ -298,12 +297,10 @@ async def handle_options_exit_order(
     kwargs["crucial_details"] = crucial_details
 
     strike_exit_price_dict = {initial_order_pyd_model.strike: exit_price}
-    future_exit_price = await get_future_price(
+    future_exit_price = await get_future_price_from_redis(
         async_redis_client=async_redis_client,
         strategy_pyd_model=strategy_pyd_model,
         expiry_date=kwargs["futures_expiry_date"],
-        signal_pyd_model=signal_pyd_model,
-        async_httpx_client=async_httpx_client,
     )
 
     logging.info(
