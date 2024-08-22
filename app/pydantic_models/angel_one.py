@@ -92,27 +92,27 @@ class InstrumentPydModel(BaseModel):
     class Config:
         use_enum_values = True
 
-    exch_seg: ExchangeEnum = Field(..., alias="exch_seg", example="NFO")
-    expiry: str = Field(..., example="29MAY2024")
-    instrumenttype: InstrumentTypeEnum = Field(..., example="FUTIDX")
-    lotsize: int = Field(..., example=15)
-    name: str = Field(..., example="BANKNIFTY")
-    strike: float = Field(..., example="-1.000000")
-    symbol: str = Field(..., example="BANKNIFTY29MAY24FUT")
-    tick_size: float = Field(..., example="5.000000")
-    token: str = Field(..., example="46923")
+    exch_seg: ExchangeEnum = Field(..., alias="exch_seg", examples=["NFO"])
+    expiry: str = Field(..., examples=["29MAY2024"])
+    instrumenttype: InstrumentTypeEnum = Field(..., examples=["FUTIDX"])
+    lotsize: int = Field(..., examples=[15])
+    name: str = Field(..., examples=["BANKNIFTY"])
+    strike: float = Field(..., examples=["-1.000000"])
+    symbol: str = Field(..., examples=["BANKNIFTY29MAY24FUT"])
+    tick_size: float = Field(..., examples=["5.000000"])
+    token: str = Field(..., examples=["46923"])
 
 
 class OrderDataPydModel(BaseModel):
-    script: str = Field(..., example="BANKNIFTY29MAY24FUT")
-    orderid: str = Field(..., example="200910000000111")
-    uniqueorderid: uuid.UUID = Field(..., example="bcd193be-0bb6-476a-b397-a70376d166cb")
+    script: str = Field(..., examples=["BANKNIFTY29MAY24FUT"])
+    orderid: str = Field(..., examples=["200910000000111"])
+    uniqueorderid: uuid.UUID = Field(..., examples=["bcd193be-0bb6-476a-b397-a70376d166cb"])
 
 
 class OrderResponsePydModel(BaseModel):
     status: Optional[bool] = Field(..., example=True)
-    message: str = Field(..., example="SUCCESS")
-    errorcode: str = Field(..., example="AB1012")
+    message: str = Field(..., examples=["SUCCESS"])
+    errorcode: str = Field(..., examples=["AB1012"])
     data: OrderDataPydModel | None = Field(default=None)
 
     class Config:
@@ -120,39 +120,41 @@ class OrderResponsePydModel(BaseModel):
 
 
 class UpdatedOrderPydModel(OrderPayloadPydModel):
-    price: float = Field(..., example=0.0)
-    triggerprice: float = Field(..., example=0.0)
-    quantity: float = Field(..., example="15")
-    disclosedquantity: str = Field(..., example="0")
-    squareoff: float = Field(..., example=0.0)
-    stoploss: float = Field(..., example=0.0)
-    trailingstoploss: float = Field(..., example=0.0)
-    tradingsymbol: str = Field(..., example="BANKNIFTY29MAY24FUT")
-    symboltoken: str = Field(..., example="46923")
-    ordertag: str = Field(..., example="")
+    price: float = Field(..., examples=[0.0])
+    triggerprice: float = Field(..., examples=[0.0])
+    quantity: float = Field(..., examples=["15"])
+    disclosedquantity: str = Field(..., examples=["0"])
+    squareoff: float = Field(..., examples=[0.0])
+    stoploss: float = Field(..., examples=[0.0])
+    trailingstoploss: float = Field(..., examples=[0.0])
+    tradingsymbol: str = Field(..., examples=["BANKNIFTY29MAY24FUT"])
+    symboltoken: str = Field(..., examples=["46923"])
+    ordertag: str = Field(..., examples=[""])
     strikeprice: float = Field(..., example=-1.0)
-    optiontype: str = Field(..., example="XX")
+    optiontype: str = Field(..., examples=["XX"])
     # TODO: try to use datetime.date
-    expirydate: str = Field(..., example="29MAY2024")
-    lotsize: float = Field(..., example="15")
-    cancelsize: float = Field(..., example="0")
-    averageprice: float = Field(..., example=0.0)
-    filledshares: float = Field(..., example="0")
-    unfilledshares: float = Field(..., example="15")
-    orderid: str = Field(..., example="240527001860613")
+    expirydate: str = Field(..., examples=["29MAY2024"])
+    lotsize: float = Field(..., examples=["15"])
+    cancelsize: float = Field(..., examples=["0"])
+    averageprice: float = Field(..., examples=[0.0])
+    filledshares: float = Field(..., examples=["0"])
+    unfilledshares: float = Field(..., examples=["15"])
+    orderid: str = Field(..., examples=["240527001860613"])
     text: str = Field(
         ...,
-        example="RMS:Rule: Position limit including CNC exceeds ,Current:15, limit set:1  for entity account-M57484244 across exchange across segment across product",
+        examples=[
+            "RMS:Rule: Position limit including CNC exceeds ,Current:15, limit set:1  for entity account-M57484244 across exchange across segment across product"
+        ],
     )
-    status: str = Field(..., example="rejected")
-    orderstatus: str = Field(..., example="rejected")
-    updatetime: datetime.datetime = Field(..., example="27-May-2024 22:17:54")
-    exchtime: str = Field(..., example="")
-    exchorderupdatetime: str = Field(..., example="")
-    fillid: str = Field(..., example="")
-    filltime: str = Field(..., example="")
-    parentorderid: str = Field(..., example="")
-    clientcode: str = Field(..., example="M57484244")
+    status: str = Field(..., examples=["rejected"])
+    orderstatus: str = Field(..., examples=["rejected"])
+    updatetime: datetime.datetime = Field(..., examples=["27-May-2024 22:17:54"])
+    exchtime: str = Field(..., examples=[""])
+    exchorderupdatetime: str = Field(..., examples=[""])
+    fillid: str = Field(..., examples=[""])
+    filltime: str = Field(..., examples=[""])
+    parentorderid: str = Field(..., examples=[""])
+    clientcode: str = Field(..., examples=["M57484244"])
 
     class Config:
         populate_by_name = True
