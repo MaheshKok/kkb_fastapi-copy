@@ -1,11 +1,13 @@
 import asyncio
+import datetime
 import io
 import json
-from datetime import datetime
 from itertools import islice
 
 import httpx
 import pandas as pd
+from cron.clean_redis import contains_date
+from cron.clean_redis import is_stale_expiry
 
 from app.core.config import get_config
 from app.database.base import get_redis_client
@@ -21,6 +23,7 @@ async def push_alice_blue_instruments(redis_client):
     # Read the CSV file
     data_stream = io.StringIO(response.text)
     df = pd.read_csv(data_stream)
+    current_date = datetime.date.today()
 
     # Construct the dictionary
     # Note: there are many duplicate keys in the CSV file and they are exact duplicates so don't worry about it
@@ -29,10 +32,15 @@ async def push_alice_blue_instruments(redis_client):
         row_dict = row.to_dict()
         key = row_dict[INSTRUMENT_COLUMN]
         value = json.dumps(row_dict)
-        full_name_row_dict[key] = value
+        if contains_date(key):
+            expiry_date_str = row_dict.get("expiry", row_dict.get("Expiry Date"))
+            if not is_stale_expiry(expiry_date_str, current_date):
+                full_name_row_dict[key] = value
+        else:
+            full_name_row_dict[key] = value
 
-    print("Setting keys in Redis")
-    start_time = datetime.now()
+    print(f"Setting alice blue [ {len(full_name_row_dict)} ] keys in Redis")
+    start_time = datetime.datetime.now()
 
     # Split the dictionary into smaller chunks
     chunk_size = 10000
@@ -48,7 +56,7 @@ async def push_alice_blue_instruments(redis_client):
             await pipe.execute()
 
     print(
-        f"Time taken to set Alice Blue {len(full_name_row_dict)} keys: {datetime.now() - start_time}"
+        f"Time taken to set Alice Blue {len(full_name_row_dict)} keys: {datetime.datetime.now() - start_time}"
     )
 
 
@@ -57,14 +65,20 @@ async def push_angel_one_instruments(redis_client, symbols=None):
     data_stream = json.loads(response.text)
     df = pd.DataFrame(data_stream)
 
+    current_date = datetime.date.today()
     # Construct the dictionary
-    full_name_row_dict = {}
+    full_symbol_to_row_mapping = {}
     if not symbols:
         for _, row in df.iterrows():
             row_dict = row.to_dict()
             trading_symbol = row_dict[SYMBOL_STR]
             value = json.dumps(row_dict)
-            full_name_row_dict[trading_symbol] = value
+            if contains_date(trading_symbol):
+                expiry_date_str = row_dict.get("expiry", row_dict.get("Expiry Date"))
+                if not is_stale_expiry(expiry_date_str, current_date):
+                    full_symbol_to_row_mapping[trading_symbol] = value
+            else:
+                full_symbol_to_row_mapping[trading_symbol] = value
     else:
         for _, row in df.iterrows():
             row_dict = row.to_dict()
@@ -72,10 +86,15 @@ async def push_angel_one_instruments(redis_client, symbols=None):
             trading_symbol = row_dict[SYMBOL_STR]
             if symbol in symbols:
                 value = json.dumps(row_dict)
-                full_name_row_dict[trading_symbol] = value
+                if contains_date(trading_symbol):
+                    expiry_date_str = row_dict.get("expiry", row_dict.get("Expiry Date"))
+                    if not is_stale_expiry(expiry_date_str, current_date):
+                        full_symbol_to_row_mapping[trading_symbol] = value
+                else:
+                    full_symbol_to_row_mapping[trading_symbol] = value
 
-    print("Setting keys in Redis")
-    start_time = datetime.now()
+    print(f"Setting angel one  [ {len(full_symbol_to_row_mapping)} ]  keys in redis")
+    start_time = datetime.datetime.now()
 
     # # Split the dictionary into smaller chunks
     def chunked_dict(d, chunk_size):
@@ -85,13 +104,13 @@ async def push_angel_one_instruments(redis_client, symbols=None):
 
     # # Use a pipeline to set each chunk of key-value pairs in Redis
     async with redis_client.pipeline() as pipe:
-        for chunk in chunked_dict(full_name_row_dict, chunk_size=1000):
+        for chunk in chunked_dict(full_symbol_to_row_mapping, chunk_size=1000):
             pipe.mset(chunk)
             # execute the pipeline after each chunk, otherwise it will throw broken pipe error due to large data
             await pipe.execute()
 
     print(
-        f"Time taken to set Angel One {len(full_name_row_dict)} keys: {datetime.now() - start_time}"
+        f"Time taken to set Angel One {len(full_symbol_to_row_mapping)} keys: {datetime.datetime.now() - start_time}"
     )
 
 

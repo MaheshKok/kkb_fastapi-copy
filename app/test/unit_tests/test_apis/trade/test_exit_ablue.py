@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy import select
 
-from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
-from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
+from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
+from app.broker_clients.async_pya3_alice_blue import AsyncPya3Aliceblue
 from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.schemas import User
@@ -13,8 +13,8 @@ from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.enums import SignalTypeEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import RedisTradePydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import RedisTradePydModel
 from app.test.factory.broker import BrokerFactory
 from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
@@ -67,7 +67,7 @@ async def test_exit_alice_blue_trade_for_long_strategy(
 
         payload = get_test_post_trade_payload(action.value)
         payload["strategy_id"] = str(strategy_db_model.id)
-        strategy_pyd_model = StrategyPydanticModel.model_validate(strategy_db_model)
+        strategy_pyd_model = StrategyPydModel.model_validate(strategy_db_model)
         # set strategy in redis
         await test_async_redis_client.hset(
             str(strategy_db_model.id),
@@ -92,7 +92,7 @@ async def test_exit_alice_blue_trade_for_long_strategy(
             redis_hash,
             json.dumps(
                 [
-                    RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json()
+                    RedisTradePydModel.model_validate(trade_db_model).model_dump_json()
                     for trade_db_model in trade_db_models
                 ]
             ),
@@ -225,7 +225,7 @@ async def test_exit_alice_blue_trade_for_short_strategy(
         payload = get_test_post_trade_payload(action.value)
         payload["strategy_id"] = str(strategy_db_model.id)
 
-        strategy_pyd_model = StrategyPydanticModel.model_validate(strategy_db_model)
+        strategy_pyd_model = StrategyPydModel.model_validate(strategy_db_model)
         # set strategy in redis
         await test_async_redis_client.hset(
             str(strategy_db_model.id),
@@ -250,7 +250,7 @@ async def test_exit_alice_blue_trade_for_short_strategy(
             redis_hash,
             json.dumps(
                 [
-                    RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json()
+                    RedisTradePydModel.model_validate(trade_db_model).model_dump_json()
                     for trade_db_model in trade_db_models
                 ]
             ),
@@ -410,7 +410,7 @@ async def test_exit_alice_blue_trade_for_short_strategy(
 #
 #     # Use monkeypatch to patch the method
 #     monkeypatch.setattr(
-#         "app.services.broker.utils.update_session_token",
+#         "app.services.broker_clients.utils.update_session_token",
 #         AsyncMock(side_effect=mock_update_session_token),
 #     )
 #     response = await test_async_client.post("/api/trades/nfo/options", json=payload)

@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy import select
 
-from app.broker.AsyncPya3AliceBlue import AsyncPya3Aliceblue
+from app.broker_clients.async_pya3_alice_blue import AsyncPya3Aliceblue
 from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.schemas import User
@@ -12,8 +12,8 @@ from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.enums import SignalTypeEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import RedisTradePydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import RedisTradePydModel
 from app.test.factory.broker import BrokerFactory
 from app.test.unit_tests.test_apis.trade import trading_options_url
 from app.test.unit_tests.test_data import get_test_post_trade_payload
@@ -59,7 +59,7 @@ async def test_buy_alice_blue_trade(
         await test_async_redis_client.hset(
             str(strategy_db_model.id),
             STRATEGY,
-            StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
+            StrategyPydModel.model_validate(strategy_db_model).model_dump_json(),
         )
 
         # set trades in redis
@@ -71,7 +71,7 @@ async def test_buy_alice_blue_trade(
             await test_async_redis_client.hset(
                 f"{strategy_db_model.id}",
                 f"{trade_db_model.expiry} {trade_db_model.option_type}",
-                RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json(),
+                RedisTradePydModel.model_validate(trade_db_model).model_dump_json(),
             )
 
         await async_session.commit()
@@ -117,10 +117,10 @@ async def test_buy_alice_blue_trade(
         assert len(redis_trade_json_list) == 1
 
         redis_trade_list = [
-            RedisTradePydanticModel.model_validate_json(trade) for trade in redis_trade_json_list
+            RedisTradePydModel.model_validate_json(trade) for trade in redis_trade_json_list
         ]
         assert redis_trade_list == [
-            RedisTradePydanticModel.model_validate(trade_db_model)
+            RedisTradePydModel.model_validate(trade_db_model)
             for trade_db_model in trade_db_models
         ]
 
@@ -153,7 +153,7 @@ async def test_buy_alice_blue_trade_raise_401(
         await test_async_redis_client.hset(
             str(strategy_db_model.id),
             STRATEGY,
-            StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
+            StrategyPydModel.model_validate(strategy_db_model).model_dump_json(),
         )
 
         # set trades in redis
@@ -165,7 +165,7 @@ async def test_buy_alice_blue_trade_raise_401(
             await test_async_redis_client.hset(
                 str(strategy_db_model.id),
                 f"{trade_db_model.expiry} {trade_db_model.option_type}",
-                RedisTradePydanticModel.model_validate(trade_db_model).model_dump_json(),
+                RedisTradePydModel.model_validate(trade_db_model).model_dump_json(),
             )
 
         await async_session.commit()
@@ -195,7 +195,7 @@ async def test_buy_alice_blue_trade_raise_401(
 
     # Use monkeypatch to patch the method
     monkeypatch.setattr(
-        "app.broker.utils.update_ablue_session_token",
+        "app.broker_clients.utils.update_ablue_session_token",
         AsyncMock(side_effect=mock_update_session_token),
     )
 
@@ -223,9 +223,9 @@ async def test_buy_alice_blue_trade_raise_401(
         assert len(redis_trade_json_list) == 1
 
         redis_trade_list = [
-            RedisTradePydanticModel.model_validate_json(trade) for trade in redis_trade_json_list
+            RedisTradePydModel.model_validate_json(trade) for trade in redis_trade_json_list
         ]
         assert redis_trade_list == [
-            RedisTradePydanticModel.model_validate(trade_db_model)
+            RedisTradePydModel.model_validate(trade_db_model)
             for trade_db_model in trade_db_models
         ]

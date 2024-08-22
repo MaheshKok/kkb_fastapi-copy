@@ -4,12 +4,12 @@ import httpx
 from cron.update_daily_profit import get_holidays_list
 from cron.update_daily_profit import get_last_working_date
 
-from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_alice_blue
-from app.api.trade.IndianFNO.utils import get_monthly_expiry_date_from_alice_blue
+from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_alice_blue
+from app.api.trade.indian_fno.utils import get_monthly_expiry_date_from_alice_blue
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.enums import SignalTypeEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
 from app.test.factory.daily_profit import DailyProfitFactory
 from app.test.factory.strategy import StrategyFactory
 from app.test.factory.trade import CompletedTradeFactory
@@ -64,7 +64,7 @@ async def create_open_trades(
             future_option_chain = await get_option_chain(
                 async_redis_client=test_async_redis_client,
                 expiry=futures_expiry_date,
-                strategy_pyd_model=StrategyPydanticModel.model_validate(strategy),
+                strategy_pyd_model=StrategyPydModel.model_validate(strategy),
                 is_future=True,
             )
             future_entry_price_received = float(future_option_chain.get("FUT"))
@@ -75,7 +75,7 @@ async def create_open_trades(
                 option_chain = await get_option_chain(
                     async_redis_client=test_async_redis_client,
                     expiry=options_expiry_date,
-                    strategy_pyd_model=StrategyPydanticModel.model_validate(strategy),
+                    strategy_pyd_model=StrategyPydModel.model_validate(strategy),
                     option_type=OptionType.CE if ce_trade else OptionType.PE,
                     is_future=False,
                 )
@@ -138,7 +138,7 @@ async def create_close_trades(
             future_option_chain = await get_option_chain(
                 async_redis_client=test_async_redis_client,
                 expiry=futures_expiry_date,
-                strategy_pyd_model=StrategyPydanticModel.model_validate(strategy),
+                strategy_pyd_model=StrategyPydModel.model_validate(strategy),
                 is_future=True,
             )
             if instrument_type == InstrumentTypeEnum.OPTIDX:
@@ -148,7 +148,7 @@ async def create_close_trades(
                 option_chain = await get_option_chain(
                     async_redis_client=test_async_redis_client,
                     expiry=options_expiry_date,
-                    strategy_pyd_model=StrategyPydanticModel.model_validate(strategy),
+                    strategy_pyd_model=StrategyPydModel.model_validate(strategy),
                     option_type=OptionType.CE,
                     is_future=False,
                 )

@@ -8,8 +8,8 @@ from sqlalchemy import select
 from app.api.dependency import get_async_redis_client
 from app.database.schemas import StrategyDBModel
 from app.database.session_manager.db_session import Database
-from app.pydantic_models.strategy import StrategyCreatePydanticModel
-from app.pydantic_models.strategy import StrategyPydanticModel
+from app.pydantic_models.strategy import StrategyCreatePydModel
+from app.pydantic_models.strategy import StrategyPydModel
 
 
 strategy_router = APIRouter(
@@ -18,7 +18,7 @@ strategy_router = APIRouter(
 )
 
 
-@strategy_router.get("/strategy", response_model=list[StrategyPydanticModel])
+@strategy_router.get("/strategy", response_model=list[StrategyPydModel])
 async def get_strategies():
     async with Database() as async_session:
         fetch_strategy_query = await async_session.execute(select(StrategyDBModel))
@@ -26,9 +26,9 @@ async def get_strategies():
         return strategy_db_models
 
 
-@strategy_router.post("/strategy", response_model=StrategyPydanticModel)
+@strategy_router.post("/strategy", response_model=StrategyPydModel)
 async def post_strategy(
-    strategy_pyd_model: StrategyCreatePydanticModel,
+    strategy_pyd_model: StrategyCreatePydModel,
     async_redis_client: Redis = Depends(get_async_redis_client),
 ):
     async with Database() as async_session:
@@ -40,7 +40,7 @@ async def post_strategy(
         redis_set_result = await async_redis_client.hset(
             str(strategy_db_model.id),
             "strategy",
-            StrategyPydanticModel.model_validate(strategy_db_model).model_dump_json(),
+            StrategyPydModel.model_validate(strategy_db_model).model_dump_json(),
         )
         if not redis_set_result:
             raise Exception(f"Redis set strategy: {strategy_db_model.id} failed")

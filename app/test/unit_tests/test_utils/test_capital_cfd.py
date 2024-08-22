@@ -4,7 +4,7 @@ from decimal import getcontext
 import pytest
 
 from app.api.trade.capital.utils import get_lots_to_trade_and_profit_or_loss
-from app.pydantic_models.strategy import CFDStrategyPydanticModel
+from app.pydantic_models.strategy import CFDStrategyPydModel
 
 
 # I think i got all edge cases covered
@@ -13,7 +13,7 @@ from app.pydantic_models.strategy import CFDStrategyPydanticModel
 @pytest.mark.asyncio
 async def test_get_lots_to_trade():
     getcontext().prec = 28
-    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=10,
@@ -43,7 +43,7 @@ async def test_get_lots_to_trade_for_banknifty():
     # funds required for 45 is just above the available funds even after profit or loss into consideration
     # get_lots_to_trade_and_profit_or_loss produces 30.0 as ans
     getcontext().prec = 28
-    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=15,
@@ -73,7 +73,7 @@ async def test_get_lots_to_trade_20_percent_usage():
     # funds usage percent is 0.2 which comes around 600 and margin required for min quantity is 1000,
     # so in this case 1000 funds would be used to calculate trade lots
     getcontext().prec = 28
-    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=10,
@@ -106,7 +106,7 @@ async def test_get_lots_to_trade_20_percent_usage_for_banknifty():
     # funds usage percent is 0.2 which comes around 600 and margin required for min quantity is 1000,
     # so in this case 1000 funds would be used to calculate trade lots
     getcontext().prec = 28
-    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=15,
@@ -134,7 +134,7 @@ async def test_get_lots_to_trade_20_percent_usage_for_banknifty():
 @pytest.mark.asyncio
 async def test_get_lots_to_trade_for_fixed_contracts():
     getcontext().prec = 28
-    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=10,
@@ -163,7 +163,7 @@ async def test_get_lots_to_trade_for_fixed_contracts():
 @pytest.mark.asyncio
 async def test_get_lots_to_trade_for_fixed_contracts__when_funds_required_is_less():
     getcontext().prec = 28
-    cfd_strategy_pyd_model = CFDStrategyPydanticModel(
+    cfd_strategy_pyd_model = CFDStrategyPydModel(
         id="b9475dee-0ec9-4ca6-815b-cbbfdf2cbc3d",
         instrument="GOLD",
         min_quantity=10,

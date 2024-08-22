@@ -10,12 +10,13 @@ from httpx import AsyncClient
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
-from app.api.dependency import get_angelone_client
-from app.api.trade.IndianFNO.tasks import task_entry_trade
-from app.api.trade.IndianFNO.tasks import task_exit_trade
-from app.api.trade.IndianFNO.utils import get_current_and_next_expiry_from_redis
-from app.api.trade.IndianFNO.utils import get_future_price_from_redis
-from app.api.trade.IndianFNO.utils import set_option_type
+from app.api.dependency import get_default_angelone_client
+from app.api.trade.indian_fno.alice_blue.tasks import task_entry_trade
+from app.api.trade.indian_fno.alice_blue.tasks import task_exit_trade
+from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
+from app.api.trade.indian_fno.utils import get_future_price_from_redis
+from app.api.trade.indian_fno.utils import is_short_strategy
+from app.api.trade.indian_fno.utils import set_option_type
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client
@@ -24,26 +25,24 @@ from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum
 from app.pydantic_models.enums import PositionEnum
 from app.pydantic_models.enums import SignalTypeEnum
-from app.pydantic_models.strategy import StrategyPydanticModel
-from app.pydantic_models.trade import RedisTradePydanticModel
-from app.pydantic_models.trade import SignalPydanticModel
+from app.pydantic_models.strategy import StrategyPydModel
+from app.pydantic_models.trade import RedisTradePydModel
+from app.pydantic_models.trade import SignalPydModel
 from app.utils.constants import OptionType
 
 
-def get_action(
-    strategy_pyd_model: StrategyPydanticModel, trade_db_model: RedisTradePydanticModel
-):
+def get_action(strategy_pyd_model: StrategyPydModel, trade_db_model: RedisTradePydModel):
     if strategy_pyd_model.instrument_type == InstrumentTypeEnum.OPTIDX:
-        if strategy_pyd_model.position == PositionEnum.LONG:
+        if is_short_strategy(strategy_pyd_model):
             if trade_db_model.option_type == OptionType.CE:
-                return SignalTypeEnum.BUY
-            else:
                 return SignalTypeEnum.SELL
+            else:
+                return SignalTypeEnum.BUY
         else:
             if trade_db_model.option_type == OptionType.CE:
-                return SignalTypeEnum.SELL
-            else:
                 return SignalTypeEnum.BUY
+            else:
+                return SignalTypeEnum.SELL
     else:
         if trade_db_model.quantity > 0:
             return SignalTypeEnum.BUY
@@ -61,7 +60,7 @@ async def rollover_to_next_expiry(
     # use different strategy to make it faster and efficient
     async_redis_client = get_redis_client(config)
     async_httpx_client = AsyncClient()
-    async_angelone_client = await get_angelone_client(
+    async_angelone_client = await get_default_angelone_client(
         config=config, async_redis_client=async_redis_client
     )
     future_price_cache = {}
@@ -84,7 +83,7 @@ async def rollover_to_next_expiry(
 
         tasks = []
         for strategy_db_model in strategy_db_models:
-            strategy_pyd_model = StrategyPydanticModel.model_validate(strategy_db_model)
+            strategy_pyd_model = StrategyPydModel.model_validate(strategy_db_model)
 
             # TODO: consider caching this expiry in local memory
             (
@@ -140,9 +139,9 @@ async def rollover_to_next_expiry(
 
             exiting_trades_json_list = json.loads(redis_strategy_data[redis_hash])
             logging.info(f"Existing total: {len(exiting_trades_json_list)} trades to be closed")
-            redis_trade_pyd_model_list = TypeAdapter(
-                List[RedisTradePydanticModel]
-            ).validate_python([json.loads(trade) for trade in exiting_trades_json_list])
+            redis_trade_pyd_model_list = TypeAdapter(List[RedisTradePydModel]).validate_python(
+                [json.loads(trade) for trade in exiting_trades_json_list]
+            )
 
             if strategy_pyd_model.symbol in future_price_cache:
                 future_entry_price_received = future_price_cache[strategy_pyd_model.symbol]
@@ -162,7 +161,7 @@ async def rollover_to_next_expiry(
                 "received_at": str(datetime.utcnow().isoformat()),
             }
 
-            signal_pyd_model = SignalPydanticModel(**signal_payload)
+            signal_pyd_model = SignalPydModel(**signal_payload)
             kwargs = {
                 "signal_pyd_model": signal_pyd_model,
                 "strategy_pyd_model": strategy_pyd_model,

@@ -6,6 +6,7 @@ import sentry_sdk
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
+from cron.clean_redis import clean_redis
 from cron.download_master_contracts import download_master_contract
 from cron.scheduler import task_backup_db
 from cron.scheduler import task_clean_redis
@@ -23,9 +24,10 @@ from app.api.healthcheck import healthcheck_router
 from app.api.strategy import strategy_router
 from app.api.trade import trading_router
 from app.api.trade.binance.crypto import binance_router
-from app.api.trade.capital.Capital import forex_router
-from app.api.trade.IndianFNO.FNO import fno_router
-from app.api.trade.oanda.Oanda import oanda_forex_router
+from app.api.trade.capital.router import forex_router
+from app.api.trade.indian_fno.alice_blue.router import fno_router
+from app.api.trade.indian_fno.angel_one.router import angel_one_router
+from app.api.trade.oanda.router import oanda_forex_router
 from app.core.config import get_config
 from app.database.base import engine_kw
 from app.database.base import get_db_url
@@ -45,6 +47,7 @@ def register_routers(app: FastAPI):
     app.include_router(healthcheck_router)
     app.include_router(trading_router)
     app.include_router(fno_router)
+    app.include_router(angel_one_router)
     app.include_router(strategy_router)
     app.include_router(forex_router)
     app.include_router(binance_router)
@@ -76,6 +79,7 @@ def register_cron_jobs(scheduler: AsyncIOScheduler):
     scheduler.add_job(
         download_master_contract, CronTrigger.from_crontab("45 2 * * *")
     )  # Every day at 02:45
+    scheduler.add_job(clean_redis, CronTrigger.from_crontab("15 3 * * *"))  # Every day at 03:15
     scheduler.add_job(
         task_update_expiry_list, CronTrigger.from_crontab("0 3 * * *")
     )  # Every day at 03:00

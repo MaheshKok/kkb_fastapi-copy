@@ -52,7 +52,10 @@ class StrategyDBModel(Base):
 
     only_on_expiry = Column(Boolean, nullable=False, server_default="False")
     broker_id = Column(
-        UUID(as_uuid=True), ForeignKey("broker.id", ondelete="CASCADE"), nullable=True, index=True
+        UUID(as_uuid=True),
+        ForeignKey("broker.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
     )
     user_id = Column(
         UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
@@ -62,3 +65,4 @@ class StrategyDBModel(Base):
         "DailyProfitDBModel", backref="strategy", cascade="all, delete"
     )
     trades = relationship("TradeDBModel", back_populates="strategy", cascade="all, delete")
+    orders = relationship("OrderDBModel", back_populates="strategy", cascade="all, delete")

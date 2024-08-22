@@ -40,7 +40,10 @@ class CFDStrategyDBModel(Base):
     funds_usage_percent = Column(Float, nullable=False, default=1.0)
 
     broker_id = Column(
-        UUID(as_uuid=True), ForeignKey("broker.id", ondelete="CASCADE"), nullable=True, index=True
+        UUID(as_uuid=True),
+        ForeignKey("broker.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
     )
     user_id = Column(
         UUID(as_uuid=True), ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True

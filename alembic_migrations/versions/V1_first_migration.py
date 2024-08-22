@@ -5,6 +5,7 @@ Revises:
 Create Date: 2023-06-04 23:39:39.609898
 
 """
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -62,7 +63,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.UUID(), nullable=False),
         sa.ForeignKeyConstraint(
             ["broker_id"],
-            ["broker.id"],
+            ["broker_clients.id"],
         ),
         sa.ForeignKeyConstraint(
             ["user_id"],
