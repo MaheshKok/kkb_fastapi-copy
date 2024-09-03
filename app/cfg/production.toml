@@ -1,22 +1,22 @@
 ENVIRONMENT = "production"
 
 [angelone_broker]
-id = "a02d2158-cf03-4527-b8a4-d4f4dee66e6d"
-username = "M57484244"
-password = "4286"
-api_key = "rUhNkLeD"
-totp = "KOZTYAU6NMG7RMZAEZOYIPYJZE"
+id = "uuid"
+username = "username"
+password = "password"
+api_key = "api_key"
+totp = "totp_key"
 
 
 [db]
-host = "l8yc5u.stackhero-network.com"
-port = "5432"
+host = "host"
+port = "port"
 database = "trading"
-username = "admin"
-password = "V7Bqqlbzx6zX9VAmcC0355dzZVNHdiYa"
+username = "user"
+password = "password"
 
 
 [trades_and_option_chain_redis]
-url = "redis://:m0xfzfd1v4r31f8qqzhkjv6gxbpp6saweqfb3m8avrr3frh28bjq@marvelous-orangutan-5ece872ffd.redisgreen.net:11042"
+url = "redis://:password@host:port"
 
-strategy_id_uuid_namespace = "570ad7fe-754f-498b-b8e1-40c5cfcf4763"
+strategy_id_uuid_namespace = "company_uuid"

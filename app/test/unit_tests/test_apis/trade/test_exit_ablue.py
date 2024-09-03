@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redis
-from app.broker_clients.async_pya3_alice_blue import AsyncPya3Aliceblue
+from app.broker_clients.india.async_pya3_alice_blue import AsyncPya3Aliceblue
 from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.schemas import User

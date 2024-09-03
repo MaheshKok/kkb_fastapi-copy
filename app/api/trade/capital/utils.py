@@ -8,7 +8,7 @@ from _decimal import getcontext
 from fastapi import HTTPException
 from sqlalchemy import update
 
-from app.broker_clients.async_capital import AsyncCapitalClient
+from app.broker_clients.uk.async_capital import AsyncCapitalClient
 from app.database.schemas import CFDStrategyDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.strategy import CFDStrategyPydModel

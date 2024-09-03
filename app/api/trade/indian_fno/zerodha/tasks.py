@@ -35,7 +35,7 @@ async def handle_futures_trade(
     ongoing_profit: int,
 ) -> str:
     """
-    Handles the opening of a futures trade with Angel One.
+    Handles the opening of a futures trade with Zerodha.
     """
     angel_one_trading_symbol = get_angel_one_futures_trading_symbol(
         symbol=strategy_pyd_model.symbol,
@@ -175,7 +175,7 @@ async def handle_options_trade(
 
 
 # @profile
-async def task_open_angelone_trade_position(
+async def task_open_zerodha_trade_position(
     *,
     signal_pyd_model: SignalPydModel,
     async_redis_client: aioredis.StrictRedis,
@@ -207,7 +207,7 @@ async def task_open_angelone_trade_position(
         )
 
 
-async def task_exit_angelone_trade_position(
+async def task_exit_zerodha_trade_position(
     *,
     signal_pyd_model: SignalPydModel,
     strategy_pyd_model: StrategyPydModel,

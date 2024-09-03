@@ -24,7 +24,7 @@ from starlette import status
 
 from app.api.trade.indian_fno.alice_blue.utils import buy_alice_blue_trades
 from app.api.trade.indian_fno.alice_blue.utils import close_alice_blue_trades
-from app.broker_clients.async_angel_one import AsyncAngelOneClient
+from app.broker_clients.india.async_angel_one import AsyncAngelOneClient
 from app.database.schemas import StrategyDBModel
 from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database

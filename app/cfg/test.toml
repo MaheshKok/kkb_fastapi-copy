@@ -1,11 +1,11 @@
 ENVIRONMENT = "test"
 
 [angelone_broker]
-id = "a02d2158-cf03-4527-b8a4-d4f4dee66e6d"
-username = "M57484244"
-password = "4286"
-api_key = "rUhNkLeD"
-totp = "KOZTYAU6NMG7RMZAEZOYIPYJZE"
+id = "uuid"
+username = "username"
+password = "password"
+api_key = "api_key"
+totp = "totp_key"
 
 
 [db]
@@ -17,7 +17,7 @@ password = "postgres"
 
 
 [trades_and_option_chain_redis]
-url="rediss://default:AVNS_r8QLpaeqMeB3bM8cKGv@test-redis-maheshkokare100.h.aivencloud.com:19849"
+url="rediss://default:pass@host:port"
 host = "test-redis-maheshkokare100.h.aivencloud.com"
 port = "19849"
 password = "AVNS_r8QLpaeqMeB3bM8cKGv"

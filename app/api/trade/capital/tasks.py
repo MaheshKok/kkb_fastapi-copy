@@ -7,7 +7,7 @@ from app.api.trade.capital.utils import find_position
 from app.api.trade.capital.utils import get_lots_to_trade_and_profit_or_loss
 from app.api.trade.capital.utils import open_order_found
 from app.api.trade.capital.utils import update_cfd_strategy_funds
-from app.broker_clients.async_capital import AsyncCapitalClient
+from app.broker_clients.uk.async_capital import AsyncCapitalClient
 from app.pydantic_models.strategy import CFDStrategyPydModel
 from app.pydantic_models.trade import CFDPayloadPydModel
 

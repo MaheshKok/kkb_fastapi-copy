@@ -20,7 +20,7 @@ from pya3 import ProductType
 from pya3 import TransactionType
 from sqlalchemy import select
 
-from app.broker_clients.async_pya3_alice_blue import AsyncPya3Aliceblue
+from app.broker_clients.india.async_pya3_alice_blue import AsyncPya3Aliceblue
 from app.database.schemas import BrokerDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.broker import BrokerPydModel

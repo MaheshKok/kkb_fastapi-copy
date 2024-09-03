@@ -20,7 +20,7 @@ from app.api.trade.indian_fno.utils import get_lots_to_open
 from app.api.trade.indian_fno.utils import get_margin_required
 from app.api.trade.indian_fno.utils import get_strike_and_entry_price
 from app.api.trade.indian_fno.utils import set_quantity
-from app.broker_clients.async_angel_one import AsyncAngelOneClient
+from app.broker_clients.india.async_angel_one import AsyncAngelOneClient
 from app.pydantic_models.strategy import StrategyPydModel
 from app.pydantic_models.trade import RedisTradePydModel
 from app.pydantic_models.trade import SignalPydModel

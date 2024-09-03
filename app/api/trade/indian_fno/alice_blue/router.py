@@ -23,7 +23,7 @@ from app.api.trade.indian_fno.utils import get_current_and_next_expiry_from_redi
 from app.api.trade.indian_fno.utils import get_opposite_trade_option_type
 from app.api.trade.indian_fno.utils import is_short_strategy
 from app.api.trade.indian_fno.utils import set_option_type
-from app.broker_clients.async_angel_one import AsyncAngelOneClient
+from app.broker_clients.india.async_angel_one import AsyncAngelOneClient
 from app.database.schemas import TradeDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import InstrumentTypeEnum

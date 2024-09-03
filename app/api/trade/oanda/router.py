@@ -18,7 +18,7 @@ from sqlalchemy import select
 from app.api.dependency import get_cfd_strategy_pyd_model
 from app.api.trade import trading_router
 from app.api.trade.capital.utils import update_cfd_strategy_funds
-from app.broker_clients.async_oanda import AsyncAPI
+from app.broker_clients.uk.async_oanda import AsyncAPI
 from app.database.schemas import BrokerDBModel
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.enums import SignalTypeEnum

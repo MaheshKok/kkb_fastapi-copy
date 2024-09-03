@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.trade.indian_fno.alice_blue.utils import get_pya3_obj
 from app.api.trade.indian_fno.alice_blue.utils import update_ablue_session_token
-from app.broker_clients.async_angel_one import AsyncAngelOneClient
+from app.broker_clients.india.async_angel_one import AsyncAngelOneClient
 from app.core.config import get_config
 from app.database.base import get_db_url
 from app.database.base import get_redis_client

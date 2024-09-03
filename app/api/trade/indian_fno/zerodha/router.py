@@ -13,24 +13,22 @@ from app.api.dependency import get_async_httpx_client
 from app.api.dependency import get_async_redis_client
 from app.api.dependency import get_strategy_pyd_model
 from app.api.trade import trading_router
-from app.api.trade.indian_fno.angel_one.db_operations import get_order_pyd_model
-from app.api.trade.indian_fno.angel_one.db_operations import update_order_in_db
-from app.api.trade.indian_fno.angel_one.dependency import get_async_angelone_client
-from app.api.trade.indian_fno.angel_one.dependency import get_strategy_pyd_model_from_order
-from app.api.trade.indian_fno.angel_one.local_trading_operations import (
-    get_angel_one_pre_trade_kwargs,
-)
-from app.api.trade.indian_fno.angel_one.local_trading_operations import handle_futures_entry_order
-from app.api.trade.indian_fno.angel_one.local_trading_operations import handle_futures_exit_order
-from app.api.trade.indian_fno.angel_one.local_trading_operations import handle_options_entry_order
-from app.api.trade.indian_fno.angel_one.local_trading_operations import handle_options_exit_order
-from app.api.trade.indian_fno.angel_one.tasks import task_exit_angelone_trade_position
-from app.api.trade.indian_fno.angel_one.tasks import task_open_angelone_trade_position
 from app.api.trade.indian_fno.utils import get_crucial_details
 from app.api.trade.indian_fno.utils import is_entry_order
 from app.api.trade.indian_fno.utils import is_futures_strategy
 from app.api.trade.indian_fno.utils import is_options_strategy
 from app.api.trade.indian_fno.utils import is_order_complete
+from app.api.trade.indian_fno.zerodha.db_operations import get_order_pyd_model
+from app.api.trade.indian_fno.zerodha.db_operations import update_order_in_db
+from app.api.trade.indian_fno.zerodha.dependency import get_async_angelone_client
+from app.api.trade.indian_fno.zerodha.dependency import get_strategy_pyd_model_from_order
+from app.api.trade.indian_fno.zerodha.local_trading_operations import get_zerodha_pre_trade_kwargs
+from app.api.trade.indian_fno.zerodha.local_trading_operations import handle_futures_entry_order
+from app.api.trade.indian_fno.zerodha.local_trading_operations import handle_futures_exit_order
+from app.api.trade.indian_fno.zerodha.local_trading_operations import handle_options_entry_order
+from app.api.trade.indian_fno.zerodha.local_trading_operations import handle_options_exit_order
+from app.api.trade.indian_fno.zerodha.tasks import task_exit_zerodha_trade_position
+from app.api.trade.indian_fno.zerodha.tasks import task_open_zerodha_trade_position
 from app.broker_clients.india.async_angel_one import AsyncAngelOneClient
 from app.database.session_manager.db_session import Database
 from app.pydantic_models.angel_one import InitialOrderPydModel
@@ -50,8 +48,8 @@ angel_one_router = APIRouter(
 )
 
 
-@angel_one_router.post("/angelone/webhook/orders/updates", status_code=200)
-async def angel_one_webhook_order_updates(
+@angel_one_router.post("/zerodha/webhook/orders/updates", status_code=200)
+async def zerodha_webhook_order_updates(
     updated_order_pyd_model: UpdatedOrderPydModel,
     async_redis_client: Redis = Depends(get_async_redis_client),
     initial_order_pyd_model: InitialOrderPydModel = Depends(get_order_pyd_model),
@@ -59,7 +57,7 @@ async def angel_one_webhook_order_updates(
     async_httpx_client: AsyncClient = Depends(get_async_httpx_client),
 ):
     logging.info(
-        f"Received angelone webhook order updates for order_id: {updated_order_pyd_model.orderid} , unique_order_id: {initial_order_pyd_model.unique_order_id}"
+        f"Received zerodha webhook order updates for order_id: {updated_order_pyd_model.orderid} , unique_order_id: {initial_order_pyd_model.unique_order_id}"
     )
 
     crucial_details = f"{strategy_pyd_model.symbol} {strategy_pyd_model.id} {strategy_pyd_model.instrument_type} {initial_order_pyd_model.action}"
@@ -128,8 +126,8 @@ async def angel_one_webhook_order_updates(
         return "Order processed successfully"
 
 
-@angel_one_router.post("/angelone/nfo", status_code=200)
-async def post_nfo_angel_one_trading(
+@angel_one_router.post("/zerodha/nfo", status_code=200)
+async def post_zerodha_trading(
     signal_pyd_model: SignalPydModel,
     strategy_pyd_model: StrategyPydModel = Depends(get_strategy_pyd_model),
     async_redis_client: Redis = Depends(get_async_redis_client),
@@ -142,7 +140,7 @@ async def post_nfo_angel_one_trading(
     )
     logging.info(f"[ {crucial_details} ] signal received")
 
-    kwargs, redis_hash = await get_angel_one_pre_trade_kwargs(
+    kwargs, redis_hash = await get_zerodha_pre_trade_kwargs(
         signal_pyd_model=signal_pyd_model,
         strategy_pyd_model=strategy_pyd_model,
         async_redis_client=async_redis_client,
@@ -159,14 +157,14 @@ async def post_nfo_angel_one_trading(
         redis_trade_pyd_model_list = TypeAdapter(List[RedisTradePydModel]).validate_python(
             [json.loads(trade) for trade in exiting_trades_json_list]
         )
-        await task_exit_angelone_trade_position(
+        await task_exit_zerodha_trade_position(
             **kwargs,
             async_angelone_client=async_angelone_client,
             redis_trade_pyd_model_list=redis_trade_pyd_model_list,
         )
         msg += " placed order to exit the position"
     else:
-        await task_open_angelone_trade_position(
+        await task_open_zerodha_trade_position(
             **kwargs,
             async_angelone_client=async_angelone_client,
         )

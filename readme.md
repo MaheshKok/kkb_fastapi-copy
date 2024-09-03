@@ -1,5 +1,5 @@
 
-# It is more of a key notes than a readme
+# It is more of a key notes than a readme as it is personal project and not intended yet to be made public
 
 # Expiry Dates Format
 
