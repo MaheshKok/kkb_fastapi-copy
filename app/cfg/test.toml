@@ -18,7 +18,7 @@ password = "postgres"
 
 [trades_and_option_chain_redis]
 url="rediss://default:pass@host:port"
-host = "test-redis-maheshkokare100.h.aivencloud.com"
-port = "19849"
-password = "AVNS_r8QLpaeqMeB3bM8cKGv"
+host = "host"
+port = "port"
+password = "password"
 db = "0"
